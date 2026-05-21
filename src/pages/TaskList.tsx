@@ -64,8 +64,10 @@ interface VertretungItem {
   tasks: {
     title: string
     description: string | null
+    categories?: { emoji: string; name: string } | null
     objects: { address: string; city: string } | null
   } | null
+  users?: { full_name: string } | null
 }
 
 export default function TaskList({ userId, userName, onLogout }: Props) {
@@ -98,6 +100,8 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
   // Tauschbörse state
   const [availableVertretungen, setAvailableVertretungen] = useState<VertretungItem[]>([])
+  const [ownVertretungen, setOwnVertretungen] = useState<VertretungItem[]>([])
+  const [cancellingVertretung, setCancellingVertretung] = useState<string|null>(null)
   const [vertretungDetail, setVertretungDetail] = useState<VertretungItem | null>(null)
   const [takingOver, setTakingOver] = useState(false)
 
@@ -154,12 +158,20 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   }
 
   const fetchVertretungen = async () => {
-    const { data } = await supabase
-      .from('task_assignments')
-      .select('id,due_date,status,user_id,tasks(title,description,objects(address,city))')
-      .eq('status', 'vertretung')
-      .neq('user_id', userId)
-    if (data) setAvailableVertretungen(data as unknown as VertretungItem[])
+    const [othersRes, ownRes] = await Promise.all([
+      supabase
+        .from('task_assignments')
+        .select('id,due_date,status,user_id,tasks(title,description,categories(emoji,name),objects(address,city)),users!task_assignments_user_id_fkey(full_name)')
+        .eq('status', 'vertretung')
+        .neq('user_id', userId),
+      supabase
+        .from('task_assignments')
+        .select('id,due_date,status,user_id,tasks(title,description,categories(emoji,name),objects(address,city))')
+        .eq('status', 'vertretung')
+        .eq('user_id', userId)
+    ])
+    if (othersRes.data) setAvailableVertretungen(othersRes.data as unknown as VertretungItem[])
+    if (ownRes.data) setOwnVertretungen(ownRes.data as unknown as VertretungItem[])
   }
 
   const fetchAssignments = async () => {
@@ -386,6 +398,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
   const takeOverVertretung = async (item: VertretungItem) => {
     setTakingOver(true)
+    const originalUserId = item.user_id
     const { error } = await supabase
       .from('task_assignments')
       .update({ user_id: userId, status: 'offen' })
@@ -394,11 +407,44 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       setAvailableVertretungen(prev => prev.filter(v => v.id !== item.id))
       setVertretungDetail(null)
       showToast('Aufgabe übernommen!', 'ok')
+      // Push notification to original MA
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          await fetch(`https://hdemkyonurqfcohhfbgj.supabase.co/functions/v1/send-push`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify({
+              user_id: originalUserId,
+              title: 'Vertretung übernommen ✅',
+              body: `${item.tasks?.title || 'Deine Aufgabe'} am ${new Date(item.due_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} wurde von einem Kollegen übernommen.`,
+            })
+          })
+        }
+      } catch(e) { /* push optional */ }
       await fetchAssignments()
+      await fetchVertretungen()
     } else {
       showToast('Fehler beim Übernehmen', 'warn')
     }
     setTakingOver(false)
+  }
+
+  const cancelVertretung = async (id: string) => {
+    setCancellingVertretung(id)
+    const { error } = await supabase
+      .from('task_assignments')
+      .update({ status: 'offen' })
+      .eq('id', id)
+      .eq('user_id', userId)
+    if (!error) {
+      setOwnVertretungen(prev => prev.filter(v => v.id !== id))
+      showToast('Vertretungsangebot zurückgezogen', 'ok')
+      await fetchAssignments()
+    } else {
+      showToast('Fehler beim Zurückziehen', 'warn')
+    }
+    setCancellingVertretung(null)
   }
 
   return (
@@ -709,7 +755,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
           </>
         )}
 
-        {activeTab === 'zeit' && <ZeitTab userId={userId} myLeaves={myLeaves} vacationDaysPerYear={vacationDaysPerYear} assignments={assignments} onLeavesChanged={fetchMyLeaves} />}
+        {activeTab === 'zeit' && <ZeitTab userId={userId} myLeaves={myLeaves} vacationDaysPerYear={vacationDaysPerYear} assignments={assignments} onLeavesChanged={fetchMyLeaves} availableVertretungen={availableVertretungen} ownVertretungen={ownVertretungen} onTakeOver={takeOverVertretung} onCancelVertretung={cancelVertretung} takingOver={takingOver} cancellingVertretung={cancellingVertretung} />}
         {activeTab === 'profile' && <ProfileTab userName={userName} initials={initials} onLogout={onLogout} userId={userId} pushEnabled={pushEnabled} pushSupported={pushSupported} onTogglePush={togglePush} onBugReport={()=>setShowBugReport(true)} />}
       </div>
 
@@ -1028,14 +1074,20 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   )
 }
 
-function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesChanged }: {
+function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesChanged, availableVertretungen, ownVertretungen, onTakeOver, onCancelVertretung, takingOver, cancellingVertretung }: {
   userId: string
   myLeaves: any[]
   vacationDaysPerYear: number
   assignments: any[]
   onLeavesChanged: () => Promise<void>
+  availableVertretungen: VertretungItem[]
+  ownVertretungen: VertretungItem[]
+  onTakeOver: (item: VertretungItem) => Promise<void>
+  onCancelVertretung: (id: string) => Promise<void>
+  takingOver: boolean
+  cancellingVertretung: string | null
 }) {
-  const [section, setSection] = useState<'uebersicht'|'urlaub'|'krank'>('uebersicht')
+  const [section, setSection] = useState<'uebersicht'|'urlaub'|'krank'|'tauschboerse'>('uebersicht')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [note, setNote] = useState('')
@@ -1100,13 +1152,15 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
       {/* Section tabs */}
       <div style={{ display:'flex', gap:8, marginBottom:20 }}>
         {([
-          { id:'uebersicht', icon:'bar_chart',    label:'Übersicht' },
-          { id:'urlaub',     icon:'beach_access', label:'Urlaub' },
-          { id:'krank',      icon:'sick',         label:'Krankmeldung' },
+          { id:'uebersicht',   icon:'bar_chart',    label:'Übersicht' },
+          { id:'urlaub',       icon:'beach_access', label:'Urlaub' },
+          { id:'krank',        icon:'sick',         label:'Krank' },
+          { id:'tauschboerse', icon:'swap_horiz',   label:'Tauschbörse', badge: availableVertretungen.length + ownVertretungen.length },
         ] as const).map(t=>(
-          <button key={t.id} onClick={()=>setSection(t.id)} style={{ flex:1, padding:'10px 8px', borderRadius:14, border:`1.5px solid ${section===t.id?'var(--pri)':'var(--outline)'}`, background:section===t.id?'var(--pri-xl)':'var(--surf-card)', color:section===t.id?'var(--pri)':'var(--txt-muted)', fontSize:10, fontWeight:700, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:section===t.id?'var(--pri)':'var(--txt-muted)' }}>{t.icon}</span>
+          <button key={t.id} onClick={()=>setSection(t.id)} style={{ flex:1, padding:'10px 4px', borderRadius:14, border:`1.5px solid ${section===t.id?'#7c3aed':'var(--outline)'}`, background:section===t.id?(t.id==='tauschboerse'?'#f3e8ff':'var(--pri-xl)'):'var(--surf-card)', color:section===t.id?(t.id==='tauschboerse'?'#7c3aed':'var(--pri)'):'var(--txt-muted)', fontSize:10, fontWeight:700, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:4, position:'relative' }}>
+            <span className="material-symbols-outlined icon-sm" style={{ color:section===t.id?(t.id==='tauschboerse'?'#7c3aed':'var(--pri)'):'var(--txt-muted)' }}>{t.icon}</span>
             {t.label}
+            {'badge' in t && t.badge > 0 && <span style={{ position:'absolute', top:4, right:4, minWidth:16, height:16, borderRadius:999, background:'#7c3aed', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{t.badge}</span>}
           </button>
         ))}
       </div>
@@ -1321,6 +1375,104 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
           <div style={{ background:'var(--pri-xl)', borderRadius:12, padding:'14px 16px', display:'flex', gap:10, alignItems:'center' }}>
             <span className="material-symbols-outlined" style={{ color:'var(--pri)', flexShrink:0 }}>construction</span>
             <div style={{ fontSize:13, color:'var(--pri)', fontWeight:600 }}>Kommt in Phase 3 – Wochenplan & Schichtplanung</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tauschbörse ── */}
+      {section === 'tauschboerse' && (
+        <div>
+          {/* Verfügbare Vertretungen */}
+          <div style={{ marginBottom:20 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+              <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Verfügbare Vertretungen</h3>
+              <span style={{ background:'#7c3aed', color:'#fff', borderRadius:999, fontSize:10, fontWeight:800, padding:'2px 8px' }}>{availableVertretungen.length}</span>
+            </div>
+            {availableVertretungen.length === 0 ? (
+              <div style={{ background:'var(--surf-low)', borderRadius:14, padding:'20px 16px', textAlign:'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:32, color:'var(--txt-muted)', display:'block', marginBottom:6, opacity:0.4 }}>swap_horiz</span>
+                <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Aktuell sucht kein Kollege eine Vertretung.</div>
+              </div>
+            ) : availableVertretungen.map(v => {
+              const task = v.tasks
+              const obj = task?.objects
+              const dateStr = new Date(v.due_date).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})
+              return (
+                <div key={v.id} style={{ background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:10, border:'1.5px solid #e9d5ff' }}>
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:12 }}>
+                    <div style={{ width:40, height:40, borderRadius:12, background:'#f3e8ff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
+                      {task?.categories?.emoji || '📋'}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:700 }}>{task?.title || '–'}</div>
+                      {obj && <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{obj.address}, {obj.city}</div>}
+                      <div style={{ fontSize:12, color:'#7c3aed', marginTop:3, fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:14 }}>event</span>{dateStr}
+                      </div>
+                      {v.users?.full_name && (
+                        <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2, display:'flex', alignItems:'center', gap:4 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:12 }}>person</span>
+                          Von: {v.users.full_name}
+                        </div>
+                      )}
+                      {task?.description && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4, fontStyle:'italic' }}>„{task.description}"</div>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => onTakeOver(v)}
+                    disabled={takingOver}
+                    style={{ width:'100%', padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#5b21b6,#7c3aed)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize:16 }}>swap_horiz</span>
+                    Vertretung übernehmen
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Eigene Angebote */}
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+              <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Meine Angebote</h3>
+              <span style={{ background:'var(--surf-high)', color:'var(--txt-muted)', borderRadius:999, fontSize:10, fontWeight:800, padding:'2px 8px' }}>{ownVertretungen.length}</span>
+            </div>
+            {ownVertretungen.length === 0 ? (
+              <div style={{ background:'var(--surf-low)', borderRadius:14, padding:'16px', textAlign:'center' }}>
+                <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Du hast keine offenen Vertretungsangebote.</div>
+                <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Aufgaben können im Aufgaben-Tab zur Vertretung angeboten werden.</div>
+              </div>
+            ) : ownVertretungen.map(v => {
+              const task = v.tasks
+              const obj = task?.objects
+              const dateStr = new Date(v.due_date).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})
+              const isCancelling = cancellingVertretung === v.id
+              return (
+                <div key={v.id} style={{ background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:10, border:'1px solid var(--outline)', display:'flex', alignItems:'flex-start', gap:10 }}>
+                  <div style={{ width:40, height:40, borderRadius:12, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
+                    {task?.categories?.emoji || '📋'}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:700 }}>{task?.title || '–'}</div>
+                    {obj && <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{obj.address}, {obj.city}</div>}
+                    <div style={{ fontSize:12, color:'#7c3aed', marginTop:3, fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:14 }}>event</span>{dateStr}
+                    </div>
+                    <span style={{ display:'inline-flex', alignItems:'center', gap:4, marginTop:6, fontSize:10, fontWeight:700, color:'#7c3aed', background:'#f3e8ff', borderRadius:999, padding:'2px 8px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:12 }}>hourglass_empty</span>Wird gesucht…
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => onCancelVertretung(v.id)}
+                    disabled={isCancelling}
+                    style={{ flexShrink:0, background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, padding:'6px 10px', cursor:'pointer', color:'var(--err-dot)', display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:700 }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize:14 }}>close</span>
+                    {isCancelling ? '…' : 'Zurückziehen'}
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

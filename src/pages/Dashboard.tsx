@@ -5871,11 +5871,13 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
   const [year, setYear]   = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth()) // 0-based
 
-  type ObjRow  = { id:string; name:string; address:string; total:number; done:number; problems:number }
-  type MARow   = { id:string; name:string; done:number; problems:number }
+  type ObjRow  = { id:string; name:string; address:string; total:number; done:number; problems:number; open:number }
+  type MARow   = { id:string; name:string; done:number; problems:number; workMin:number; travelMin:number }
 
   const [objRows, setObjRows]   = useState<ObjRow[]>([])
   const [maRows, setMARows]     = useState<MARow[]>([])
+  const [dayMap, setDayMap]     = useState<Record<string,{done:number;total:number}>>({})
+  const [prevDone, setPrevDone] = useState<number|null>(null)
   const [loading, setLoading]   = useState(false)
   const [exporting, setExporting] = useState(false)
 
@@ -5884,35 +5886,60 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
 
   const load = async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('task_assignments')
-      .select('id,status,user_id,tasks(id,object_id,objects(id,name,address,city)),users(full_name)')
-      .gte('due_date', monthStart)
-      .lte('due_date', monthEnd)
-    setLoading(false)
-    if (!data) return
+    // Previous month range for trend
+    const prevStart = new Date(year, month - 1, 1).toISOString().split('T')[0]
+    const prevEnd   = new Date(year, month, 0).toISOString().split('T')[0]
 
-    // Per Objekt
+    const [curRes, prevRes] = await Promise.all([
+      supabase
+        .from('task_assignments')
+        .select('id,status,due_date,user_id,started_at,completed_at,travel_minutes,tasks(id,object_id,objects(id,name,address,city)),users(full_name)')
+        .gte('due_date', monthStart)
+        .lte('due_date', monthEnd),
+      supabase
+        .from('task_assignments')
+        .select('id,status')
+        .gte('due_date', prevStart)
+        .lte('due_date', prevEnd)
+        .eq('status', 'erledigt')
+    ])
+    setLoading(false)
+    if (!curRes.data) return
+
     const objMap: Record<string, ObjRow> = {}
     const maMap:  Record<string, MARow>  = {}
+    const dMap:   Record<string, {done:number;total:number}> = {}
 
-    for (const a of data as any[]) {
+    for (const a of curRes.data as any[]) {
       const obj = a.tasks?.objects
       if (obj) {
-        if (!objMap[obj.id]) objMap[obj.id] = { id:obj.id, name:obj.name||obj.address, address:obj.address+', '+obj.city, total:0, done:0, problems:0 }
+        if (!objMap[obj.id]) objMap[obj.id] = { id:obj.id, name:obj.name||obj.address, address:obj.address+', '+obj.city, total:0, done:0, problems:0, open:0 }
         objMap[obj.id].total++
         if (a.status === 'erledigt') objMap[obj.id].done++
         if (a.status === 'problem')  objMap[obj.id].problems++
+        if (['offen','in_arbeit'].includes(a.status)) objMap[obj.id].open++
       }
       const u = a.users
       if (u && a.user_id) {
-        if (!maMap[a.user_id]) maMap[a.user_id] = { id:a.user_id, name:u.full_name, done:0, problems:0 }
+        if (!maMap[a.user_id]) maMap[a.user_id] = { id:a.user_id, name:u.full_name, done:0, problems:0, workMin:0, travelMin:0 }
         if (a.status === 'erledigt') maMap[a.user_id].done++
         if (a.status === 'problem')  maMap[a.user_id].problems++
+        if (a.started_at && a.completed_at) {
+          const mins = Math.round((new Date(a.completed_at).getTime() - new Date(a.started_at).getTime()) / 60000)
+          if (mins > 0 && mins < 600) maMap[a.user_id].workMin += mins
+        }
+        if (a.travel_minutes) maMap[a.user_id].travelMin += a.travel_minutes
       }
+      // Day map
+      const d = a.due_date
+      if (!dMap[d]) dMap[d] = { done:0, total:0 }
+      dMap[d].total++
+      if (a.status === 'erledigt') dMap[d].done++
     }
     setObjRows(Object.values(objMap).sort((a,b) => b.total - a.total))
     setMARows(Object.values(maMap).sort((a,b) => b.done - a.done))
+    setDayMap(dMap)
+    setPrevDone(prevRes.data?.length ?? null)
   }
 
   useEffect(() => { load() }, [year, month])
@@ -5984,7 +6011,7 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
         ) : (
           <>
             {/* KPI-Zusammenfassung */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:20 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:14 }}>
               {[
                 { label:'Erledigt', val:totalDone, color:'var(--ok)', bg:'var(--ok-bg)', icon:'task_alt' },
                 { label:'Probleme', val:totalProblems, color:'#93000a', bg:'#ffdad6', icon:'warning' },
@@ -5997,6 +6024,69 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
                 </div>
               ))}
             </div>
+
+            {/* Trend Vormonat */}
+            {prevDone !== null && (() => {
+              const diff = totalDone - prevDone
+              const isUp = diff >= 0
+              return (
+                <div style={{ background: isUp ? 'var(--ok-bg)' : '#fff8e6', borderRadius:12, padding:'10px 14px', marginBottom:16, display:'flex', alignItems:'center', gap:8 }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color: isUp ? 'var(--ok)' : '#b45309' }}>
+                    {isUp ? 'trending_up' : 'trending_down'}
+                  </span>
+                  <span style={{ fontSize:13, fontWeight:700, color: isUp ? 'var(--ok)' : '#b45309' }}>
+                    {isUp ? '+' : ''}{diff} vs. Vormonat
+                  </span>
+                  <span style={{ fontSize:11, color:'var(--txt-muted)', marginLeft:2 }}>
+                    ({prevDone} erledigt im Vormonat)
+                  </span>
+                </div>
+              )
+            })()}
+
+            {/* Tages-Heatmap */}
+            {Object.keys(dayMap).length > 0 && (() => {
+              const daysInMonth = new Date(year, month+1, 0).getDate()
+              const cells = Array.from({length: daysInMonth}, (_, i) => {
+                const d = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`
+                const info = dayMap[d]
+                const q = info && info.total > 0 ? info.done / info.total : null
+                return { day: i+1, d, q, info }
+              })
+              return (
+                <div style={{ marginBottom:20 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Aktivität im Monat</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:4 }}>
+                    {['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => (
+                      <div key={d} style={{ fontSize:9, fontWeight:700, color:'var(--txt-muted)', textAlign:'center', paddingBottom:2 }}>{d}</div>
+                    ))}
+                    {Array((new Date(year, month, 1).getDay() + 6) % 7).fill(null).map((_,i) => <div key={`pad-${i}`}/>)}
+                    {cells.map(({day, q, info}) => {
+                      const bg = q === null ? 'var(--surf-low)'
+                        : q === 1 ? '#16a34a'
+                        : q >= 0.7 ? '#4ade80'
+                        : q >= 0.4 ? '#fbbf24'
+                        : '#f87171'
+                      const isToday = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}` === new Date().toISOString().split('T')[0]
+                      return (
+                        <div key={day} title={info ? `${info.done}/${info.total} erledigt` : undefined}
+                          style={{ aspectRatio:'1', borderRadius:6, background:bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color: q !== null ? '#fff' : 'var(--txt-muted)', border: isToday ? '2px solid var(--pri)' : 'none', boxSizing:'border-box' }}>
+                          {day}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{ display:'flex', gap:10, marginTop:8, flexWrap:'wrap' }}>
+                    {[['#16a34a','100%'],['#4ade80','≥70%'],['#fbbf24','≥40%'],['#f87171','<40%'],['var(--surf-low)','Kein Termin']].map(([c,l])=>(
+                      <div key={l} style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'var(--txt-muted)' }}>
+                        <div style={{ width:10, height:10, borderRadius:3, background:c }}/>
+                        {l}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Per Objekt */}
             <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Nach Objekt</div>
@@ -6036,21 +6126,43 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
             {maRows.length > 0 && (
               <>
                 <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', margin:'20px 0 8px' }}>Nach Mitarbeiter</div>
-                {maRows.map(r => (
-                  <div key={r.id} style={{ background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:12, boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
-                    <div style={{ width:36, height:36, borderRadius:11, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, fontFamily:'var(--font-head)', flexShrink:0 }}>
-                      {r.name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}
-                    </div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{r.name}</div>
-                      <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>
-                        <span style={{ color:'var(--ok)', fontWeight:700 }}>{r.done}</span> erledigt
-                        {r.problems > 0 && <> · <span style={{ color:'#93000a', fontWeight:700 }}>{r.problems}</span> {r.problems===1?'Problem':'Probleme'}</>}
+                {maRows.map(r => {
+                  const wH = Math.floor(r.workMin/60), wM = r.workMin%60
+                  const tH = Math.floor(r.travelMin/60), tM = r.travelMin%60
+                  return (
+                  <div key={r.id} style={{ background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, boxShadow:'0 1px 4px rgba(0,0,0,0.05)' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom: r.workMin > 0 ? 10 : 0 }}>
+                      <div style={{ width:36, height:36, borderRadius:11, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, fontFamily:'var(--font-head)', flexShrink:0 }}>
+                        {r.name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}
                       </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{r.name}</div>
+                        <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>
+                          <span style={{ color:'var(--ok)', fontWeight:700 }}>{r.done}</span> erledigt
+                          {r.problems > 0 && <> · <span style={{ color:'#93000a', fontWeight:700 }}>{r.problems}</span> {r.problems===1?'Problem':'Probleme'}</>}
+                        </div>
+                      </div>
+                      <div style={{ fontSize:16, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)' }}>{r.done}</div>
                     </div>
-                    <div style={{ fontSize:16, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)' }}>{r.done}</div>
+                    {(r.workMin > 0 || r.travelMin > 0) && (
+                      <div style={{ display:'flex', gap:8, paddingTop:8, borderTop:'1px solid var(--outline)' }}>
+                        {r.workMin > 0 && (
+                          <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:8, padding:'4px 8px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:13, color:'var(--pri)' }}>schedule</span>
+                            {wH}h {wM > 0 ? `${wM}m` : ''} Arbeit
+                          </div>
+                        )}
+                        {r.travelMin > 0 && (
+                          <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:8, padding:'4px 8px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:13, color:'#b45309' }}>directions_car</span>
+                            {tH > 0 ? `${tH}h ` : ''}{tM > 0 ? `${tM}m` : `${tH}h`} Fahrzeit
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  )
+                })}
               </>
             )}
             <div style={{ height:20 }} />
