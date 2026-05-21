@@ -493,7 +493,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
               })()}
               <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:12 }}>
                 <h1 style={s.h1}>Dashboard</h1>
-                <p style={{ fontSize:12, color:'rgba(255,255,255,0.55)', fontStyle:'italic', marginBottom:6, textAlign:'right', maxWidth:180, lineHeight:1.4 }}>{motivation}</p>
+                <p style={{ fontSize:12, color:'var(--txt-muted)', fontStyle:'italic', marginBottom:6, textAlign:'right', maxWidth:200, lineHeight:1.4 }}>{motivation}</p>
               </div>
               <p style={s.sub}>{today.getDate()}. {MONTHS[today.getMonth()]} {today.getFullYear()}</p>
               <button onClick={() => setShowMonthOverlay(true)} style={{ marginTop:6, display:'inline-flex', alignItems:'center', gap:4, padding:'4px 10px', borderRadius:20, border:'1px solid rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.9)', fontSize:11, fontWeight:700, cursor:'pointer' }}>
