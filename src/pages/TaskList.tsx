@@ -73,7 +73,7 @@ interface VertretungItem {
 export default function TaskList({ userId, userName, onLogout }: Props) {
   const [assignments, setAssignments] = useState<TaskAssignment[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'tasks'|'zeit'|'profile'>('tasks')
+  const [activeTab, setActiveTab] = useState<'start'|'tasks'|'zeit'|'profile'>('start')
   const [selectedDay, setSelectedDay] = useState(new Date())
   const [weekOffset, setWeekOffset] = useState(0)
   const [detail, setDetail] = useState<TaskAssignment | null>(null)
@@ -459,8 +459,10 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
               <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginTop:1 }}>{today.getDate()}. {MONTHS[today.getMonth()]} {today.getFullYear()}</div>
             </div>
           </div>
-          <button style={{ background:'rgba(255,255,255,0.15)', border:'none', width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-            <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:20 }}>notifications</span>
+          <button
+            onClick={() => setActiveTab('profile')}
+            style={{ background: activeTab==='profile'?'rgba(255,255,255,0.30)':'rgba(255,255,255,0.15)', border:`2px solid ${activeTab==='profile'?'#fff':'rgba(255,255,255,0.3)'}`, width:36, height:36, borderRadius:'50%', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Manrope,sans-serif', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0, transition:'all 0.15s' }}>
+            {initials}
           </button>
         </div>
       </header>
@@ -607,7 +609,141 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
       {/* Content */}
       <div style={s.content}>
-        {activeTab === 'tasks' && (
+        {activeTab === 'start' && (() => {
+          const todayStr2 = today.toISOString().split('T')[0]
+          const todayAll = assignments.filter(a => a.due_date === todayStr2)
+          const todayOpen2 = todayAll.filter(a => a.status==='offen'||a.status==='in_arbeit').length
+          const todayDone2 = todayAll.filter(a => a.status==='erledigt').length
+          const todayProb2 = todayAll.filter(a => a.status==='problem').length
+          const todayTotal2 = todayAll.length
+          const nextOpen = assignments.find(a => (a.status==='offen'||a.status==='in_arbeit') && a.due_date >= todayStr2)
+          const hour = new Date().getHours()
+          const greeting = hour < 12 ? 'Guten Morgen' : hour < 17 ? 'Guten Tag' : 'Guten Abend'
+          const activeTodayLeave = myLeaves.find(l => l.status!=='abgelehnt' && todayStr2 >= l.from_date && todayStr2 <= l.to_date)
+          const pct = todayTotal2 > 0 ? Math.round((todayDone2/todayTotal2)*100) : 0
+          const upcomingDays = Array.from({length:7}, (_,i) => {
+            const d = new Date(today); d.setDate(today.getDate()+i)
+            const ds = d.toISOString().split('T')[0]
+            const dayTasks = assignments.filter(a => a.due_date===ds)
+            const openC = dayTasks.filter(a=>a.status==='offen'||a.status==='in_arbeit').length
+            const doneC = dayTasks.filter(a=>a.status==='erledigt').length
+            const hasProb = dayTasks.some(a=>a.status==='problem')
+            return { d, ds, openC, doneC, hasProb, total: dayTasks.length }
+          })
+          return (
+            <div style={{ paddingBottom:8 }}>
+              {/* ── Greeting Card ── */}
+              <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:22, padding:'20px 18px 22px', marginBottom:16, color:'#fff' }}>
+                <div style={{ fontSize:11, fontWeight:700, opacity:0.7, letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:4 }}>{greeting}</div>
+                <div style={{ fontSize:28, fontWeight:800, fontFamily:'var(--font-head)', letterSpacing:'-0.02em', lineHeight:1.1 }}>{firstName} 👋</div>
+                <div style={{ fontSize:12, opacity:0.8, marginTop:4 }}>{today.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+                <div style={{ marginTop:16, height:6, borderRadius:99, background:'rgba(255,255,255,0.25)', overflow:'hidden' }}>
+                  <div style={{ height:'100%', borderRadius:99, background:'#fff', width:`${pct}%`, transition:'width 0.5s' }}/>
+                </div>
+                <div style={{ marginTop:6, fontSize:11, opacity:0.85 }}>
+                  {todayDone2 === todayTotal2 && todayTotal2 > 0 ? '🎉 Alle Aufgaben heute erledigt!' : `${todayDone2} von ${todayTotal2} Aufgaben heute erledigt`}
+                </div>
+              </div>
+
+              {/* ── KPI Row ── */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:16 }}>
+                {[
+                  { label:'Offen',   val:todayOpen2, icon:'pending_actions', color:'#b45309',  bg:'#fff8e6' },
+                  { label:'Erledigt',val:todayDone2, icon:'task_alt',        color:'#166534',  bg:'#dcfce7' },
+                  { label:'Probleme',val:todayProb2, icon:'warning',         color:'#b91c1c',  bg:'#ffeaea' },
+                ].map(k => (
+                  <div key={k.label} style={{ background:'var(--surf-card)', borderRadius:16, padding:'12px 10px', border:'1px solid var(--outline)', textAlign:'center' }}>
+                    <div style={{ width:32, height:32, borderRadius:10, background:k.bg, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 6px' }}>
+                      <span className="material-symbols-outlined icon-fill" style={{ fontSize:17, color:k.color }}>{k.icon}</span>
+                    </div>
+                    <div style={{ fontSize:22, fontWeight:800, fontFamily:'var(--font-head)', color:k.val>0?k.color:'var(--txt)', lineHeight:1 }}>{k.val}</div>
+                    <div style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', marginTop:3, textTransform:'uppercase', letterSpacing:'0.06em' }}>{k.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Active leave notice ── */}
+              {activeTodayLeave && (
+                <div style={{ background: activeTodayLeave.request_type==='krankmeldung'?'#ffeaea':'var(--pri-xl)', borderRadius:16, padding:'13px 16px', marginBottom:16, display:'flex', alignItems:'center', gap:12, border:`1.5px solid ${activeTodayLeave.request_type==='krankmeldung'?'#fca5a5':'var(--pri)'}` }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:24, color:activeTodayLeave.request_type==='krankmeldung'?'#dc2626':'var(--pri)', flexShrink:0 }}>{activeTodayLeave.request_type==='krankmeldung'?'sick':'beach_access'}</span>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color:activeTodayLeave.request_type==='krankmeldung'?'#b91c1c':'var(--pri)' }}>{activeTodayLeave.request_type==='krankmeldung'?'Krankmeldung aktiv':'Urlaub heute'}</div>
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{new Date(activeTodayLeave.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – {new Date(activeTodayLeave.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Next task ── */}
+              {nextOpen && (
+                <div style={{ marginBottom:16 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Nächste Aufgabe</div>
+                  <div style={{ background:'var(--surf-card)', borderRadius:18, padding:'16px 16px 14px', border:'1px solid var(--outline)', boxShadow:'0 2px 12px rgba(0,0,0,0.05)' }}>
+                    <div style={{ display:'flex', gap:12, alignItems:'flex-start', marginBottom:14 }}>
+                      <div style={{ width:44, height:44, borderRadius:14, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
+                        {nextOpen.tasks?.categories?.emoji || '📋'}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:15, fontWeight:800, color:'var(--txt)', fontFamily:'var(--font-head)', marginBottom:2 }}>{nextOpen.tasks?.title}</div>
+                        {nextOpen.tasks?.objects && (
+                          <div style={{ fontSize:12, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:4 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:13 }}>location_on</span>
+                            {nextOpen.tasks.objects.address}, {nextOpen.tasks.objects.city}
+                          </div>
+                        )}
+                        <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+                          <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999, background: nextOpen.due_date===todayStr2?'#fff8e6':'var(--surf-low)', color: nextOpen.due_date===todayStr2?'#b45309':'var(--txt-muted)' }}>
+                            {nextOpen.due_date===todayStr2 ? '⚡ Heute' : formatDue(nextOpen.due_date).label}
+                          </span>
+                          <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999, background:STATUS_META[nextOpen.status].bg, color:STATUS_META[nextOpen.status].color }}>
+                            {STATUS_META[nextOpen.status].label}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedDay(new Date(nextOpen.due_date + 'T12:00:00')); setActiveTab('tasks') }}
+                      style={{ width:'100%', padding:'11px', borderRadius:13, border:'none', background:'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:13, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:7, cursor:'pointer' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:16 }}>arrow_forward</span>
+                      Zum Aufgaben-Tab
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Week strip ── */}
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Diese Woche</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:6 }}>
+                  {upcomingDays.map(({ d, ds, openC, doneC, hasProb, total }) => {
+                    const isToday3 = ds === todayStr2
+                    const isPast = ds < todayStr2
+                    return (
+                      <div
+                        key={ds}
+                        onClick={() => { setSelectedDay(new Date(ds+'T12:00:00')); setActiveTab('tasks') }}
+                        style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'10px 4px 8px', borderRadius:14, cursor:'pointer', background: isToday3 ? 'var(--pri)' : 'var(--surf-card)', border: isToday3 ? 'none' : '1px solid var(--outline)', opacity: isPast && !isToday3 ? 0.55 : 1, transition:'opacity 0.15s' }}>
+                        <span style={{ fontSize:9, fontWeight:700, color: isToday3?'rgba(255,255,255,0.75)':'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                          {['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]}
+                        </span>
+                        <span style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)', color: isToday3?'#fff':'var(--txt)', lineHeight:1 }}>{d.getDate()}</span>
+                        {total > 0 ? (
+                          <span style={{ fontSize:10, fontWeight:800, color: isToday3?'rgba(255,255,255,0.9)':hasProb?'#dc2626':openC>0?'#b45309':'#166534' }}>
+                            {hasProb ? '⚠' : openC > 0 ? openC : '✓'}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize:10, color: isToday3?'rgba(255,255,255,0.4)':'var(--txt-muted)', opacity:0.5 }}>–</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+            </div>
+          )
+        })()}
+
+      {activeTab === 'tasks' && (
           <>
 
 
@@ -762,9 +898,9 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       {/* Bottom nav */}
       <nav style={s.botNav}>
         {([
-          { id: 'tasks',   icon: 'dashboard',      label: 'Aufgaben' },
-          { id: 'zeit',    icon: 'calendar_month', label: 'Zeitplan' },
-          { id: 'profile', icon: 'person',          label: 'Profil' },
+          { id: 'start', icon: 'home',           label: 'Start' },
+          { id: 'tasks', icon: 'task_alt',        label: 'Aufgaben' },
+          { id: 'zeit',  icon: 'calendar_month',  label: 'Zeitplan' },
         ] as const).map(item => {
           const isOn = activeTab === item.id
           return (
