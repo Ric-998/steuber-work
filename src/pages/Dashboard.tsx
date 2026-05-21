@@ -74,7 +74,27 @@ const STATUS_META: Record<string,{label:string;icon:string;bg:string;color:strin
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
+const MOTIVATIONS = [
+  "Heute wird ein guter Tag. 💪",
+  "Dein Team gibt alles – du auch!",
+  "Sauberkeit ist das halbe Leben. ✨",
+  "Jeder erledigte Auftrag zählt.",
+  "Qualität kommt von innen. 🏆",
+  "Ein starkes Team braucht starke Führung.",
+  "Der beste Moment ist jetzt.",
+  "Schritt für Schritt zum Ziel. 🎯",
+  "Vertrauen beginnt mit Verlässlichkeit.",
+  "Heute besser als gestern.",
+  "Dein Einsatz macht den Unterschied. 🌟",
+  "Ordnung schafft Klarheit.",
+  "Fokus. Disziplin. Ergebnis. 🔥",
+  "Jeder Auftrag ist eine Chance.",
+  "Gutes tun und darüber reden. 😄",
+  "Mit diesem Tool wirst du reich. 🤑",
+]
+
 export default function Dashboard({ userName, onLogout }: Props) {
+  const [motivation] = useState(() => MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)])
   const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'team'|'bericht'|'profil'>('overview')
   const [selectedObject, setSelectedObject] = useState<ObjectItem|null>(null)
   const [selectedProblem, setSelectedProblem] = useState<Problem|null>(null)
@@ -471,7 +491,10 @@ export default function Dashboard({ userName, onLogout }: Props) {
                   </p>
                 )
               })()}
-              <h1 style={s.h1}>Dashboard</h1>
+              <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', gap:12 }}>
+                <h1 style={s.h1}>Dashboard</h1>
+                <p style={{ fontSize:12, color:'rgba(255,255,255,0.55)', fontStyle:'italic', marginBottom:6, textAlign:'right', maxWidth:180, lineHeight:1.4 }}>{motivation}</p>
+              </div>
               <p style={s.sub}>{today.getDate()}. {MONTHS[today.getMonth()]} {today.getFullYear()}</p>
               <button onClick={() => setShowMonthOverlay(true)} style={{ marginTop:6, display:'inline-flex', alignItems:'center', gap:4, padding:'4px 10px', borderRadius:20, border:'1px solid rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.9)', fontSize:11, fontWeight:700, cursor:'pointer' }}>
                 <span className="material-symbols-outlined" style={{ fontSize:13 }}>bar_chart</span>Monatsübersicht
