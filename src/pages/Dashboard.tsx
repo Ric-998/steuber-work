@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import BugReport from '../components/BugReport'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import QRCode from '../components/QRCode'
+import MapView from '../components/MapView'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Stats { heute_faellig:number; in_arbeit:number; gesamt_offen:number; diese_woche_done:number; probleme:number; probleme_heute:number }
@@ -1702,6 +1703,15 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             </div>
           </div>
         )}
+
+        {/* ── Karte ── */}
+        <div style={{ marginBottom:14 }}>
+          <MapView
+            address={obj.address}
+            city={obj.city}
+            postalCode={obj.postal_code}
+          />
+        </div>
 
         {/* ── Leistungen ── */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>

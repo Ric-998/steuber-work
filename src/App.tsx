@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import RegisterPage from './pages/RegisterPage'
 import './styles/global.css'
 import CustomerStatusPage from './pages/CustomerStatusPage'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 interface UserProfile {
   id: string
