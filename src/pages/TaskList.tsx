@@ -1324,12 +1324,10 @@ function ChatTab({ currentUserId }: { currentUserName: string; currentUserId: st
     )
   }
 
-  // Sort users: those with messages first (by recency), then alphabetical
+  // Main list: ONLY users with existing messages, sorted by recency
   const usersWithMsg = users.filter(u => lastMessages[u.id])
     .sort((a, b) => new Date(lastMessages[b.id].created_at).getTime() - new Date(lastMessages[a.id].created_at).getTime())
-  const usersWithoutMsg = users.filter(u => !lastMessages[u.id])
-  const sortedUsers = [...usersWithMsg, ...usersWithoutMsg]
-  const filtered = sortedUsers.filter(u => u.full_name.toLowerCase().includes(search.toLowerCase()))
+  const filtered = usersWithMsg.filter(u => u.full_name.toLowerCase().includes(search.toLowerCase()))
   const hasAnyMsg = usersWithMsg.length > 0
 
   return (
