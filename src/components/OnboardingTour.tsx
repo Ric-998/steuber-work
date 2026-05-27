@@ -9,7 +9,7 @@ const STEPS = [
     bg: '#E6F3F4',
     title: 'Deine Aufgaben',
     desc: 'Auf dem Aufgaben-Tab siehst du sofort was heute zu tun ist – sortiert nach Objekt. Tippe auf eine Aufgabe für alle Details.',
-    hint: 'Tipp: Punkte unter den Wochentagen zeigen wo Aufgaben liegen.',
+    hint: 'Tipp: Die Wochenkacheln oben zeigen direkt wie viele Aufgaben pro Tag offen sind.',
   },
   {
     icon: 'play_circle',

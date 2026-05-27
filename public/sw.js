@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steuberwork-v2'
+const CACHE_NAME = 'steuberwork-v4'
 const VAPID_PUBLIC_KEY = 'BIVxcSSeFZEXfg82j5-GQR6x4nOZxgiFVaPbRxkBarjj8oP2y7auEww2-aWuj_PpOcBuXXzrBbqU_D8eNqTEZik'
 
 // Install & cache
@@ -58,4 +58,9 @@ self.addEventListener('notificationclick', e => {
       return clients.openWindow(url)
     })
   )
+})
+
+// Update on demand: main.tsx sendet SKIP_WAITING wenn Nutzer "Jetzt laden" klickt
+self.addEventListener('message', e => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting()
 })

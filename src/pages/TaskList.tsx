@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { OnboardingTour, InstallGuide, useOnboarding, resetTour } from '../components/OnboardingTour'
+import { WasIstNeu } from '../components/WasIstNeu'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import BugReport from '../components/BugReport'
 import MapView from '../components/MapView'
@@ -73,7 +74,7 @@ interface VertretungItem {
 export default function TaskList({ userId, userName, onLogout }: Props) {
   const [assignments, setAssignments] = useState<TaskAssignment[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'start'|'tasks'|'zeit'|'profile'>('start')
+  const [activeTab, setActiveTab] = useState<'start'|'tasks'|'zeit'|'chat'|'profile'>('start')
   const [selectedDay, setSelectedDay] = useState(new Date())
   const [weekOffset, setWeekOffset] = useState(0)
   const [detail, setDetail] = useState<TaskAssignment | null>(null)
@@ -81,6 +82,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   const [sheetType, setSheetType] = useState<'complete'|'problem'|'vertretung'|null>(null)
   const [selectedOption, setSelectedOption] = useState('')
   const [problemNote, setProblemNote] = useState('')
+  const [problemUrgent, setProblemUrgent] = useState(false)
   const [vertretungNote, setVertretungNote] = useState('')
   const [photoFile, setPhotoFile] = useState<File|null>(null)
   const [photoUploading, setPhotoUploading] = useState(false)
@@ -95,8 +97,10 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   // Urlaubs-/Krankmeldungs-Daten für Kalender
   const [myLeaves, setMyLeaves] = useState<any[]>([])
   const [vacationDaysPerYear, setVacationDaysPerYear] = useState(30)
-  const [showMonthView, setShowMonthView] = useState(false)
   const [monthOffset, setMonthOffset] = useState(0)
+  const [showKonfetti, setShowKonfetti] = useState(false)
+  const [monthSheetOpen, setMonthSheetOpen] = useState(false)
+  const [objectSheetObj, setObjectSheetObj] = useState<any>(null)
 
   // Tauschbörse state
   const [availableVertretungen, setAvailableVertretungen] = useState<VertretungItem[]>([])
@@ -183,7 +187,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
     rangeEnd.setDate(rangeEnd.getDate() + 28)
     const { data } = await supabase
       .from('task_assignments')
-      .select(`*, tasks(id,title,description,interval,categories(id,name,emoji),objects(id,name,address,city,postal_code,customers(name)))`)
+      .select(`*, tasks(id,title,description,interval,categories(id,name,emoji),objects(id,name,address,city,postal_code,access_note,parking_note,floor_info,notes,customers(id,name)))`)
       .eq('user_id', userId)
       .gte('due_date', rangeStart.toISOString().split('T')[0])
       .lte('due_date', rangeEnd.toISOString().split('T')[0])
@@ -234,10 +238,20 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
     if (status === 'erledigt') updates.completed_at = new Date().toISOString()
     const { error } = await supabase.from('task_assignments').update(updates).eq('id', id)
     if (!error) {
-      setAssignments(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a))
+      setAssignments(prev => {
+        const next = prev.map((a: TaskAssignment) => a.id === id ? { ...a, ...updates } : a)
+        if (status === 'erledigt') {
+          const todayStr2 = new Date().toISOString().split('T')[0]
+          const todayAll = next.filter((a: TaskAssignment) => a.due_date === todayStr2)
+          if (todayAll.length > 0 && todayAll.every((a: TaskAssignment) => a.status === 'erledigt')) {
+            setTimeout(() => { setShowKonfetti(true); setTimeout(() => setShowKonfetti(false), 3200) }, 200)
+          }
+        }
+        return next
+      })
       if (detail?.id === id) setDetail(prev => prev ? { ...prev, ...updates } : prev)
     }
-    setUpdating(false); setSheetTask(null); setSheetType(null); setSelectedOption(''); setProblemNote('')
+    setUpdating(false); setSheetTask(null); setSheetType(null); setSelectedOption(''); setProblemNote(''); setProblemUrgent(false)
   }
 
   const confirmAction = async () => {
@@ -285,15 +299,17 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
           const { data: admins } = await supabase.from('users').select('id').eq('role_id', roles.id).eq('is_active', true)
           const taskTitle = sheetTask.tasks?.title ?? 'Aufgabe'
           const objAddr = sheetTask.tasks?.objects?.address ?? ''
+          const pushTitle = problemUrgent ? '🚨 DRINGEND: Problem gemeldet' : '⚠ Problem gemeldet'
           for (const admin of (admins ?? [])) {
             await fetch('https://hdemkyonurqfcohhfbgj.supabase.co/functions/v1/send-push', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
               body: JSON.stringify({
                 user_id: admin.id,
-                title: '⚠ Problem gemeldet',
+                title: pushTitle,
                 body: `${taskTitle}${objAddr ? ' · ' + objAddr : ''}: ${problemNoteText}`,
                 tag: 'problem-' + sheetTask.id,
+                requireInteraction: problemUrgent,
               }),
             }).catch(() => {/* ignore push errors */})
           }
@@ -449,13 +465,17 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
   return (
     <div style={s.shell}>
+      {/* Konfetti overlay */}
+      {showKonfetti && <Konfetti />}
       {/* ── TOP BAR: teal, only name + date + bell ── */}
-      <header style={s.appHead}>
+      <header style={{ ...s.appHead, display: activeTab === 'start' ? 'none' : undefined }}>
         <div style={s.topBarInner}>
           <div style={s.topBarLeft}>
             <div style={s.topAva}>{initials}</div>
             <div>
-              <div style={{ fontSize:17, fontWeight:800, color:'#fff', fontFamily:'Manrope,sans-serif', letterSpacing:'-0.02em' }}>{firstName}</div>
+              <div style={{ fontSize:17, fontWeight:800, color:'#fff', fontFamily:'Manrope,sans-serif', letterSpacing:'-0.02em' }}>
+                {activeTab === 'tasks' ? 'Aufgaben' : activeTab === 'zeit' ? 'Zeitplan' : activeTab === 'chat' ? 'Nachrichten' : activeTab === 'profile' ? 'Profil' : firstName}
+              </div>
               <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginTop:1 }}>{today.getDate()}. {MONTHS[today.getMonth()]} {today.getFullYear()}</div>
             </div>
           </div>
@@ -467,148 +487,9 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
         </div>
       </header>
 
-      {/* ── CALENDAR CARD ── */}
-      {activeTab === 'tasks' && (() => {
-        // Month view base: today + monthOffset months
-        const mvBase = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)
-        const mvYr = mvBase.getFullYear(), mvMo = mvBase.getMonth()
-        const mvFirstDay = new Date(mvYr, mvMo, 1)
-        const mvLastDay  = new Date(mvYr, mvMo + 1, 0)
-        let mvStartPad = mvFirstDay.getDay() - 1; if (mvStartPad < 0) mvStartPad = 6
-        const mvCells: (Date|null)[] = Array(mvStartPad).fill(null)
-        for (let d = 1; d <= mvLastDay.getDate(); d++) mvCells.push(new Date(mvYr, mvMo, d))
-        while (mvCells.length % 7 !== 0) mvCells.push(null)
-        const todayStr = today.toISOString().split('T')[0]
-
-        return (
-          <div style={{ background:'#fff', padding:'14px 16px 16px', borderBottom:'1px solid #EDF1F2', boxShadow:'0 2px 12px rgba(0,0,0,0.06)', flexShrink:0, marginTop:8, borderRadius:'16px 16px 0 0' }}>
-            {/* Header row */}
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-              <button
-                onClick={() => showMonthView ? setMonthOffset(o=>o-1) : (setWeekOffset(o=>o-1), setSelectedDay(weekDays[0]))}
-                style={{ background:'#F0F8F9', border:'none', width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'#2f7681' }}>chevron_left</span>
-              </button>
-
-              <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, justifyContent:'center' }}>
-                <span style={{ fontSize:13, fontWeight:800, color:'#2f7681', letterSpacing:'0.04em', textTransform:'uppercase', fontFamily:'Manrope,sans-serif' }}>
-                  {showMonthView
-                    ? `${MONTHS[mvMo]} ${mvYr}`
-                    : weekDays[0].getMonth() === weekDays[6].getMonth()
-                      ? `${MONTHS[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`
-                      : `${MONTHS[weekDays[0].getMonth()]} / ${MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getFullYear()}`
-                  }
-                </span>
-                {((!showMonthView && weekOffset === 0) || (showMonthView && monthOffset === 0)) && (
-                  <span style={{ fontSize:9, fontWeight:800, background:'#E6F3F4', color:'#2f7681', padding:'3px 8px', borderRadius:999, letterSpacing:'0.06em', textTransform:'uppercase' }}>Heute</span>
-                )}
-              </div>
-
-              {/* Toggle */}
-              <button
-                onClick={() => { setShowMonthView(v => !v); setMonthOffset(0) }}
-                style={{ padding:'5px 10px', borderRadius:10, border:'1.5px solid #2f7681', background: showMonthView ? '#2f7681' : 'transparent', color: showMonthView ? '#fff' : '#2f7681', fontSize:11, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:14 }}>{showMonthView ? 'view_week' : 'calendar_month'}</span>
-                {showMonthView ? 'Woche' : 'Monat'}
-              </button>
-
-              <button
-                onClick={() => showMonthView ? setMonthOffset(o=>o+1) : (setWeekOffset(o=>o+1), setSelectedDay(weekDays[6]))}
-                style={{ background:'#F0F8F9', border:'none', width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'#2f7681' }}>chevron_right</span>
-              </button>
-            </div>
-
-            {/* ── WEEK VIEW ── */}
-            {!showMonthView && (
-              <div style={{ display:'flex', gap:4 }}>
-                {weekDays.map((d, i) => {
-                  const isToday = d.getTime() === today.getTime()
-                  const isSel = d.toDateString() === selectedDay.toDateString()
-                  const hasTasks = assignments.some(a => { const ad = new Date(a.due_date); ad.setHours(0,0,0,0); return ad.getTime() === d.getTime() })
-                  const dStr = d.toISOString().split('T')[0]
-                  const dayLeave = myLeaves.find((l:any) => l.status !== 'abgelehnt' && dStr >= l.from_date && dStr <= l.to_date)
-                  const lc = dayLeave
-                    ? dayLeave.request_type === 'krankmeldung' ? '#e53935'
-                      : dayLeave.status === 'genehmigt' ? '#2f7681' : '#f59e0b'
-                    : null
-                  return (
-                    <div key={i} onClick={() => setSelectedDay(d)} style={{
-                      flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3,
-                      padding:'8px 4px', borderRadius:14, cursor:'pointer',
-                      background: isSel ? '#2f7681' : lc && !isSel ? lc+'18' : isToday ? '#F0F8F9' : 'transparent',
-                      border: lc && !isSel ? `1.5px solid ${lc}35` : '1.5px solid transparent',
-                      transition:'background 0.15s',
-                    }}>
-                      <span style={{ fontSize:9, fontWeight:700, color: isSel ? 'rgba(255,255,255,0.75)' : '#9BA8A9', textTransform:'uppercase', letterSpacing:'0.05em' }}>{DAYS[d.getDay()]}</span>
-                      <span style={{ fontSize:15, fontWeight: isSel||isToday ? 800 : 500, color: isSel ? '#fff' : isToday ? '#2f7681' : '#3a4a4b', fontFamily:'Manrope,sans-serif' }}>{d.getDate()}</span>
-                      {lc && !isSel
-                        ? <span style={{ width:5, height:5, borderRadius:'50%', background: lc }}/>
-                        : <span style={{ width:5, height:5, borderRadius:'50%', background: hasTasks ? (isSel ? 'rgba(255,255,255,0.7)' : '#2f7681') : 'transparent' }}/>
-                      }
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* ── MONTH VIEW ── */}
-            {showMonthView && (
-              <div>
-                {/* Weekday headers */}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3, marginBottom:4 }}>
-                  {['Mo','Di','Mi','Do','Fr','Sa','So'].map(d => (
-                    <div key={d} style={{ textAlign:'center', fontSize:10, fontWeight:700, color:'#9BA8A9', padding:'2px 0' }}>{d}</div>
-                  ))}
-                </div>
-                {/* Day cells */}
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:3 }}>
-                  {mvCells.map((d, i) => {
-                    if (!d) return <div key={i}/>
-                    const dStr = d.toISOString().split('T')[0]
-                    const isToday2 = dStr === todayStr
-                    const isSel2   = dStr === selectedDay.toISOString().split('T')[0]
-                    const dayLeave2 = myLeaves.find((l:any) => l.status !== 'abgelehnt' && dStr >= l.from_date && dStr <= l.to_date)
-                    const hasTask2  = assignments.some((a:any) => a.due_date === dStr)
-                    const lc2 = dayLeave2
-                      ? dayLeave2.request_type === 'krankmeldung' ? '#e53935'
-                        : dayLeave2.status === 'genehmigt' ? '#2f7681' : '#f59e0b'
-                      : null
-                    return (
-                      <div key={i}
-                        onClick={() => { setSelectedDay(d); setShowMonthView(false); setWeekOffset(Math.round((d.getTime()-new Date().getTime())/(7*24*3600*1000))) }}
-                        style={{
-                          aspectRatio:'1', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2,
-                          borderRadius:10, cursor:'pointer',
-                          background: isSel2 ? '#2f7681' : lc2 ? lc2+'22' : isToday2 ? '#E6F3F4' : 'transparent',
-                          border: isSel2 ? 'none' : isToday2 ? '2px solid #2f7681' : lc2 ? `1.5px solid ${lc2}40` : '1.5px solid transparent',
-                          transition:'background 0.12s',
-                        }}>
-                        <span style={{ fontSize:13, fontWeight: isToday2||isSel2 ? 800 : 400, color: isSel2 ? '#fff' : isToday2 ? '#2f7681' : '#3a4a4b', fontFamily:'Manrope,sans-serif' }}>{d.getDate()}</span>
-                        {(hasTask2 || lc2) && (
-                          <span style={{ width:4, height:4, borderRadius:'50%', background: isSel2 ? 'rgba(255,255,255,0.75)' : lc2 ?? '#2f7681' }}/>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-                {/* Legend */}
-                <div style={{ display:'flex', gap:16, marginTop:10, justifyContent:'center', flexWrap:'wrap' }}>
-                  {[{c:'#2f7681',op:0.45,r:4,l:'Urlaub'},{c:'#f59e0b',op:0.45,r:4,l:'Ausstehend'},{c:'#e53935',op:0.45,r:4,l:'Krank'},{c:'#2f7681',op:1,r:99,l:'Aufgaben'}].map(x=>(
-                    <div key={x.l} style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, color:'#9BA8A9' }}>
-                      <span style={{ width:8, height:8, borderRadius:x.r, background:x.c, opacity:x.op, flexShrink:0 }}/>
-                      {x.l}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )
-      })()}
 
       {/* Content */}
-      <div style={s.content}>
+      <div style={{ ...s.content, paddingTop: activeTab === 'start' ? 0 : undefined, padding: activeTab === 'chat' ? '0 14px' : undefined }}>
         {activeTab === 'start' && (() => {
           const todayStr2 = today.toISOString().split('T')[0]
           const todayAll = assignments.filter(a => a.due_date === todayStr2)
@@ -616,142 +497,224 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
           const todayDone2 = todayAll.filter(a => a.status==='erledigt').length
           const todayProb2 = todayAll.filter(a => a.status==='problem').length
           const todayTotal2 = todayAll.length
-          const nextOpen = assignments.find(a => (a.status==='offen'||a.status==='in_arbeit') && a.due_date >= todayStr2)
           const hour = new Date().getHours()
           const greeting = hour < 12 ? 'Guten Morgen' : hour < 17 ? 'Guten Tag' : 'Guten Abend'
-          const activeTodayLeave = myLeaves.find(l => l.status!=='abgelehnt' && todayStr2 >= l.from_date && todayStr2 <= l.to_date)
           const pct = todayTotal2 > 0 ? Math.round((todayDone2/todayTotal2)*100) : 0
-          const upcomingDays = Array.from({length:7}, (_,i) => {
-            const d = new Date(today); d.setDate(today.getDate()+i)
+          const dayName = today.toLocaleDateString('de-DE', { weekday:'long' })
+          const dayNum = today.getDate()
+          const monthStr2 = today.toLocaleDateString('de-DE', { month:'long' })
+
+          // Mo–Sa strip (6 days from Monday of current week)
+          const mondayOffset = (today.getDay() + 6) % 7
+          const weekStrip = Array.from({length:6}, (_:unknown, i:number) => {
+            const d = new Date(today); d.setDate(today.getDate() - mondayOffset + i)
             const ds = d.toISOString().split('T')[0]
-            const dayTasks = assignments.filter(a => a.due_date===ds)
-            const openC = dayTasks.filter(a=>a.status==='offen'||a.status==='in_arbeit').length
-            const doneC = dayTasks.filter(a=>a.status==='erledigt').length
-            const hasProb = dayTasks.some(a=>a.status==='problem')
-            return { d, ds, openC, doneC, hasProb, total: dayTasks.length }
+            const dt = assignments.filter(a => a.due_date === ds)
+            return { d, ds, count:dt.length, hasProb:dt.some(a=>a.status==='problem'), allDone:dt.length>0&&dt.every(a=>a.status==='erledigt') }
           })
+
+          // Mitteilungen from leave requests (recent status changes)
+          const mitteilungen = myLeaves.slice(0,4).map((l:any) => ({
+            id: l.id,
+            icon: l.request_type==='krankmeldung' ? 'sick' : l.status==='genehmigt' ? 'beach_access' : 'event_busy',
+            accent: l.status==='genehmigt' ? 'green' : l.status==='abgelehnt' ? 'red' : 'amber',
+            title: l.status==='genehmigt' ? (l.request_type==='krankmeldung'?'Krankmeldung erfasst':'Urlaubsantrag genehmigt')
+                 : l.status==='abgelehnt' ? 'Urlaubsantrag abgelehnt'
+                 : l.request_type==='krankmeldung' ? 'Krankmeldung eingereicht' : 'Urlaubsantrag eingereicht',
+            body: `${new Date(l.from_date).toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'})} – ${new Date(l.to_date).toLocaleDateString('de-DE',{day:'numeric',month:'long'})}${l.note ? ' · '+l.note : ''}`,
+            unread: l.status === 'genehmigt' || l.status === 'abgelehnt',
+          }))
+
+          // Problem-Aufgaben als Mitteilungen
+          const probAssignments = todayAll.filter(a=>a.status==='problem').slice(0,2).map(a=>({
+            id: 'prob_'+a.id,
+            icon: 'warning',
+            accent: 'red',
+            title: 'Problem gemeldet: '+a.tasks?.title,
+            body: a.tasks?.objects?.address || '',
+            unread: false,
+          }))
+
+          const allMitt = [...probAssignments, ...mitteilungen].slice(0,5)
+          const unreadCount = allMitt.filter(n=>n.unread).length
+
           return (
             <div style={{ paddingBottom:8 }}>
-              {/* ── Greeting Card ── */}
-              <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:22, padding:'20px 18px 22px', marginBottom:16, color:'#fff' }}>
-                <div style={{ fontSize:11, fontWeight:700, opacity:0.7, letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:4 }}>{greeting}</div>
-                <div style={{ fontSize:28, fontWeight:800, fontFamily:'var(--font-head)', letterSpacing:'-0.02em', lineHeight:1.1 }}>{firstName} 👋</div>
-                <div style={{ fontSize:12, opacity:0.8, marginTop:4 }}>{today.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
-                <div style={{ marginTop:16, height:6, borderRadius:99, background:'rgba(255,255,255,0.25)', overflow:'hidden' }}>
-                  <div style={{ height:'100%', borderRadius:99, background:'#fff', width:`${pct}%`, transition:'width 0.5s' }}/>
-                </div>
-                <div style={{ marginTop:6, fontSize:11, opacity:0.85 }}>
-                  {todayDone2 === todayTotal2 && todayTotal2 > 0 ? '🎉 Alle Aufgaben heute erledigt!' : `${todayDone2} von ${todayTotal2} Aufgaben heute erledigt`}
-                </div>
-              </div>
-
-              {/* ── KPI Row ── */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:16 }}>
-                {[
-                  { label:'Offen',   val:todayOpen2, icon:'pending_actions', color:'#b45309',  bg:'#fff8e6' },
-                  { label:'Erledigt',val:todayDone2, icon:'task_alt',        color:'#166534',  bg:'#dcfce7' },
-                  { label:'Probleme',val:todayProb2, icon:'warning',         color:'#b91c1c',  bg:'#ffeaea' },
-                ].map(k => (
-                  <div key={k.label} style={{ background:'var(--surf-card)', borderRadius:16, padding:'12px 10px', border:'1px solid var(--outline)', textAlign:'center' }}>
-                    <div style={{ width:32, height:32, borderRadius:10, background:k.bg, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 6px' }}>
-                      <span className="material-symbols-outlined icon-fill" style={{ fontSize:17, color:k.color }}>{k.icon}</span>
-                    </div>
-                    <div style={{ fontSize:22, fontWeight:800, fontFamily:'var(--font-head)', color:k.val>0?k.color:'var(--txt)', lineHeight:1 }}>{k.val}</div>
-                    <div style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', marginTop:3, textTransform:'uppercase', letterSpacing:'0.06em' }}>{k.label}</div>
+              {/* ── Hero Header ── */}
+              <div style={{
+                background:'linear-gradient(160deg,var(--pri) 0%,var(--pri-c) 100%)',
+                borderRadius:'0 0 32px 32px', padding:'48px 18px 20px',
+                margin:'0 -16px 0 -16px',
+              }}>
+                {/* Top row */}
+                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+                  <div style={{ width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.18)', border:'1.5px solid rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:800, color:'#fff', fontFamily:'Manrope,sans-serif', flexShrink:0, cursor:'pointer' }}
+                    onClick={() => setActiveTab('profile')}>
+                    {initials}
                   </div>
-                ))}
-              </div>
-
-              {/* ── Active leave notice ── */}
-              {activeTodayLeave && (
-                <div style={{ background: activeTodayLeave.request_type==='krankmeldung'?'#ffeaea':'var(--pri-xl)', borderRadius:16, padding:'13px 16px', marginBottom:16, display:'flex', alignItems:'center', gap:12, border:`1.5px solid ${activeTodayLeave.request_type==='krankmeldung'?'#fca5a5':'var(--pri)'}` }}>
-                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:24, color:activeTodayLeave.request_type==='krankmeldung'?'#dc2626':'var(--pri)', flexShrink:0 }}>{activeTodayLeave.request_type==='krankmeldung'?'sick':'beach_access'}</span>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:700, color:activeTodayLeave.request_type==='krankmeldung'?'#b91c1c':'var(--pri)' }}>{activeTodayLeave.request_type==='krankmeldung'?'Krankmeldung aktiv':'Urlaub heute'}</div>
-                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{new Date(activeTodayLeave.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – {new Date(activeTodayLeave.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:10, opacity:0.7, letterSpacing:'0.1em', textTransform:'uppercase', fontWeight:700, color:'#fff' }}>{greeting}</div>
+                    <div style={{ fontSize:17, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'#fff' }}>{firstName} 👋</div>
                   </div>
+                  <button onClick={() => setActiveTab('chat')}
+                    style={{ position:'relative', width:36, height:36, borderRadius:'50%', background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color:'#fff' }}>chat</span>
+                    {unreadCount > 0 && (
+                      <span style={{ position:'absolute', top:-2, right:-2, minWidth:16, height:16, borderRadius:99, background:'#fff', color:'var(--pri)', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px' }}>{unreadCount}</span>
+                    )}
+                  </button>
                 </div>
-              )}
 
-              {/* ── Next task ── */}
-              {nextOpen && (
+                {/* Datum + Status */}
                 <div style={{ marginBottom:16 }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Nächste Aufgabe</div>
-                  <div style={{ background:'var(--surf-card)', borderRadius:18, padding:'16px 16px 14px', border:'1px solid var(--outline)', boxShadow:'0 2px 12px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display:'flex', gap:12, alignItems:'flex-start', marginBottom:14 }}>
-                      <div style={{ width:44, height:44, borderRadius:14, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
-                        {nextOpen.tasks?.categories?.emoji || '📋'}
-                      </div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:15, fontWeight:800, color:'var(--txt)', fontFamily:'var(--font-head)', marginBottom:2 }}>{nextOpen.tasks?.title}</div>
-                        {nextOpen.tasks?.objects && (
-                          <div style={{ fontSize:12, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:4 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize:13 }}>location_on</span>
-                            {nextOpen.tasks.objects.address}, {nextOpen.tasks.objects.city}
-                          </div>
-                        )}
-                        <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-                          <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999, background: nextOpen.due_date===todayStr2?'#fff8e6':'var(--surf-low)', color: nextOpen.due_date===todayStr2?'#b45309':'var(--txt-muted)' }}>
-                            {nextOpen.due_date===todayStr2 ? '⚡ Heute' : formatDue(nextOpen.due_date).label}
-                          </span>
-                          <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999, background:STATUS_META[nextOpen.status].bg, color:STATUS_META[nextOpen.status].color }}>
-                            {STATUS_META[nextOpen.status].label}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => { setSelectedDay(new Date(nextOpen.due_date + 'T12:00:00')); setActiveTab('tasks') }}
-                      style={{ width:'100%', padding:'11px', borderRadius:13, border:'none', background:'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:13, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:7, cursor:'pointer' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:16 }}>arrow_forward</span>
-                      Zum Aufgaben-Tab
-                    </button>
+                  <div style={{ fontSize:36, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'#fff', lineHeight:1, letterSpacing:'-0.02em' }}>{dayName}</div>
+                  <div style={{ fontSize:13, opacity:0.75, color:'#fff', marginTop:5, fontWeight:600 }}>
+                    {dayNum}. {monthStr2} · {todayTotal2===0 ? 'Kein Einsatz heute' : todayOpen2===0 ? '🎉 Alles erledigt!' : `noch ${todayOpen2} offen`}
                   </div>
+                  {todayTotal2 > 0 && todayOpen2 > 0 && (
+                    <div style={{ height:3, borderRadius:99, background:'rgba(255,255,255,0.2)', overflow:'hidden', marginTop:10 }}>
+                      <div style={{ height:'100%', borderRadius:99, background:'#fff', width:`${pct}%`, transition:'width 0.6s' }}/>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {/* ── Week strip ── */}
-              <div>
-                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Diese Woche</div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:6 }}>
-                  {upcomingDays.map(({ d, ds, openC, doneC, hasProb, total }) => {
+                {/* Mo–Sa Strip */}
+                <div style={{ display:'flex', gap:5 }}>
+                  {weekStrip.map(({ d, ds, count, hasProb, allDone }) => {
                     const isToday3 = ds === todayStr2
-                    const isPast = ds < todayStr2
+                    const DAY_ABBR2 = ['So','Mo','Di','Mi','Do','Fr','Sa']
+                    const dotColor = hasProb ? '#fca5a5' : allDone ? '#4ade80' : 'rgba(255,255,255,0.6)'
                     return (
-                      <div
-                        key={ds}
+                      <div key={ds}
                         onClick={() => { setSelectedDay(new Date(ds+'T12:00:00')); setActiveTab('tasks') }}
-                        style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'10px 4px 8px', borderRadius:14, cursor:'pointer', background: isToday3 ? 'var(--pri)' : 'var(--surf-card)', border: isToday3 ? 'none' : '1px solid var(--outline)', opacity: isPast && !isToday3 ? 0.55 : 1, transition:'opacity 0.15s' }}>
-                        <span style={{ fontSize:9, fontWeight:700, color: isToday3?'rgba(255,255,255,0.75)':'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
-                          {['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]}
-                        </span>
-                        <span style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)', color: isToday3?'#fff':'var(--txt)', lineHeight:1 }}>{d.getDate()}</span>
-                        {total > 0 ? (
-                          <span style={{ fontSize:10, fontWeight:800, color: isToday3?'rgba(255,255,255,0.9)':hasProb?'#dc2626':openC>0?'#b45309':'#166534' }}>
-                            {hasProb ? '⚠' : openC > 0 ? openC : '✓'}
-                          </span>
-                        ) : (
-                          <span style={{ fontSize:10, color: isToday3?'rgba(255,255,255,0.4)':'var(--txt-muted)', opacity:0.5 }}>–</span>
-                        )}
+                        style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'8px 4px', borderRadius:14, cursor:'pointer', background:isToday3?'rgba(255,255,255,0.22)':'rgba(0,0,0,0.12)', border:isToday3?'1.5px solid rgba(255,255,255,0.45)':'1px solid transparent' }}>
+                        <span style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.65)', textTransform:'uppercase', letterSpacing:'0.06em' }}>{DAY_ABBR2[d.getDay()]}</span>
+                        <span style={{ fontSize:15, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'#fff' }}>{d.getDate()}</span>
+                        {count > 0
+                          ? <span style={{ width:5, height:5, borderRadius:'50%', background:dotColor }}/>
+                          : <span style={{ width:5, height:5 }}/>
+                        }
                       </div>
                     )
                   })}
                 </div>
               </div>
 
+              <div style={{ padding:'18px 0 0' }}>
+                {/* Was heute ansteht */}
+                <button onClick={() => { setSelectedDay(new Date(todayStr2+'T12:00:00')); setActiveTab('tasks') }}
+                  style={{ width:'100%', padding:'16px 18px', background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:20, cursor:'pointer', textAlign:'left', marginBottom:16, display:'block', boxShadow:'0 2px 12px rgba(8,93,104,0.07)' }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>Was heute ansteht</div>
+                    <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>arrow_forward_ios</span>
+                  </div>
+                  {todayTotal2 === 0
+                    ? <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Heute kein Einsatz 🌟</div>
+                    : <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                        {todayOpen2 > 0 && <span style={{ fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:99, background:'#fff8e6', color:'#92400e' }}>{todayOpen2} offen</span>}
+                        {todayDone2 > 0 && <span style={{ fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:99, background:'var(--ok-bg)', color:'var(--ok)' }}>{todayDone2} erledigt</span>}
+                        {todayProb2 > 0 && <span style={{ fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:99, background:'var(--err-bg)', color:'var(--err)' }}>{todayProb2} Problem</span>}
+                        {todayOpen2===0&&todayProb2===0 && <span style={{ fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:99, background:'var(--ok-bg)', color:'var(--ok)' }}>Alles erledigt 🎉</span>}
+                      </div>
+                  }
+                </button>
+
+                {/* Mitteilungen */}
+                <div style={{ marginBottom:24 }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Mitteilungen</div>
+                    {unreadCount > 0 && <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99, background:'var(--pri-xl)', color:'var(--pri)' }}>{unreadCount} neu</span>}
+                  </div>
+                  {allMitt.length === 0 ? (
+                    <div style={{ background:'var(--surf-card)', borderRadius:12, padding:'18px', textAlign:'center', border:'1px solid var(--outline)', color:'var(--txt-muted)', fontSize:13 }}>
+                      Keine neuen Mitteilungen
+                    </div>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                      {allMitt.map((n:any) => {
+                        const ACCENT: Record<string, {bg:string;fg:string}> = {
+                          green:{bg:'var(--ok-bg)',fg:'var(--ok)'},
+                          teal:{bg:'var(--pri-xl)',fg:'var(--pri)'},
+                          amber:{bg:'#fff8e6',fg:'#92400e'},
+                          red:{bg:'var(--err-bg)',fg:'var(--err-dot)'},
+                        }
+                        const ac = ACCENT[n.accent] || ACCENT.teal
+                        return (
+                          <div key={n.id} style={{ background:'var(--surf-card)', borderRadius:12, padding:'11px 12px', border:'1px solid var(--outline)', display:'flex', gap:10 }}>
+                            <div style={{ width:34, height:34, borderRadius:10, background:ac.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                              <span className="material-symbols-outlined icon-fill" style={{ fontSize:17, color:ac.fg }}>{n.icon}</span>
+                            </div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+                                {n.unread && <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--pri)', flexShrink:0 }}/>}
+                                <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{n.title}</div>
+                              </div>
+                              {n.body && <div style={{ fontSize:12, color:'var(--txt-muted)', lineHeight:1.4 }}>{n.body}</div>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )
         })()}
 
-      {activeTab === 'tasks' && (
-          <>
 
+      {activeTab === 'tasks' && (() => {
+          const DAY_FULL = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag']
+          const selStr = selectedDay.toISOString().split('T')[0]
+          const todayStr2 = today.toISOString().split('T')[0]
+          const isTodaySelected = selStr === todayStr2
+          const shiftDay = (n: number) => { const d = new Date(selectedDay); d.setDate(d.getDate()+n); setSelectedDay(d) }
+          const dayTotal = filteredByDay.length
+          const dayDone = filteredByDay.filter((a: TaskAssignment) => a.status === 'erledigt').length
+          const dayProgress = dayTotal > 0 ? Math.round((dayDone/dayTotal)*100) : 0
+          return (
+          <>
+            {/* ── Date Nav Bar ── */}
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+              <button onClick={() => shiftDay(-1)} style={{ width:40, height:48, borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--txt)' }}>chevron_left</span>
+              </button>
+              <button onClick={() => setMonthSheetOpen(true)} style={{ flex:1, height:48, padding:'0 14px', borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
+                  <span style={{ fontSize:15, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'var(--txt)' }}>
+                    {DAY_FULL[selectedDay.getDay()]}, {selectedDay.getDate()}. {selectedDay.toLocaleDateString('de-DE',{month:'short'})}
+                  </span>
+                  {isTodaySelected && <span style={{ fontSize:10, background:'var(--pri)', color:'#fff', padding:'2px 7px', borderRadius:99, fontWeight:700 }}>HEUTE</span>}
+                </div>
+                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>calendar_month</span>
+              </button>
+              <button onClick={() => shiftDay(1)} style={{ width:40, height:48, borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--txt)' }}>chevron_right</span>
+              </button>
+            </div>
+
+            {/* ── Progress Ring ── */}
+            {dayTotal > 0 && (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', borderRadius:14, background: dayProgress===100 ? 'var(--ok-bg)' : 'var(--surf-card)', border:`1px solid ${dayProgress===100 ? '#b6dec5' : 'var(--outline)'}`, marginBottom:14 }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color: dayProgress===100 ? 'var(--ok)' : 'var(--txt)' }}>
+                    {dayProgress===100 ? '🎉 Alle erledigt!' : `${dayDone} von ${dayTotal} erledigt`}
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>
+                    {dayTotal-dayDone > 0 ? `${dayTotal-dayDone} noch offen` : 'Super Tag!'}
+                  </div>
+                </div>
+                <div style={{ width:44, height:44, borderRadius:'50%', background:`conic-gradient(var(--ok) ${dayProgress}%, var(--outline) ${dayProgress}%)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <div style={{ width:34, height:34, borderRadius:'50%', background: dayProgress===100 ? 'var(--ok-bg)' : 'var(--surf-card)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color: dayProgress===100 ? 'var(--ok)' : 'var(--txt)', fontFamily:'Manrope,sans-serif' }}>{dayProgress}%</div>
+                </div>
+              </div>
+            )}
 
             {/* Vertretungen Banner */}
             {availableVertretungen.length > 0 && (
               <div
                 onClick={() => setVertretungDetail(availableVertretungen[0])}
-                style={{ display:'flex', alignItems:'center', gap:12, background:'linear-gradient(135deg,#5b21b6,#7c3aed)', borderRadius:16, padding:'14px 16px', marginBottom:16, cursor:'pointer', boxShadow:'0 4px 16px rgba(91,33,182,0.25)' }}
+                style={{ display:'flex', alignItems:'center', gap:12, background:'linear-gradient(135deg,#5b21b6,#7c3aed)', borderRadius:16, padding:'14px 16px', marginBottom:14, cursor:'pointer', boxShadow:'0 4px 16px rgba(91,33,182,0.25)' }}
               >
                 <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                   <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:22 }}>swap_horiz</span>
@@ -768,48 +731,17 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
               </div>
             )}
 
-            {/* Summary row */}
-            <div style={{ display:'flex', gap:10, marginBottom:20 }}>
-              {/* Offen */}
-              <div style={{ flex:1, background:'#fff', borderRadius:18, padding:'16px 14px', boxShadow:'0 2px 10px rgba(0,0,0,0.06)', border:'1px solid #EDF1F2' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
-                  <span style={{ width:8, height:8, borderRadius:'50%', background: open+inProgress > 0 ? '#f59e0b' : '#ccc', flexShrink:0 }}/>
-                  <span style={{ fontSize:10, fontWeight:700, color:'#9BA8A9', textTransform:'uppercase', letterSpacing:'0.08em' }}>Offen</span>
-                </div>
-                <div style={{ fontSize:34, fontWeight:800, color:'#1a2020', fontFamily:'Manrope,sans-serif', lineHeight:1 }}>{open + inProgress}</div>
-                <div style={{ fontSize:11, color:'#9BA8A9', marginTop:4 }}>diese Woche</div>
-              </div>
-              {/* Erledigt */}
-              <div style={{ flex:1, background:'#fff', borderRadius:18, padding:'16px 14px', boxShadow:'0 2px 10px rgba(0,0,0,0.06)', border:'1px solid #EDF1F2' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
-                  <span style={{ width:8, height:8, borderRadius:'50%', background: done > 0 ? '#2f7681' : '#ccc', flexShrink:0 }}/>
-                  <span style={{ fontSize:10, fontWeight:700, color:'#9BA8A9', textTransform:'uppercase', letterSpacing:'0.08em' }}>Erledigt</span>
-                </div>
-                <div style={{ fontSize:34, fontWeight:800, color: done > 0 ? '#2f7681' : '#1a2020', fontFamily:'Manrope,sans-serif', lineHeight:1 }}>{done}</div>
-                <div style={{ fontSize:11, color:'#9BA8A9', marginTop:4 }}>diese Woche</div>
-              </div>
-            </div>
+
 
 
 
             {/* Task list */}
-            <section style={{ ...s.secHead, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
-              <h3 style={s.secTitle}>Aufgaben – {selectedDay.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
-              {Object.keys(grouped).length >= 2 && (
-                <button onClick={optimizeRoute} disabled={optimizingRoute}
-                  style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:12, border:'1.5px solid var(--pri)', background:'var(--pri-xl)', color:'var(--pri)', fontSize:12, fontWeight:700, cursor:optimizingRoute?'default':'pointer', opacity:optimizingRoute?0.6:1 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:15 }}>{optimizingRoute ? 'hourglass_empty' : 'route'}</span>
-                  {optimizingRoute ? 'Optimiere…' : 'Route optimieren'}
-                </button>
-              )}
-            </section>
-
             {loading ? (
               <div style={s.empty}><span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--txt-muted)', opacity: 0.4 }}>hourglass_empty</span><p style={s.emptyTxt}>Wird geladen...</p></div>
             ) : filteredByDay.length === 0 ? (
               (() => {
                 const dStr2 = selectedDay.toISOString().split('T')[0]
-                const activLeave = myLeaves.find(l => l.status !== 'abgelehnt' && dStr2 >= l.from_date && dStr2 <= l.to_date)
+                const activLeave = myLeaves.find((l: any) => l.status !== 'abgelehnt' && dStr2 >= l.from_date && dStr2 <= l.to_date)
                 if (activLeave) {
                   const isKrank = activLeave.request_type === 'krankmeldung'
                   const stMap: Record<string,string> = { genehmigt:'Genehmigt', ausstehend:'Ausstehend', abgelehnt:'Abgelehnt' }
@@ -822,85 +754,120 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
                     </div>
                   )
                 }
-                return <div style={s.empty}><span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--ok)', opacity: 0.5 }}>check_circle</span><p style={s.emptyTxt}>Keine Aufgaben für diesen Tag</p><p style={s.emptySub}>Genieß den freien Tag!</p></div>
-              })()
-            ) : (
-              sortedGroupEntries.map(([objectKey, tasks], groupIdx) => {
-                const groupCount = sortedGroupEntries.length;
-                const obj = tasks[0].tasks?.objects
                 return (
-                  <div key={tasks[0].id} style={{ marginBottom: 20 }}>
-                    <div style={{ ...s.groupHead, justifyContent:'space-between' }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span className="material-symbols-outlined icon-sm" style={{ color: 'var(--pri)' }}>location_on</span>
-                        <span style={s.groupName}>{obj ? `${obj.address}, ${obj.city}` : 'Objekt unbekannt'}</span>
-                      </div>
-                      {groupCount > 1 && (
-                        <div style={{ display:'flex', gap:4 }}>
-                          <button disabled={groupIdx === 0} onClick={() => reorderGroup(objectKey, 'up')}
-                            style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--outline)', background:'var(--surf-low)', color: groupIdx===0?'var(--txt-muted)':'var(--pri)', cursor:groupIdx===0?'default':'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity:groupIdx===0?0.4:1 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize:16 }}>expand_less</span>
-                          </button>
-                          <button disabled={groupIdx === groupCount-1} onClick={() => reorderGroup(objectKey, 'down')}
-                            style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--outline)', background:'var(--surf-low)', color: groupIdx===groupCount-1?'var(--txt-muted)':'var(--pri)', cursor:groupIdx===groupCount-1?'default':'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity:groupIdx===groupCount-1?0.4:1 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize:16 }}>expand_more</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {tasks.map(a => {
-                        const due = formatDue(a.due_date)
-                        const meta = STATUS_META[a.status]
-                        const catName = a.tasks?.categories?.name || ''
-                        const catIcon = CAT_ICONS[catName] || 'cleaning_services'
-                        const isDone = a.status === 'erledigt'
-                        const isProb = a.status === 'problem'
-                        return (
-                          <div key={a.id} style={{ ...s.tcard, opacity: isDone ? 0.65 : 1 }}>
-                            <div style={{ ...s.tcardIcon, background: isProb ? 'var(--err-bg)' : isDone ? 'var(--ok-bg)' : 'var(--surf-low)' }}>
-                              <span className="material-symbols-outlined" style={{ color: isProb ? 'var(--err-dot)' : isDone ? '#166534' : 'var(--pri)' }}>{catIcon}</span>
-                            </div>
-                            <div style={{ flex: 1 }} onClick={() => setDetail(a)}>
-                              <h4 style={{ ...s.tcardTitle, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--txt-muted)' : 'var(--txt)' }}>{a.tasks?.title}</h4>
-                              <div style={s.tcardMeta}>
-                                {catName && <span style={s.catBadge}>{catName}</span>}
-                                <span style={s.tcardDue}>
-                                  <span className="material-symbols-outlined icon-sm" style={{ color: due.urgent ? 'var(--err-dot)' : 'var(--txt-muted)' }}>schedule</span>
-                                  <span style={{ color: due.urgent ? 'var(--err-dot)' : 'var(--txt-muted)', fontWeight: due.urgent ? 600 : 400 }}>{due.label}</span>
-                                </span>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <span style={{ ...s.statusBadge, background: meta.bg, color: meta.color }}>
-                                <span className="material-symbols-outlined icon-sm icon-fill">{meta.icon}</span>
-                                {meta.label}
-                              </span>
-                              <button style={s.chevronBtn} onClick={() => setDetail(a)}>
-                                <span className="material-symbols-outlined">chevron_right</span>
-                              </button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                  <div style={{ background:'var(--surf-card)', borderRadius:16, padding:36, textAlign:'center', border:'1px solid var(--outline)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:42, color:'var(--outline)', display:'block', marginBottom:8 }}>event_available</span>
+                    <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>Kein Einsatz</div>
+                    <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:4 }}>Für diesen Tag sind keine Aufgaben geplant.</div>
                   </div>
                 )
-              })
+              })()
+            ) : (
+              <>
+                {filteredByDay.some((a: TaskAssignment) => a.status === 'offen' || a.status === 'in_arbeit') && (
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:12, padding:'8px 12px', background:'var(--surf-low)', borderRadius:10, border:'1px dashed var(--outline)', display:'flex', alignItems:'center', gap:8 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--pri)' }}>swipe</span>
+                    <span><b>Tipp:</b> rechts = erledigt · links = Problem · Buttons = Schnellaktionen</span>
+                  </div>
+                )}
+                {sortedGroupEntries.map(([objectKey, tasks], groupIdx) => {
+                  const groupCount = sortedGroupEntries.length
+                  const obj = (tasks[0] as TaskAssignment).tasks?.objects
+                  return (
+                    <div key={(tasks[0] as TaskAssignment).id} style={{ marginBottom:18 }}>
+                      {/* Object group header */}
+                      <button onClick={() => obj && setObjectSheetObj(obj)}
+                        style={{ width:'100%', display:'flex', alignItems:'center', gap:10, marginBottom:10, padding:'8px 10px', borderRadius:12, background:'transparent', border:'none', cursor: obj ? 'pointer' : 'default', textAlign:'left' }}>
+                        <div style={{ width:32, height:32, borderRadius:9, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, borderLeft:'3px solid var(--pri)' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--pri)' }}>apartment</span>
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)', display:'flex', alignItems:'center', gap:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {obj ? (obj.name || obj.address) : 'Objekt unbekannt'}
+                            {obj && <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--txt-muted)', flexShrink:0 }}>arrow_forward_ios</span>}
+                          </div>
+                          <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {obj ? `${obj.address}, ${obj.city}` : ''} · {tasks.length} Aufgabe{tasks.length>1?'n':''}
+                          </div>
+                        </div>
+                        {groupCount > 1 && (
+                          <div style={{ display:'flex', gap:4, flexShrink:0 }} onClick={e => e.stopPropagation()}>
+                            <button disabled={groupIdx === 0} onClick={() => reorderGroup(objectKey, 'up')}
+                              style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--outline)', background:'var(--surf-low)', color: groupIdx===0?'var(--txt-muted)':'var(--pri)', cursor:groupIdx===0?'default':'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity:groupIdx===0?0.4:1 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize:16 }}>expand_less</span>
+                            </button>
+                            <button disabled={groupIdx === groupCount-1} onClick={() => reorderGroup(objectKey, 'down')}
+                              style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--outline)', background:'var(--surf-low)', color: groupIdx===groupCount-1?'var(--txt-muted)':'var(--pri)', cursor:groupIdx===groupCount-1?'default':'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity:groupIdx===groupCount-1?0.4:1 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize:16 }}>expand_more</span>
+                            </button>
+                          </div>
+                        )}
+                      </button>
+                      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        {(tasks as TaskAssignment[]).map(a => {
+                          const due = formatDue(a.due_date)
+                          const meta = STATUS_META[a.status]
+                          const catName = a.tasks?.categories?.name || ''
+                          const catIcon = CAT_ICONS[catName] || 'cleaning_services'
+                          return (
+                            <SwipeableTaskCard
+                              key={a.id} a={a} meta={meta} due={due} catIcon={catIcon} catName={catName}
+                              onOpenDetail={() => setDetail(a)}
+                              onSwipeRight={() => {
+                                if (a.status === 'offen') updateStatus(a.id, 'in_arbeit')
+                                else { setSheetTask(a); setSheetType('complete'); setSelectedOption(''); setTravelMinutes(0); setCustomTravel('') }
+                              }}
+                              onSwipeLeft={() => { setSheetTask(a); setSheetType('problem'); setSelectedOption(''); setProblemNote(''); setProblemUrgent(false) }}
+                              onInlineStart={() => updateStatus(a.id, 'in_arbeit')}
+                              onInlineComplete={() => { setSheetTask(a); setSheetType('complete'); setSelectedOption(''); setTravelMinutes(0); setCustomTravel('') }}
+                              onInlineProblem={() => { setSheetTask(a); setSheetType('problem'); setSelectedOption(''); setProblemNote(''); setProblemUrgent(false) }}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
             )}
           </>
-        )}
+          )
+        })()}
 
         {activeTab === 'zeit' && <ZeitTab userId={userId} myLeaves={myLeaves} vacationDaysPerYear={vacationDaysPerYear} assignments={assignments} onLeavesChanged={fetchMyLeaves} availableVertretungen={availableVertretungen} ownVertretungen={ownVertretungen} onTakeOver={takeOverVertretung} onCancelVertretung={cancelVertretung} takingOver={takingOver} cancellingVertretung={cancellingVertretung} />}
+        {activeTab === 'chat' && <ChatTab currentUserName={userName} currentUserId={userId} />}
         {activeTab === 'profile' && <ProfileTab userName={userName} initials={initials} onLogout={onLogout} userId={userId} pushEnabled={pushEnabled} pushSupported={pushSupported} onTogglePush={togglePush} onBugReport={()=>setShowBugReport(true)} />}
       </div>
+      {/* MonthSheet */}
+      <MonthSheet
+        open={monthSheetOpen}
+        anchorDate={selectedDay}
+        assignments={assignments}
+        myLeaves={myLeaves}
+        onClose={() => setMonthSheetOpen(false)}
+        onSelectDay={(d) => {
+          setSelectedDay(d)
+          setWeekOffset(Math.round((d.getTime() - new Date().getTime()) / (7*24*3600*1000)))
+          setMonthSheetOpen(false)
+        }}
+      />
+
+      {/* ObjectSheet */}
+      {objectSheetObj && (
+        <ObjectSheet
+          obj={objectSheetObj}
+          onClose={() => setObjectSheetObj(null)}
+        />
+      )}
 
       {/* Bottom nav */}
       <nav style={s.botNav}>
         {([
-          { id: 'start', icon: 'home',           label: 'Start' },
-          { id: 'tasks', icon: 'task_alt',        label: 'Aufgaben' },
-          { id: 'zeit',  icon: 'calendar_month',  label: 'Zeitplan' },
+          { id: 'start',   icon: 'home',           label: 'Start' },
+          { id: 'tasks',   icon: 'task_alt',        label: 'Aufgaben' },
+          { id: 'chat',    icon: 'chat_bubble',     label: 'Chat' },
+          { id: 'zeit',    icon: 'calendar_month',  label: 'Zeitplan' },
+          { id: 'profile', icon: 'person',          label: 'Profil' },
         ] as const).map(item => {
           const isOn = activeTab === item.id
           return (
@@ -997,7 +964,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
       {/* Bottom Sheet */}
       {sheetTask && sheetType && (
-        <div style={s.backdrop} onClick={() => { setSheetTask(null); setSheetType(null); setSelectedOption(''); setProblemNote(''); setVertretungNote(''); setTravelMinutes(0); setCustomTravel('') }}>
+        <div style={s.backdrop} onClick={() => { setSheetTask(null); setSheetType(null); setSelectedOption(''); setProblemNote(''); setProblemUrgent(false); setVertretungNote(''); setTravelMinutes(0); setCustomTravel('') }}>
           <div style={s.sheet} onClick={e => e.stopPropagation()}>
             <div style={s.sheetHandle} />
             <h3 style={s.sheetTitle}>
@@ -1073,49 +1040,80 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
                   )
                 })()}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                  {(sheetType === 'complete'
-                    ? [{ val:'done', icon:'check_circle', label:'Erledigt', sub:'Alles wie vereinbart durchgeführt' },
-                       { val:'photo', icon:'photo_camera', label:'Erledigt + Foto', sub:'Mit Fotodokumentation abschließen' }]
-                    : [{ val:'Kein Zugang', icon:'lock', label:'Kein Zugang', sub:'Gebäude/Bereich nicht zugänglich' },
-                       { val:'Schaden', icon:'build', label:'Schaden festgestellt', sub:'Defekt, Bruch, Wasserschaden o.ä.' },
-                       { val:'Sonstiges', icon:'chat', label:'Sonstiges', sub:'Anderes Problem beschreiben' }]
-                  ).map(o => (
-                    <div key={o.val} onClick={() => setSelectedOption(o.val)} style={{ ...s.sheetOpt, borderColor: selectedOption===o.val ? (sheetType==='problem'?'var(--err-dot)':'var(--pri)') : 'var(--outline)', background: selectedOption===o.val ? (sheetType==='problem'?'var(--err-bg)':'var(--pri-xl)') : 'var(--surf-card)' }}>
-                      <span className="material-symbols-outlined" style={{ color: sheetType==='problem' ? 'var(--err-dot)' : 'var(--pri)' }}>{o.icon}</span>
-                      <div><div style={{ fontSize: 14, fontWeight: 600 }}>{o.label}</div><div style={{ fontSize: 12, color: 'var(--txt-muted)', marginTop: 2 }}>{o.sub}</div></div>
+                {/* ── COMPLETE OPTIONS ── */}
+                {sheetType === 'complete' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                    {([{ val:'done', icon:'check_circle', label:'Erledigt', sub:'Alles wie vereinbart durchgeführt' },
+                      { val:'photo', icon:'photo_camera', label:'Erledigt + Foto', sub:'Mit Fotodokumentation abschließen' }
+                    ] as const).map(o => (
+                      <div key={o.val} onClick={() => setSelectedOption(o.val)} style={{ ...s.sheetOpt, borderColor: selectedOption===o.val ? 'var(--pri)' : 'var(--outline)', background: selectedOption===o.val ? 'var(--pri-xl)' : 'var(--surf-card)' }}>
+                        <span className="material-symbols-outlined" style={{ color: 'var(--pri)' }}>{o.icon}</span>
+                        <div><div style={{ fontSize: 14, fontWeight: 600 }}>{o.label}</div><div style={{ fontSize: 12, color: 'var(--txt-muted)', marginTop: 2 }}>{o.sub}</div></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* ── PROBLEM OPTIONS (neue Design-Version) ── */}
+                {sheetType === 'problem' && (
+                  <>
+                    {/* Info-Hinweis */}
+                    <div style={{ fontSize: 12, color: '#92400e', background: '#fff8e6', borderRadius: 10, padding: '9px 12px', marginBottom: 14, border: '1px solid #f4e3b8', display: 'flex', gap: 8, lineHeight: 1.45, alignItems: 'flex-start' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>info</span>
+                      <span>Till bekommt sofort eine Push-Nachricht — je mehr Infos, desto schneller die Hilfe.</span>
                     </div>
-                  ))}
-                </div>
-                {sheetType === 'problem' && selectedOption && (
-                  <div style={{ marginBottom: 12 }}>
+
+                    {/* Problemtyp-Chips */}
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Was ist los?</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginBottom: 16 }}>
+                      {(['Schlüssel fehlt', 'Kein Zugang', 'Schaden / Defekt', 'Reinigungsmittel fehlt', 'Nicht anwesend', 'Sonstiges'] as const).map((opt, idx) => {
+                        const icons = ['vpn_key','lock','build','cleaning_services','person_off','chat']
+                        const on = selectedOption === opt
+                        return (
+                          <button key={opt} onClick={() => setSelectedOption(opt)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 999, border: on ? '1.5px solid var(--err-dot)' : '1px solid var(--outline)', background: on ? 'var(--err-bg)' : 'var(--surf-card)', color: on ? 'var(--err-dot)' : 'var(--txt)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{icons[idx]}</span>
+                            {opt}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Notiz */}
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Notiz an Till (optional)</div>
                     <textarea
                       value={problemNote}
                       onChange={e => setProblemNote(e.target.value)}
-                      placeholder={selectedOption === 'Sonstiges' ? 'Was ist genau passiert? (Pflicht)' : 'Zusätzliche Details (optional)…'}
-                      rows={3}
-                      style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: `1.5px solid ${selectedOption === 'Sonstiges' && !problemNote.trim() ? 'var(--err-dot)' : 'var(--outline)'}`, background: 'var(--surf-low)', fontSize: 14, color: 'var(--txt)', fontFamily: 'var(--font-body)', resize: 'none', outline: 'none', boxSizing: 'border-box' }}
-                      autoFocus
+                      placeholder="z.B. Wo genau, was du brauchst, ob du weiterarbeiten kannst…"
+                      rows={2}
+                      style={{ width: '100%', padding: '11px 14px', borderRadius: 12, border: '1.5px solid var(--outline)', background: 'var(--surf-low)', fontSize: 14, color: 'var(--txt)', fontFamily: 'var(--font-body)', resize: 'none', outline: 'none', boxSizing: 'border-box', marginBottom: 14 }}
                     />
-                    {selectedOption === 'Sonstiges' && !problemNote.trim() && (
-                      <div style={{ fontSize: 12, color: 'var(--err)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>error</span>
-                        Bitte beschreibe das Problem kurz.
+
+                    {/* Dringlichkeit-Toggle */}
+                    <div onClick={() => setProblemUrgent((u: boolean) => !u)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: 12, border: `1px solid ${problemUrgent ? '#fca5a5' : 'var(--outline)'}`, background: problemUrgent ? 'var(--err-bg)' : 'var(--surf-card)', marginBottom: 16, cursor: 'pointer' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: problemUrgent ? 'var(--err-dot)' : 'var(--txt-muted)' }}>priority_high</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: problemUrgent ? 'var(--err-dot)' : 'var(--txt)' }}>Dringend</div>
+                        <div style={{ fontSize: 11, color: problemUrgent ? 'var(--err-dot)' : 'var(--txt-muted)', marginTop: 1 }}>Till wird mit Notruf-Push benachrichtigt</div>
                       </div>
-                    )}
-                  </div>
+                      <div style={{ width: 42, height: 24, borderRadius: 999, background: problemUrgent ? 'var(--err-dot)' : '#D7DEE0', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: problemUrgent ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}/>
+                      </div>
+                    </div>
+                  </>
                 )}
+
                 <button
-                  disabled={!selectedOption || updating || photoUploading || (selectedOption === 'Sonstiges' && !problemNote.trim())}
+                  disabled={!selectedOption || updating || photoUploading}
                   onClick={confirmAction}
-                  style={{ ...s.btnPri, width: '100%', justifyContent: 'center', opacity: (selectedOption && !(selectedOption === 'Sonstiges' && !problemNote.trim())) ? 1 : 0.4, background: sheetType==='problem' ? 'linear-gradient(135deg,#ba1a1a,#ef4444)' : undefined }}
+                  style={{ ...s.btnPri, width: '100%', justifyContent: 'center', opacity: selectedOption ? 1 : 0.4, background: sheetType==='problem' ? (problemUrgent ? 'linear-gradient(135deg,#7f1d1d,#ef4444)' : 'linear-gradient(135deg,#ba1a1a,#ef4444)') : undefined }}
                 >
-                  {(updating||photoUploading) ? 'Wird gespeichert...' : 'Bestätigen'}
+                  {(updating||photoUploading) ? 'Wird gespeichert...' : sheetType==='problem' ? (problemUrgent ? 'Senden · Notruf an Till' : 'Senden · Till informieren') : 'Bestätigen'}
                 </button>
               </>
             )}
 
-            <button onClick={() => { setSheetTask(null); setSheetType(null); setSelectedOption(''); setProblemNote(''); setVertretungNote(''); setTravelMinutes(0); setCustomTravel('') }} style={{ width:'100%', marginTop:8, padding:13, borderRadius:14, border:'none', background:'var(--surf-low)', color:'var(--txt-muted)', fontSize:14, fontWeight:600 }}>
+            <button onClick={() => { setSheetTask(null); setSheetType(null); setSelectedOption(''); setProblemNote(''); setProblemUrgent(false); setVertretungNote(''); setTravelMinutes(0); setCustomTravel('') }} style={{ width:'100%', marginTop:8, padding:13, borderRadius:14, border:'none', background:'var(--surf-low)', color:'var(--txt-muted)', fontSize:14, fontWeight:600 }}>
               Abbrechen
             </button>
           </div>
@@ -1186,6 +1184,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
       {/* Onboarding Tour */}
       {showTour && <OnboardingTour onClose={() => setShowTour(false)} />}
+      <WasIstNeu role="mitarbeiter" />
 
       {/* Bug Report */}
       {showBugReport && <BugReport userId={userId} onClose={()=>setShowBugReport(false)} />}
@@ -1206,6 +1205,700 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
           {toast.msg}
         </div>
       )}
+    </div>
+  )
+}
+
+
+// ─── ChatTab ──────────────────────────────────────────────────────────────────
+interface ChatContact {
+  id: string
+  name: string
+  role: string
+  initials: string
+  online: boolean
+  lastSeen?: string
+}
+
+interface ChatMessage {
+  id: string
+  sender: string
+  time: string
+  text: string
+  read: boolean
+  task_ref?: { title: string; object: string }
+}
+
+const CHAT_CONTACTS: ChatContact[] = [
+  { id:'till', name:'Till Heuser', role:'Chef · Steuber GmbH', initials:'TH', online:true },
+  { id:'lisa',  name:'Lisa Müller',    role:'Mitarbeiterin',    initials:'LM', online:true },
+  { id:'mehmet',name:'Mehmet Yılmaz', role:'Mitarbeiter',       initials:'MY', online:false, lastSeen:'vor 2 Std.' },
+]
+
+const INITIAL_CHAT_MESSAGES: Record<string, ChatMessage[]> = {
+  till: [
+    { id:'c1', sender:'till', time:'Mo 08:05', text:'Guten Morgen! Heute bitte Glasfassade zuerst, ist ein Termin um 11h danach.', read:true },
+    { id:'c2', sender:'me',   time:'Mo 08:07', text:'Alles klar, ich fang direkt damit an.', read:true },
+    { id:'c3', sender:'till', time:'Heute 09:18', text:'Habe dein Problem gesehen — Material liegt ab 11 Uhr beim Hausmeister.', read:false,
+      task_ref:{ title:'Glasreinigung', object:'Bürogebäude Nord' } },
+  ],
+  lisa: [
+    { id:'l1', sender:'lisa', time:'Gestern 14:30', text:'Hey! Hast du noch Glasreiniger übrig?', read:true },
+    { id:'l2', sender:'me',   time:'Gestern 14:35', text:'Hab leider auch keinen mehr. Till bringt heute welchen vorbei.', read:true },
+  ],
+  mehmet: [
+    { id:'m1', sender:'mehmet', time:'Di 11:00', text:'Kannst du Donnerstag meine Schicht am Rathaus übernehmen?', read:true },
+    { id:'m2', sender:'me',     time:'Di 11:15', text:'Ich schau mal — melde mich heute Abend.', read:true },
+  ],
+}
+
+function ChatTab({ currentUserName, currentUserId }: { currentUserName: string; currentUserId: string }) {
+  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(INITIAL_CHAT_MESSAGES)
+  const [openContact, setOpenContact] = useState<string|null>(null)
+
+  if (openContact) {
+    const contact = CHAT_CONTACTS.find(c => c.id === openContact)!
+    return (
+      <ChatConversation
+        contact={contact}
+        messages={messages[openContact] || []}
+        onBack={() => setOpenContact(null)}
+        onSend={(text) => {
+          const msg: ChatMessage = {
+            id: `c${Date.now()}`, sender:'me',
+            time: new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}),
+            text, read:true,
+          }
+          setMessages(prev => ({ ...prev, [openContact]: [...(prev[openContact]||[]), msg] }))
+        }}
+      />
+    )
+  }
+
+  return (
+    <div style={{ paddingBottom:80 }}>
+      <div style={{ padding:'10px 0 8px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 14px', background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:14 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>search</span>
+          <span style={{ fontSize:14, color:'var(--txt-muted)' }}>Suche</span>
+        </div>
+      </div>
+      <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8, marginTop:6 }}>Chats</div>
+      {CHAT_CONTACTS.map(contact => {
+        const msgs = messages[contact.id] || []
+        const lastMsg = msgs[msgs.length - 1]
+        const unread = msgs.filter(m => m.sender !== 'me' && !m.read).length
+        return (
+          <button key={contact.id} onClick={() => setOpenContact(contact.id)}
+            style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:16, marginBottom:8, cursor:'pointer', textAlign:'left' }}>
+            <div style={{ position:'relative', flexShrink:0 }}>
+              <div style={{ width:46, height:46, borderRadius:'50%', background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, color:'var(--pri)' }}>{contact.initials}</div>
+              {contact.online && <div style={{ position:'absolute', bottom:1, right:1, width:12, height:12, borderRadius:'50%', background:'var(--ok)', border:'2px solid var(--surf-card)' }}/>}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:3 }}>
+                <span style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{contact.name}</span>
+                {lastMsg && <span style={{ fontSize:11, color:'var(--txt-muted)' }}>{lastMsg.time}</span>}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span style={{ fontSize:13, color:'var(--txt-muted)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'80%' }}>
+                  {lastMsg ? (lastMsg.sender==='me' ? `Du: ${lastMsg.text}` : lastMsg.text) : contact.role}
+                </span>
+                {unread > 0 && (
+                  <span style={{ minWidth:20, height:20, borderRadius:99, background:'var(--pri)', color:'#fff', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px', marginLeft:8, flexShrink:0 }}>{unread}</span>
+                )}
+              </div>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function ChatConversation({ contact, messages, onBack, onSend }: {
+  contact: ChatContact
+  messages: ChatMessage[]
+  onBack: () => void
+  onSend: (text: string) => void
+}) {
+  const [input, setInput] = useState('')
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block:'end' })
+  }, [messages])
+
+  const send = () => {
+    const text = input.trim(); if (!text) return
+    onSend(text); setInput('')
+  }
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'calc(100vh - 140px)', background:'var(--bg)' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0 10px', background:'var(--surf-card)', borderBottom:'1px solid var(--outline)', flexShrink:0 }}>
+        <button onClick={onBack} style={{ background:'none', border:'none', cursor:'pointer', padding:'0 4px', display:'flex', alignItems:'center', color:'var(--pri)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize:22 }}>arrow_back</span>
+        </button>
+        <div style={{ position:'relative' }}>
+          <div style={{ width:36, height:36, borderRadius:'50%', background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'var(--pri)' }}>{contact.initials}</div>
+          {contact.online && <div style={{ position:'absolute', bottom:1, right:1, width:10, height:10, borderRadius:'50%', background:'var(--ok)', border:'2px solid var(--surf-card)' }}/>}
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{contact.name}</div>
+          <div style={{ fontSize:11, color: contact.online ? 'var(--ok)' : 'var(--txt-muted)', fontWeight:600 }}>{contact.online ? 'Jetzt online' : `Zuletzt ${contact.lastSeen || 'kürzlich'}`}</div>
+        </div>
+        <a href="tel:+49" onClick={e=>e.preventDefault()} style={{ width:36, height:36, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', textDecoration:'none' }}>
+          <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)', fontVariationSettings:"'FILL' 1" }}>call</span>
+        </a>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', padding:'14px 0 8px', display:'flex', flexDirection:'column', gap:8 }}>
+        <div style={{ textAlign:'center', marginBottom:6 }}>
+          <span style={{ fontSize:11, fontWeight:600, color:'var(--txt-muted)', background:'var(--surf-low)', padding:'3px 10px', borderRadius:99 }}>Diese Woche</span>
+        </div>
+        {messages.map((m, i) => {
+          const isMe = m.sender === 'me'
+          const showDiv = m.time?.startsWith('Heute') && i > 0 && !messages[i-1]?.time?.startsWith('Heute')
+          return (
+            <div key={m.id}>
+              {showDiv && (
+                <div style={{ textAlign:'center', margin:'4px 0' }}>
+                  <span style={{ fontSize:11, fontWeight:600, color:'var(--txt-muted)', background:'var(--surf-low)', padding:'3px 10px', borderRadius:99 }}>Heute</span>
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                <div style={{ maxWidth:'78%', background: isMe ? 'var(--pri)' : 'var(--surf-card)', color: isMe ? '#fff' : 'var(--txt)', borderRadius: isMe ? '16px 4px 16px 16px' : '4px 16px 16px 16px', padding:'10px 12px', border: isMe ? 'none' : '1px solid var(--outline)', boxShadow: isMe ? '0 2px 8px rgba(8,93,104,0.2)' : 'none' }}>
+                  {m.task_ref && (
+                    <div style={{ background: isMe ? 'rgba(255,255,255,0.18)' : 'var(--pri-xl)', borderRadius:8, padding:'6px 10px', marginBottom:8, borderLeft:`3px solid ${isMe ? 'rgba(255,255,255,0.5)' : 'var(--pri)'}`, fontSize:11 }}>
+                      <div style={{ fontWeight:700, color: isMe ? '#fff' : 'var(--pri)' }}>{m.task_ref.title}</div>
+                      <div style={{ color: isMe ? 'rgba(255,255,255,0.7)' : 'var(--txt-muted)', fontSize:10, marginTop:1 }}>{m.task_ref.object}</div>
+                    </div>
+                  )}
+                  <div style={{ fontSize:14, lineHeight:1.45 }}>{m.text}</div>
+                  <div style={{ fontSize:10, marginTop:5, fontWeight:600, textAlign:'right', color: isMe ? 'rgba(255,255,255,0.65)' : 'var(--txt-muted)', display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}>
+                    {m.time}
+                    {isMe && <span className="material-symbols-outlined" style={{ fontSize:13, fontVariationSettings:"'FILL' 1", color: m.read ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)' }}>done_all</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+        <div ref={bottomRef} style={{ height:1 }}/>
+      </div>
+      <div style={{ display:'flex', alignItems:'flex-end', gap:8, padding:'10px 0 14px', background:'var(--surf-card)', borderTop:'1px solid var(--outline)', flexShrink:0 }}>
+        <div style={{ flex:1, display:'flex', alignItems:'center', background:'var(--surf-low)', borderRadius:20, border:'1px solid var(--outline)', padding:'9px 14px', minHeight:42 }}>
+          <textarea value={input}
+            onChange={e => { setInput(e.target.value); e.currentTarget.style.height='auto'; e.currentTarget.style.height=e.currentTarget.scrollHeight+'px' }}
+            onKeyDown={e => { if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send() } }}
+            placeholder={`Nachricht an ${contact.name.split(' ')[0]}…`}
+            rows={1}
+            style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', resize:'none', maxHeight:100, fontFamily:'inherit', lineHeight:1.4, overflowY:'auto' }}/>
+        </div>
+        <button onClick={send} disabled={!input.trim()}
+          style={{ width:42, height:42, borderRadius:'50%', border:'none', background: input.trim() ? 'var(--pri)' : 'var(--outline)', display:'flex', alignItems:'center', justifyContent:'center', cursor: input.trim() ? 'pointer' : 'default', transition:'background 0.15s', flexShrink:0 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:20, color:'#fff', fontVariationSettings:"'FILL' 1" }}>send</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── SwipeableTaskCard ────────────────────────────────────────────────────────
+// Swipe rechts → starten (offen) / abschließen (in_arbeit)
+// Swipe links → Problem-Sheet öffnen
+// Tap → Detail-Overlay öffnen
+function SwipeableTaskCard({ a, meta, due, catIcon, catName, onOpenDetail, onSwipeRight, onSwipeLeft, onInlineStart, onInlineComplete, onInlineProblem }: {
+  a: TaskAssignment
+  meta: { label: string; icon: string; bg: string; color: string }
+  due: { label: string; urgent: boolean }
+  catIcon: string
+  catName: string
+  onOpenDetail: () => void
+  onSwipeRight: () => void
+  onSwipeLeft: () => void
+  onInlineStart?: () => void
+  onInlineComplete?: () => void
+  onInlineProblem?: () => void
+}) {
+  const [dx, setDx] = useState(0)
+  const [anim, setAnim] = useState(false)
+  const startX = useRef<number | null>(null)
+  const startY = useRef<number | null>(null)
+  const locked = useRef(false)
+
+  const isDone = a.status === 'erledigt'
+  const isProb = a.status === 'problem'
+  const isActive = a.status === 'offen' || a.status === 'in_arbeit'
+
+  const tsStart = (clientX: number, clientY: number) => {
+    if (!isActive) return
+    startX.current = clientX; startY.current = clientY
+    locked.current = false; setAnim(false)
+  }
+  const tsMove = (clientX: number, clientY: number, cancelable: boolean) => {
+    if (!isActive || startX.current === null || startY.current === null) return
+    const dX = clientX - startX.current
+    const dY = clientY - startY.current
+    if (!locked.current) {
+      if (Math.abs(dY) > 8 && Math.abs(dY) > Math.abs(dX)) { startX.current = null; return }
+      if (Math.abs(dX) > 8) locked.current = true; else return
+    }
+    setDx(Math.max(-130, Math.min(130, dX)))
+  }
+  const tsEnd = () => {
+    if (startX.current === null) return
+    startX.current = null; setAnim(true)
+    if (dx > 90) {
+      setDx(400); setTimeout(() => { onSwipeRight(); setDx(0); setAnim(false) }, 200)
+    } else if (dx < -90) {
+      setDx(-400); setTimeout(() => { onSwipeLeft(); setDx(0); setAnim(false) }, 200)
+    } else { setDx(0); setTimeout(() => setAnim(false), 240) }
+  }
+
+  const swipeOp = Math.min(1, Math.abs(dx) / 90)
+
+  return (
+    <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', marginBottom: 0 }}>
+      {/* Swipe-Reveal-Hintergrund */}
+      {isActive && (
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+          justifyContent: dx > 0 ? 'flex-start' : 'flex-end', padding: '0 16px',
+          background: dx > 0 ? (a.status === 'offen' ? '#1565c0' : '#16a34a') : '#b91c1c',
+          opacity: swipeOp, borderRadius: 14,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontWeight: 800, fontSize: 13 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: "'FILL' 1" }}>
+              {dx > 0 ? (a.status === 'offen' ? 'play_arrow' : 'task_alt') : 'warning'}
+            </span>
+            {dx > 0 ? (a.status === 'offen' ? 'Starten' : 'Erledigt') : 'Problem'}
+          </div>
+        </div>
+      )}
+
+      {/* Eigentliche Card */}
+      <div
+        onTouchStart={e => tsStart(e.touches[0].clientX, e.touches[0].clientY)}
+        onTouchMove={e => { tsMove(e.touches[0].clientX, e.touches[0].clientY, e.cancelable); if (locked.current && e.cancelable) e.preventDefault() }}
+        onTouchEnd={tsEnd}
+        onMouseDown={e => tsStart(e.clientX, e.clientY)}
+        onMouseMove={e => { if (e.buttons === 1 && startX.current !== null) tsMove(e.clientX, e.clientY, false) }}
+        onMouseUp={tsEnd}
+        onMouseLeave={() => { if (startX.current !== null) tsEnd() }}
+        style={{
+          ...s.tcard, opacity: isDone ? 0.65 : 1,
+          transform: `translateX(${dx}px)`,
+          transition: anim ? 'transform 0.22s cubic-bezier(.32,.72,0,1)' : 'none',
+          touchAction: isActive ? 'pan-y' : 'auto', userSelect: 'none', position: 'relative', zIndex: 1,
+        }}
+      >
+        <div style={{ ...s.tcardIcon, background: isProb ? 'var(--err-bg)' : isDone ? 'var(--ok-bg)' : 'var(--surf-low)' }}>
+          <span className="material-symbols-outlined" style={{ color: isProb ? 'var(--err-dot)' : isDone ? '#166534' : 'var(--pri)' }}>{catIcon}</span>
+        </div>
+        <div style={{ flex: 1 }} onClick={onOpenDetail}>
+          <h4 style={{ ...s.tcardTitle, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? 'var(--txt-muted)' : 'var(--txt)' }}>{a.tasks?.title}</h4>
+          <div style={s.tcardMeta}>
+            {catName && <span style={s.catBadge}>{catName}</span>}
+            <span style={s.tcardDue}>
+              <span className="material-symbols-outlined icon-sm" style={{ color: due.urgent ? 'var(--err-dot)' : 'var(--txt-muted)' }}>schedule</span>
+              <span style={{ color: due.urgent ? 'var(--err-dot)' : 'var(--txt-muted)', fontWeight: due.urgent ? 600 : 400 }}>{due.label}</span>
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ ...s.statusBadge, background: meta.bg, color: meta.color }}>
+            <span className="material-symbols-outlined icon-sm icon-fill">{meta.icon}</span>
+            {meta.label}
+          </span>
+          <button style={s.chevronBtn} onClick={onOpenDetail}>
+            <span className="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
+        {/* ── Inline action buttons ── */}
+        {a.status === 'offen' && (
+          <div style={{ display:'flex', gap:8, marginTop:10 }} onClick={e => e.stopPropagation()}>
+            <button onClick={onInlineStart}
+              style={{ flex:1, padding:'9px 0', borderRadius:12, border:'none', background:'#1565c0', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:15 }}>play_arrow</span>Starten
+            </button>
+            <button onClick={onInlineComplete}
+              style={{ flex:1, padding:'9px 0', borderRadius:12, border:'1px solid #b6dec533', background:'var(--ok-bg)', color:'var(--ok)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:15, fontVariationSettings:"'FILL' 1" }}>task_alt</span>Fertig
+            </button>
+            <button onClick={onInlineProblem}
+              style={{ padding:'9px 14px', borderRadius:12, border:'1px solid #fca5a533', background:'var(--err-bg)', color:'var(--err-dot)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:15 }}>warning</span>
+            </button>
+          </div>
+        )}
+        {a.status === 'in_arbeit' && (
+          <div style={{ display:'flex', gap:8, marginTop:10 }} onClick={e => e.stopPropagation()}>
+            <button onClick={onInlineComplete}
+              style={{ flex:1, padding:'9px 0', borderRadius:12, border:'none', background:'var(--ok)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:15, fontVariationSettings:"'FILL' 1" }}>task_alt</span>Abschließen
+            </button>
+            <button onClick={onInlineProblem}
+              style={{ flex:1, padding:'9px 0', borderRadius:12, border:'1px solid #fca5a533', background:'var(--err-bg)', color:'var(--err-dot)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:15 }}>warning</span>Problem
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
+// ── ObjectSheet ────────────────────────────────────────────────────────────────
+function ObjectSheet({ obj, onClose }: { obj: any; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false)
+  const [visible, setVisible] = useState(false)
+  const [contacts, setContacts] = useState<any[]>([])
+
+  useEffect(() => {
+    setMounted(true)
+    requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
+    // Load contacts for this customer
+    if (obj?.customers?.id) {
+      supabase
+        .from('contact_persons')
+        .select('id,name,role,phone,email')
+        .eq('customer_id', obj.customers.id)
+        .order('sort_order', { ascending: true })
+        .then(({ data }) => { if (data) setContacts(data) })
+    }
+  }, [obj])
+
+  const close = () => {
+    setVisible(false)
+    setTimeout(onClose, 280)
+  }
+
+  if (!mounted) return null
+
+  const fullAddress = [obj.address, obj.address_supplement, obj.postal_code, obj.city].filter(Boolean).join(', ')
+  const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(fullAddress)}`
+
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:300,
+      background: visible ? 'rgba(13,31,34,0.45)' : 'rgba(13,31,34,0)',
+      transition:'background 0.25s', display:'flex', alignItems:'flex-end',
+    }} onClick={close}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        width:'100%', background:'var(--surf-card)', borderRadius:'24px 24px 0 0',
+        maxHeight:'88vh', overflowY:'auto',
+        transform: visible ? 'translateY(0)' : 'translateY(100%)',
+        transition:'transform 0.28s cubic-bezier(.32,.72,0,1)',
+        boxShadow:'0 -8px 32px rgba(0,0,0,0.18)',
+      }}>
+        {/* Handle */}
+        <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 4px' }}>
+          <div style={{ width:36, height:4, borderRadius:99, background:'var(--outline)' }}/>
+        </div>
+
+        {/* Header */}
+        <div style={{
+          background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)',
+          padding:'18px 20px 22px', color:'#fff', position:'relative', overflow:'hidden',
+        }}>
+          <span className="material-symbols-outlined" style={{
+            position:'absolute', right:-20, bottom:-30, fontSize:160,
+            color:'rgba(255,255,255,0.07)',
+          }}>apartment</span>
+          <div style={{ position:'relative', zIndex:1 }}>
+            {obj.customers?.name && (
+              <div style={{ fontSize:10, fontWeight:700, opacity:0.7, letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:6 }}>
+                {obj.customers.name}
+              </div>
+            )}
+            <div style={{ fontSize:22, fontWeight:800, fontFamily:'Manrope,sans-serif', lineHeight:1.15, marginBottom:4 }}>
+              {obj.name || obj.address}
+            </div>
+            <div style={{ fontSize:13, opacity:0.9 }}>
+              {[obj.address, obj.postal_code, obj.city].filter(Boolean).join(' · ')}
+            </div>
+          </div>
+        </div>
+
+        {/* Action tiles */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', borderBottom:'1px solid var(--outline)' }}>
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={close}
+            style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, padding:'18px 0', textDecoration:'none', borderRight:'1px solid var(--outline)' }}>
+            <span className="material-symbols-outlined icon-fill" style={{ fontSize:22, color:'var(--pri)' }}>directions</span>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>Navigation</div>
+            <div style={{ fontSize:11, color:'var(--txt-muted)' }}>In Maps öffnen</div>
+          </a>
+          {contacts.length > 0 && contacts[0].phone ? (
+            <a href={`tel:${contacts[0].phone}`}
+              style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, padding:'18px 0', textDecoration:'none' }}>
+              <span className="material-symbols-outlined icon-fill" style={{ fontSize:22, color:'var(--pri)' }}>call</span>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>Anrufen</div>
+              <div style={{ fontSize:11, color:'var(--txt-muted)', maxWidth:120, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{contacts[0].name}</div>
+            </a>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, padding:'18px 0', opacity:0.35 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:22, color:'var(--txt-muted)' }}>call</span>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--txt-muted)' }}>Anrufen</div>
+              <div style={{ fontSize:11, color:'var(--txt-muted)' }}>Kein Kontakt</div>
+            </div>
+          )}
+        </div>
+
+        {/* Info blocks */}
+        <div style={{ padding:'18px 20px 28px' }}>
+          {obj.access_note && (
+            <ObjInfoBlock icon="vpn_key" label="Zugang" text={obj.access_note} />
+          )}
+          {obj.parking_note && (
+            <ObjInfoBlock icon="local_parking" label="Parken" text={obj.parking_note} />
+          )}
+          {obj.floor_info && (
+            <ObjInfoBlock icon="layers" label="Etagen" text={obj.floor_info} />
+          )}
+
+          {/* Contacts */}
+          {contacts.length > 0 && (
+            <>
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10, marginTop: (obj.access_note||obj.parking_note||obj.floor_info) ? 6 : 0 }}>
+                Ansprechpartner
+              </div>
+              {contacts.map(c => {
+                const initials = c.name.split(' ').map((w:string)=>w[0]).join('').toUpperCase().slice(0,2)
+                return (
+                  <div key={c.id} style={{
+                    display:'flex', alignItems:'center', gap:12,
+                    background:'var(--surf-low)', border:'1px solid var(--outline)',
+                    borderRadius:14, padding:'12px 14px', marginBottom:10,
+                  }}>
+                    <div style={{ width:40, height:40, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color:'var(--pri)', flexShrink:0 }}>
+                      {initials}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{c.name}</div>
+                      {c.role && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{c.role}</div>}
+                      {c.email && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{c.email}</div>}
+                    </div>
+                    {c.phone && (
+                      <a href={`tel:${c.phone}`}
+                        style={{ background:'var(--pri-xl)', color:'var(--pri)', width:38, height:38, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', textDecoration:'none', flexShrink:0 }}>
+                        <span className="material-symbols-outlined icon-fill" style={{ fontSize:18 }}>call</span>
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
+
+          {/* Notes hint box */}
+          {obj.notes && (
+            <div style={{ display:'flex', gap:10, padding:'12px 14px', background:'#fffbeb', border:'1px solid #f4e3b8', borderRadius:12, marginTop: contacts.length > 0 ? 6 : 0 }}>
+              <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color:'#92400e', flexShrink:0, marginTop:1 }}>info</span>
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:'#92400e', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:2 }}>Hinweis</div>
+                <div style={{ fontSize:13, color:'#5b3107', lineHeight:1.45 }}>{obj.notes}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!obj.access_note && !obj.parking_note && !obj.floor_info && contacts.length === 0 && !obj.notes && (
+            <div style={{ textAlign:'center', padding:'24px 0', color:'var(--txt-muted)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:40, display:'block', marginBottom:8, opacity:0.4 }}>info</span>
+              <div style={{ fontSize:13 }}>Noch keine Objektinfos hinterlegt.</div>
+              <div style={{ fontSize:12, marginTop:4, opacity:0.7 }}>Der Admin kann Zugang & Kontakt ergänzen.</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ObjInfoBlock({ icon, label, text }: { icon: string; label: string; text: string }) {
+  return (
+    <div style={{ display:'flex', gap:12, marginBottom:14 }}>
+      <div style={{ width:34, height:34, borderRadius:10, background:'var(--pri-xl)', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--pri)' }}>{icon}</span>
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:3 }}>{label}</div>
+        <div style={{ fontSize:13, color:'var(--txt)', lineHeight:1.45 }}>{text}</div>
+      </div>
+    </div>
+  )
+}
+
+
+// ── Konfetti ──────────────────────────────────────────────────────────────────
+function Konfetti() {
+  const pieces = Array.from({length:32}, (_:unknown, i:number) => ({
+    id: i,
+    x: Math.random()*100,
+    delay: Math.random()*0.8,
+    dur: 2.2 + Math.random()*1.2,
+    size: 6 + Math.random()*8,
+    color: ['#085d68','#16a34a','#f59e0b','#3b82f6','#8b5cf6','#ec4899'][i%6],
+    shape: i%3===0 ? 'circle' : 'rect',
+  }))
+  return (
+    <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:999, overflow:'hidden' }}>
+      <style>{`@keyframes konfettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(900px) rotate(720deg);opacity:0}}`}</style>
+      {pieces.map(p => (
+        <div key={p.id} style={{
+          position:'absolute', left:`${p.x}%`, top:0,
+          width:p.size, height:p.shape==='circle' ? p.size : p.size*0.6,
+          borderRadius: p.shape==='circle' ? '50%' : 2,
+          background: p.color,
+          animation:`konfettiFall ${p.dur}s ${p.delay}s ease-in forwards`,
+        }}/>
+      ))}
+      <div style={{
+        position:'absolute', top:'35%', left:'50%', transform:'translate(-50%,-50%)',
+        fontSize:30, fontWeight:900, color:'var(--ok)', textAlign:'center',
+        fontFamily:'Manrope,sans-serif', letterSpacing:'-0.02em',
+        textShadow:'0 2px 16px rgba(22,163,74,0.2)',
+      }}>Alle erledigt! 🎉</div>
+    </div>
+  )
+}
+
+// ── MonthSheet ─────────────────────────────────────────────────────────────────
+const MONTHS_LONG = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember']
+const DAY_ABBR = ['Mo','Di','Mi','Do','Fr','Sa','So']
+
+function MonthSheet({ open, anchorDate, assignments, myLeaves, onClose, onSelectDay }: {
+  open: boolean; anchorDate: Date; assignments: TaskAssignment[]; myLeaves: any[];
+  onClose: () => void; onSelectDay: (d: Date) => void
+}) {
+  const [mounted, setMounted] = useState(open)
+  const [visible, setVisible] = useState(false)
+  const [viewMonth, setViewMonth] = useState(() => new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1))
+
+  useEffect(() => {
+    if (open) {
+      setViewMonth(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1))
+      setMounted(true)
+      requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
+    } else {
+      setVisible(false)
+      const t = setTimeout(() => setMounted(false), 280)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+
+  if (!mounted) return null
+
+  const todayStr = new Date().toISOString().split('T')[0]
+  const anchorStr = anchorDate.toISOString().split('T')[0]
+  const year = viewMonth.getFullYear(), month = viewMonth.getMonth()
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7
+  const gridStart = new Date(year, month, 1 - firstWeekday)
+  const days = Array.from({length:42}, (_:unknown, i:number) => {
+    const d = new Date(gridStart); d.setDate(gridStart.getDate()+i); return d
+  })
+
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:300,
+      background: visible ? 'rgba(13,31,34,0.45)' : 'rgba(13,31,34,0)',
+      transition:'background 0.25s', display:'flex', alignItems:'flex-end',
+    }} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        width:'100%', background:'var(--surf-card)', borderRadius:'24px 24px 0 0',
+        maxHeight:'80vh', overflowY:'auto',
+        transform: visible ? 'translateY(0)' : 'translateY(100%)',
+        transition:'transform 0.28s cubic-bezier(.32,.72,0,1)',
+        boxShadow:'0 -8px 32px rgba(0,0,0,0.18)',
+      }}>
+        {/* Handle */}
+        <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 4px' }}>
+          <div style={{ width:36, height:4, borderRadius:99, background:'var(--outline)' }}/>
+        </div>
+        <div style={{ padding:'4px 16px 32px' }}>
+          {/* Header */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 4px 16px' }}>
+            <button onClick={()=>setViewMonth(new Date(year,month-1,1))}
+              style={{ width:38, height:38, borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-low)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:22, color:'var(--txt)' }}>chevron_left</span>
+            </button>
+            <button onClick={()=>{const t=new Date();setViewMonth(new Date(t.getFullYear(),t.getMonth(),1))}}
+              style={{ display:'flex', alignItems:'baseline', gap:6, background:'none', border:'none', cursor:'pointer' }}>
+              <span style={{ fontSize:18, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'var(--txt)' }}>{MONTHS_LONG[month]}</span>
+              <span style={{ fontSize:14, fontWeight:600, color:'var(--txt-muted)' }}>{year}</span>
+            </button>
+            <button onClick={()=>setViewMonth(new Date(year,month+1,1))}
+              style={{ width:38, height:38, borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-low)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:22, color:'var(--txt)' }}>chevron_right</span>
+            </button>
+          </div>
+
+          {/* Weekday headers */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:6 }}>
+            {DAY_ABBR.map(d => (
+              <div key={d} style={{ textAlign:'center', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', paddingBottom:4 }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Day grid */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4 }}>
+            {days.map((d, i) => {
+              const inMonth = d.getMonth() === month
+              const ds = d.toISOString().split('T')[0]
+              const isToday = ds === todayStr
+              const isAnchor = ds === anchorStr
+              const dayTasks = assignments.filter((a:TaskAssignment) => a.due_date === ds)
+              const total = dayTasks.length
+              const done = dayTasks.filter((a:TaskAssignment) => a.status === 'erledigt').length
+              const hasProb = dayTasks.some((a:TaskAssignment) => a.status === 'problem')
+              const allDone = total > 0 && done === total
+              const leave = myLeaves.find((l:any) => l.status!=='abgelehnt' && ds>=l.from_date && ds<=l.to_date)
+              const leaveColor = leave
+                ? leave.request_type==='krankmeldung' ? '#e53935'
+                : leave.status==='genehmigt' ? 'var(--pri)' : '#f59e0b'
+                : null
+              return (
+                <button key={i}
+                  onClick={() => { onSelectDay(new Date(ds+'T12:00:00')); onClose() }}
+                  style={{
+                    aspectRatio:'1', padding:0, border:'none', cursor:'pointer', borderRadius:10,
+                    background: isAnchor ? 'var(--pri)' : isToday ? 'var(--pri-xl)' : leaveColor ? leaveColor+'22' : 'transparent',
+                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3,
+                  }}>
+                  <span style={{
+                    fontSize:14, fontWeight: isToday||isAnchor ? 800 : 500, fontFamily:'Manrope,sans-serif',
+                    color: isAnchor ? '#fff' : !inMonth ? 'var(--txt-muted)' : isToday ? 'var(--pri)' : leaveColor ?? 'var(--txt)',
+                  }}>{d.getDate()}</span>
+                  {total > 0 ? (
+                    <div style={{ display:'flex', gap:2, alignItems:'center' }}>
+                      <span style={{ width:5, height:5, borderRadius:'50%', background: isAnchor?'#fff':hasProb?'var(--err-dot)':allDone?'var(--ok)':'var(--warn)' }}/>
+                      <span style={{ fontSize:9, fontWeight:700, color: isAnchor?'rgba(255,255,255,0.8)':'var(--txt-muted)' }}>{total}</span>
+                    </div>
+                  ) : <div style={{height:5}}/>}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Legend */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:18, paddingTop:14, borderTop:'1px solid var(--outline)' }}>
+            <div style={{ display:'flex', gap:12, fontSize:10, color:'var(--txt-muted)', flexWrap:'wrap' }}>
+              {[{c:'var(--warn)',l:'Offen'},{c:'var(--ok)',l:'Fertig'},{c:'var(--err-dot)',l:'Problem'}].map(({c,l})=>(
+                <span key={l} style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', background:c, display:'inline-block' }}/>
+                  {l}
+                </span>
+              ))}
+            </div>
+            <button onClick={()=>{ onSelectDay(new Date()); onClose() }}
+              style={{ fontSize:12, fontWeight:700, color:'var(--pri)', background:'none', border:'none', cursor:'pointer', padding:'4px 8px' }}>
+              Heute →
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

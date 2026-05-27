@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import * as XLSX from 'xlsx'
 import BugReport from '../components/BugReport'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
+import { WasIstNeu } from '../components/WasIstNeu'
 import QRCode from '../components/QRCode'
 import MapView from '../components/MapView'
 
@@ -25,30 +26,37 @@ interface TeamMember {
 }
 interface Category { id:string; name:string; emoji:string }
 type ObjectType = 'einfamilienhaus'|'mehrfamilienhaus'|'firmengelaende'|'grundstueck'
-interface ObjectItem { id:string; name:string; address:string; city:string; postal_code:string; object_number?:string|null; customer_id?:string|null; is_active:boolean; object_type?:ObjectType|null; address_supplement?:string|null; customers:{ name:string }|null }
+interface ObjectItem { id:string; name:string; address:string; city:string; postal_code:string; object_number?:string|null; customer_id?:string|null; is_active:boolean; object_type?:ObjectType|null; address_supplement?:string|null; notes?:string|null; access_note?:string|null; parking_note?:string|null; floor_info?:string|null; customers:{ id:string; name:string }|null }
+type CustomerType = 'privatperson'|'firma'|'weg-verwaltung'|'mietverwaltung'
 interface CustomerItem {
   id: string
-  customer_type: 'privatperson'|'firma'
-  name: string                          // kept for backward compat; = first_name + last_name for privatperson, company name for firma
-  // Split name fields
-  first_name?: string|null              // privatperson only
-  last_name?: string|null               // privatperson only
-  // Company contact
-  contact_person?: string|null          // legacy, kept for compat
-  contact_first_name?: string|null      // firma only
-  contact_last_name?: string|null       // firma only
+  customer_type: CustomerType
+  name: string                          // display name; computed for privatperson, company/WEG name otherwise
+  // Split name fields (privatperson only)
+  first_name?: string|null
+  last_name?: string|null
+  salutation?: string|null
+  // Company contact (legacy, kept for compat)
+  contact_person?: string|null
+  contact_first_name?: string|null
+  contact_last_name?: string|null
   email?: string|null
   phone?: string|null
-  // Split address
-  street?: string|null                  // legacy full street (kept)
-  street_name?: string|null             // new: just street name
-  street_number?: string|null           // new: house number
+  // Address
+  street?: string|null
+  street_name?: string|null
+  street_number?: string|null
   postal_code?: string|null
   city?: string|null
   address_supplement?: string|null
   notes?: string|null
   lexware_id?: string|null
   contract_type?: 'jahresvertrag'|'einmalig'|null
+  // WEG-Verwaltung: Verknüpfung zur Hausverwaltung + c/o-Ansprechpartner
+  hausverwaltung_id?: string|null
+  co_contact_id?: string|null
+  hausverwaltung?: { id:string; name:string; customer_type:CustomerType } | null
+  co_contact?: { id:string; name:string; role?:string|null; phone?:string|null; email?:string|null } | null
 }
 interface ContactPerson {
   id: string
@@ -57,6 +65,11 @@ interface ContactPerson {
   role?: string|null
   phone?: string|null
   email?: string|null
+  salutation?: string|null          // 'herr'|'frau'|'eheleute'|'firma' (Eigentümer)
+  first_name?: string|null
+  last_name?: string|null
+  second_first_name?: string|null
+  second_last_name?: string|null
   created_at: string
 }
 interface ContractItem { id:string; type:'jahresvertrag'|'einmalig'; start_date:string|null; end_date:string|null; object_id:string|null; customer_id:string|null }
@@ -217,9 +230,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.rpc('get_dashboard_problems'),
       supabase.from('users').select('id,full_name,phone,email,is_active,role_id,street,postal_code,city,created_at,employed_since,work_days,work_hours_per_week,work_hours_type,hourly_wage,admin_setup_done,is_onboarded,vacation_days_per_year').order('full_name'),
       supabase.from('tasks').select('id,title,description,interval,is_active,due_date,end_date,category_id,object_id,contract_id,default_assignee_id,categories(name,emoji),objects(name,address,city),contracts(id,type,start_date,end_date,object_id,customer_id),users!tasks_default_assignee_id_fkey(full_name)').order('created_at',{ascending:false}),
-      supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,customers(name)').order('address'),
+      supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)').order('address'),
       supabase.from('categories').select('*').order('name'),
-      supabase.from('customers').select('id,customer_type,name,first_name,last_name,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,contract_type').order('name'),
+      supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,contract_type,hausverwaltung_id,co_contact_id,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name'),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
     ])
     if (stRes.data) setStats(stRes.data)
@@ -228,7 +241,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     if (tkRes.data) setTasks(tkRes.data as unknown as TaskItem[])
     if (obRes.data) setObjects(obRes.data as unknown as ObjectItem[])
     if (catRes.data) setCategories(catRes.data)
-    if (custRes?.data) setCustomers(custRes.data as CustomerItem[])
+    if (custRes?.data) setCustomers(custRes.data as unknown as CustomerItem[])
     if (lvRes?.data) setLeaveRequests(lvRes.data as unknown as LeaveRequest[])
 
     // Tauschbörse: assignments with status=vertretung
@@ -1405,6 +1418,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       )}
 
       {/* Bug Report */}
+      <WasIstNeu role="admin" />
       {showBugReport && <BugReport userId={currentUserId} onClose={()=>setShowBugReport(false)} />}
       <PWAInstallBanner />
 
@@ -1943,6 +1957,10 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
   const [cityLocked, setCityLocked] = useState(false)
   const [addrSup, setAddrSup]     = useState(obj.address_supplement || '')
   const [objType, setObjType]     = useState<ObjectType>((obj.object_type as ObjectType) || 'mehrfamilienhaus')
+  const [accessNote, setAccessNote] = useState((obj as any).access_note || '')
+  const [parkingNote, setParkingNote] = useState((obj as any).parking_note || '')
+  const [floorInfo, setFloorInfo]   = useState((obj as any).floor_info || '')
+  const [objNotes, setObjNotes]     = useState(obj.notes || '')
   const [plzLoading, setPlzLoading] = useState(false)
 
   // Kunde ändern
@@ -1990,8 +2008,12 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
       object_type:  objType,
       name:         `${street.trim()}, ${postal.trim()} ${city.trim()}`,
       customer_id:  selectedCust?.id || null,
+      access_note:  accessNote.trim() || null,
+      parking_note: parkingNote.trim() || null,
+      floor_info:   floorInfo.trim() || null,
+      notes:        objNotes.trim() || null,
     }
-    const { data, error: e } = await supabase.from('objects').update(updates).eq('id', obj.id).select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,customers(name)').single()
+    const { data, error: e } = await supabase.from('objects').update(updates).eq('id', obj.id).select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)').single()
     if (e || !data) { setError(e?.message || 'Fehler beim Speichern'); setSaving(false); return }
     onSaved(data as unknown as ObjectItem)
   }
@@ -2091,7 +2113,7 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
               {custResults.map(c => (
                 <div key={c.id} onClick={() => { setSelectedCust(c); setCustResults([]); setCustQuery(''); setShowCustSearch(false) }}
                   style={{ padding:'10px 14px', borderBottom:'1px solid var(--outline)', cursor:'pointer', display:'flex', alignItems:'center', gap:10 }}>
-                  <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>{c.customer_type==='firma'?'business':'person'}</span>
+                  <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>{CUST_ICON[c.customer_type]}</span>
                   <div>
                     <div style={{ fontSize:13, fontWeight:700 }}>{c.name}</div>
                     {c.contact_person && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{c.contact_person}</div>}
@@ -2100,6 +2122,36 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
               ))}
             </div>
           )}
+
+          {/* Objektinfos für MA-App */}
+          <div style={{ marginTop:20, paddingTop:16, borderTop:'1px solid var(--outline)' }}>
+            <div style={{ fontSize:13, fontWeight:800, fontFamily:'var(--font-head)', marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>info</span>
+              Objektinfos für Mitarbeiter-App
+            </div>
+
+            <label style={s.fieldLabel}>Zugang / Zugangscode</label>
+            <div style={{ ...s.inputWrap, marginBottom:12 }}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>vpn_key</span>
+              <input value={accessNote} onChange={e => setAccessNote(e.target.value)} placeholder="z.B. Schlüssel beim Hausmeister, Code: 1234" style={s.input} />
+            </div>
+
+            <label style={s.fieldLabel}>Parken</label>
+            <div style={{ ...s.inputWrap, marginBottom:12 }}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>local_parking</span>
+              <input value={parkingNote} onChange={e => setParkingNote(e.target.value)} placeholder="z.B. Hofeinfahrt links, max. 2 Stunden" style={s.input} />
+            </div>
+
+            <label style={s.fieldLabel}>Etagen / Bereiche</label>
+            <div style={{ ...s.inputWrap, marginBottom:12 }}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>layers</span>
+              <input value={floorInfo} onChange={e => setFloorInfo(e.target.value)} placeholder="z.B. EG + 3 OG, Keller separat" style={s.input} />
+            </div>
+
+            <label style={s.fieldLabel}>Hinweis (wird gelb hervorgehoben)</label>
+            <textarea value={objNotes} onChange={e => setObjNotes(e.target.value)} placeholder="z.B. Hund im Haus, bitte klingeln"
+              style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box', resize:'vertical', minHeight:72, fontFamily:'inherit', marginBottom:16 }} />
+          </div>
 
           {/* Save */}
           <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg, var(--pri) 0%, var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'var(--font-head)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:4 }}>
@@ -2883,6 +2935,49 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   const [newCpRole, setNewCpRole]             = useState('')
   const [newCpPhone, setNewCpPhone]           = useState('')
   const [newCpEmail, setNewCpEmail]           = useState('')
+  // WEG: Hausverwaltung suchen/anlegen
+  const [hvQuery, setHvQuery]                 = useState('')
+  const [hvResults, setHvResults]             = useState<CustomerItem[]>([])
+  const [hvSearching, setHvSearching]         = useState(false)
+  const [selectedHv, setSelectedHv]           = useState<CustomerItem|null>(null)
+  const [hvCreateMode, setHvCreateMode]       = useState(false)
+  const [hvNewName, setHvNewName]             = useState('')
+  const [hvNewStreet, setHvNewStreet]         = useState('')
+  const [hvNewPostal, setHvNewPostal]         = useState('')
+  const [hvNewCity, setHvNewCity]             = useState('')
+  const [hvNewCityLocked, setHvNewCityLocked] = useState(false)
+  const [hvNewPlzLoading, setHvNewPlzLoading] = useState(false)
+  const [hvNewCpName, setHvNewCpName]         = useState('')
+  const [hvNewCpRole, setHvNewCpRole]         = useState('')
+  const [hvNewCpPhone, setHvNewCpPhone]       = useState('')
+  const [hvNewCpEmail, setHvNewCpEmail]       = useState('')
+  // WEG: c/o Ansprechpartner aus HV-Kontakten
+  const [hvContacts, setHvContacts]           = useState<ContactPerson[]>([])
+  const [selectedCoContact, setSelectedCoContact] = useState<ContactPerson|null>(null)
+  // Mietverwaltung: Eigentümer
+  const [mvEigTyp, setMvEigTyp]               = useState<'herr'|'frau'|'eheleute'|'firma'|''>('')
+  const [mvEigVorname, setMvEigVorname]         = useState('')
+  const [mvEigNachname, setMvEigNachname]       = useState('')
+  const [mvEigVorname2, setMvEigVorname2]       = useState('')
+  const [mvEigNachname2, setMvEigNachname2]     = useState('')
+  const [mvEigFirma, setMvEigFirma]             = useState('')
+  const [mvEigPhone, setMvEigPhone]             = useState('')
+  const [mvEigEmail, setMvEigEmail]             = useState('')
+  // Mietverwaltung: Verwaltung suchen/anlegen
+  const [mvVerwQuery, setMvVerwQuery]           = useState('')
+  const [mvVerwResults, setMvVerwResults]       = useState<CustomerItem[]>([])
+  const [mvVerwSearching, setMvVerwSearching]   = useState(false)
+  const [selectedMvVerw, setSelectedMvVerw]     = useState<CustomerItem|null>(null)
+  const [mvVerwCreateMode, setMvVerwCreateMode] = useState(false)
+  const [mvVerwNewName, setMvVerwNewName]       = useState('')
+  const [mvVerwNewStreet, setMvVerwNewStreet]   = useState('')
+  const [mvVerwNewPostal, setMvVerwNewPostal]   = useState('')
+  const [mvVerwNewCity, setMvVerwNewCity]       = useState('')
+  const [mvVerwNewCityLocked, setMvVerwNewCityLocked] = useState(false)
+  const [mvVerwNewPlzLoading, setMvVerwNewPlzLoading] = useState(false)
+  const [mvVerwNewCpName, setMvVerwNewCpName]   = useState('')
+  const [mvVerwNewCpPhone, setMvVerwNewCpPhone] = useState('')
+  const [mvVerwNewCpEmail, setMvVerwNewCpEmail] = useState('')
 
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -2914,6 +3009,64 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
     setNewPlzLoading(false)
   }
 
+  const lookupHvCity = async (plz: string) => {
+    setHvNewPostal(plz)
+    if (plz.length !== 5) { if (hvNewCityLocked) { setHvNewCity(''); setHvNewCityLocked(false) }; return }
+    setHvNewPlzLoading(true)
+    try {
+      const res = await fetch(`https://openplzapi.org/de/Localities?postalCode=${plz}`)
+      if (res.ok) { const data = await res.json(); const found = data[0]?.name; if (found) { setHvNewCity(found); setHvNewCityLocked(true) } }
+    } catch { /* ignore */ }
+    setHvNewPlzLoading(false)
+  }
+
+  const lookupMvVerwCity = async (plz: string) => {
+    setMvVerwNewPostal(plz)
+    if (plz.length !== 5) { if (mvVerwNewCityLocked) { setMvVerwNewCity(''); setMvVerwNewCityLocked(false) }; return }
+    setMvVerwNewPlzLoading(true)
+    try {
+      const res = await fetch(`https://openplzapi.org/de/Localities?postalCode=${plz}`)
+      if (res.ok) { const data = await res.json(); const found = data[0]?.name; if (found) { setMvVerwNewCity(found); setMvVerwNewCityLocked(true) } }
+    } catch { /* ignore */ }
+    setMvVerwNewPlzLoading(false)
+  }
+
+  const searchMvVerw = async (q: string) => {
+    setMvVerwQuery(q); setSelectedMvVerw(null); setMvVerwCreateMode(false)
+    if (q.trim().length < 2) { setMvVerwResults([]); return }
+    setMvVerwSearching(true)
+    const { data } = await supabase
+      .from('customers')
+      .select('id,customer_type,name,contact_person,email,phone,street,postal_code,city')
+      .in('customer_type', ['firma','mietverwaltung'])
+      .or(`name.ilike.%${q.trim()}%,contact_person.ilike.%${q.trim()}%`)
+      .limit(6)
+    setMvVerwResults(data || [])
+    setMvVerwSearching(false)
+  }
+
+  const searchHv = async (q: string) => {
+    setHvQuery(q); setSelectedHv(null); setHvCreateMode(false); setHvContacts([]); setSelectedCoContact(null)
+    if (q.trim().length < 2) { setHvResults([]); return }
+    setHvSearching(true)
+    const { data } = await supabase
+      .from('customers')
+      .select('id,customer_type,name,contact_person,email,phone,street,postal_code,city,lexware_id,hausverwaltung_id,co_contact_id')
+      .in('customer_type', ['firma','mietverwaltung'])
+      .or(`name.ilike.%${q.trim()}%,contact_person.ilike.%${q.trim()}%`)
+      .limit(6)
+    setHvResults(data || [])
+    setHvSearching(false)
+  }
+
+  const selectHv = async (hv: CustomerItem) => {
+    setSelectedHv(hv); setHvQuery(hv.name); setHvResults([]); setHvCreateMode(false)
+    // Lade Kontakte der HV
+    const { data } = await supabase.from('contact_persons').select('*').eq('customer_id', hv.id).order('created_at')
+    setHvContacts(data || [])
+    setSelectedCoContact(null)
+  }
+
   // Dynamische Kundensuche
   const searchCustomers = async (q: string) => {
     setCustQuery(q); setSelectedCust(null); setCreateMode(false)
@@ -2943,9 +3096,16 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       let lastName: string|null  = null
       let firstName2: string|null = null
       let lastName2: string|null  = null
+      let custSalutation: string|null = null
+      let custPhone: string|null = null
+      let custEmail: string|null = null
+
       if (newCustType === 'privatperson') {
         firstName = newVorname.trim() || null
         lastName  = newNachname.trim() || null
+        custSalutation = newAnrede || null
+        custPhone = newPhone.trim() || null
+        custEmail = newEmail.trim() || null
         if (newAnrede === 'eheleute') {
           firstName2 = newVorname2.trim() || null
           lastName2  = newNachname2.trim() || null
@@ -2955,11 +3115,31 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
         } else {
           builtName = `${newVorname.trim()} ${newNachname.trim()}`
         }
+      } else if (newCustType === 'mietverwaltung') {
+        custSalutation = mvEigTyp || null
+        custPhone = mvEigPhone.trim() || null
+        custEmail = mvEigEmail.trim() || null
+        if (mvEigTyp === 'firma') {
+          builtName = mvEigFirma.trim()
+        } else if (mvEigTyp === 'eheleute') {
+          firstName  = mvEigVorname.trim() || null
+          lastName   = mvEigNachname.trim() || null
+          firstName2 = mvEigVorname2.trim() || null
+          lastName2  = mvEigNachname2.trim() || null
+          builtName  = lastName && lastName === lastName2
+            ? `${mvEigVorname.trim()} und ${mvEigVorname2.trim()} ${mvEigNachname.trim()}`
+            : `${mvEigVorname.trim()} ${mvEigNachname.trim()}${mvEigVorname2.trim() ? ` & ${mvEigVorname2.trim()} ${mvEigNachname2.trim()}` : ''}`
+        } else {
+          firstName = mvEigVorname.trim() || null
+          lastName  = mvEigNachname.trim() || null
+          builtName = `${mvEigVorname.trim()} ${mvEigNachname.trim()}`
+        }
       }
+
       const { data: cust, error: e } = await supabase.from('customers').insert({
         customer_type: newCustType,
         name: builtName,
-        salutation: newCustType === 'privatperson' ? newAnrede || null : null,
+        salutation: custSalutation,
         first_name: firstName,
         last_name: lastName,
         contact_first_name: firstName2,
@@ -2968,14 +3148,78 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
         address_supplement: newAddrSup.trim() || null,
         postal_code: newPostal.trim() || null,
         city: newCity.trim() || null,
-        phone: newCustType === 'privatperson' ? newPhone.trim() || null : null,
-        email: newCustType === 'privatperson' ? newEmail.trim() || null : null,
+        phone: custPhone,
+        email: custEmail,
       }).select('id').single()
       if (e || !cust) { setError(e?.message || 'Kunde konnte nicht angelegt werden'); setSaving(false); return }
       customerId = cust.id
-      // Firma / Verwaltung: erster Ansprechpartner speichern
-      if (newCustType !== 'privatperson' && newCpName.trim()) {
+      // Firma: erster Ansprechpartner
+      if (newCustType === 'firma' && newCpName.trim()) {
         await supabase.from('contact_persons').insert({ customer_id: cust.id, name: newCpName.trim(), role: newCpRole.trim() || null, phone: newCpPhone.trim() || null, email: newCpEmail.trim() || null })
+      }
+
+      // Mietverwaltung: Verwaltung verknüpfen/anlegen
+      if (newCustType === 'mietverwaltung') {
+        let verwId: string | null = selectedMvVerw?.id || null
+        if (mvVerwCreateMode && mvVerwNewName.trim()) {
+          const { data: verwData } = await supabase.from('customers').insert({
+            customer_type: 'firma',
+            name: mvVerwNewName.trim(),
+            street: mvVerwNewStreet.trim() || null,
+            postal_code: mvVerwNewPostal.trim() || null,
+            city: mvVerwNewCity.trim() || null,
+          }).select('id').single()
+          if (verwData) {
+            verwId = verwData.id
+            if (mvVerwNewCpName.trim()) {
+              await supabase.from('contact_persons').insert({
+                customer_id: verwData.id,
+                name: mvVerwNewCpName.trim(),
+                phone: mvVerwNewCpPhone.trim() || null,
+                email: mvVerwNewCpEmail.trim() || null,
+              })
+            }
+          }
+        }
+        if (verwId) {
+          await supabase.from('customers').update({ hausverwaltung_id: verwId }).eq('id', cust.id)
+        }
+      }
+
+      // WEG: Hausverwaltung anlegen oder verwenden, dann co_contact setzen
+      if (newCustType === 'weg-verwaltung') {
+        let hvId: string | null = selectedHv?.id || null
+        let coContactId: string | null = selectedCoContact?.id || null
+
+        if (hvCreateMode && hvNewName.trim()) {
+          // Neue HV anlegen
+          const { data: hvData } = await supabase.from('customers').insert({
+            customer_type: 'firma',
+            name: hvNewName.trim(),
+            street: hvNewStreet.trim() || null,
+            postal_code: hvNewPostal.trim() || null,
+            city: hvNewCity.trim() || null,
+          }).select('id').single()
+
+          if (hvData) {
+            hvId = hvData.id
+            // Ansprechpartner der HV anlegen
+            if (hvNewCpName.trim()) {
+              const { data: cpData } = await supabase.from('contact_persons').insert({
+                customer_id: hvData.id,
+                name: hvNewCpName.trim(),
+                role: hvNewCpRole.trim() || null,
+                phone: hvNewCpPhone.trim() || null,
+                email: hvNewCpEmail.trim() || null,
+              }).select('id').single()
+              if (cpData) coContactId = cpData.id
+            }
+          }
+        }
+
+        if (hvId) {
+          await supabase.from('customers').update({ hausverwaltung_id: hvId, co_contact_id: coContactId }).eq('id', cust.id)
+        }
       }
     } else {
       setError('Bitte einen Kunden auswählen oder neu anlegen.'); setSaving(false); return
@@ -3017,7 +3261,16 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
     && newVorname.trim() !== ''
     && newNachname.trim() !== ''
     && (newAnrede !== 'eheleute' || (newVorname2.trim() !== '' && newNachname2.trim() !== ''))
-  const otherTypeValid = newCustType !== '' && newCustType !== 'privatperson' && newCustName.trim() !== ''
+  const mvEigValid = mvEigTyp !== '' && (
+    (mvEigTyp === 'firma' && mvEigFirma.trim() !== '') ||
+    (mvEigTyp !== 'firma' && mvEigVorname.trim() !== '' && mvEigNachname.trim() !== '')
+  )
+  const otherTypeValid = newCustType !== '' && newCustType !== 'privatperson' && (
+    (newCustType !== 'mietverwaltung' && newCustName.trim() !== '') ||
+    (newCustType === 'mietverwaltung' && mvEigValid)
+  ) && (
+    newCustType !== 'weg-verwaltung' || selectedHv !== null || (hvCreateMode && hvNewName.trim() !== '')
+  )
   const canSave  = !!selectedCust || (createMode && (privatpersonValid || otherTypeValid))
 
   return (
@@ -3405,27 +3658,24 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 </div>
               </>)}
 
-              {/* ── WEG-Verwaltung / Mietverwaltung (Platzhalter für nächsten Sprint) ── */}
-              {(newCustType === 'weg-verwaltung' || newCustType === 'mietverwaltung') && (<>
+              {/* ── WEG-Verwaltung ────────────────────────────────── */}
+              {newCustType === 'weg-verwaltung' && (<>
+                {/* Name + Adresse */}
                 <div style={{ marginBottom: 10 }}>
-                  <label style={s.fieldLabel}>{newCustType === 'weg-verwaltung' ? 'WEG-Name *' : 'Verwaltungsname *'}</label>
+                  <label style={s.fieldLabel}>WEG-Name *</label>
                   <div style={s.inputWrap}>
-                    <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>{newCustType === 'weg-verwaltung' ? 'apartment' : 'home_work'}</span>
-                    <input value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder={newCustType === 'weg-verwaltung' ? 'WEG Musterstraße' : 'Muster Hausverwaltung'} style={s.input}/>
+                    <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>apartment</span>
+                    <input value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="WEG Musterstraße 10" style={s.input}/>
                   </div>
                 </div>
-                {[
-                  { label:'Straße + Hausnummer', val:newStreet, set:setNewStreet, icon:'location_on', ph:'Musterstraße 1' },
-                ].map(f => (
-                  <div key={f.label} style={{ marginBottom: 10 }}>
-                    <label style={s.fieldLabel}>{f.label}</label>
-                    <div style={s.inputWrap}>
-                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>{f.icon}</span>
-                      <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={s.input}/>
-                    </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label style={s.fieldLabel}>Straße + Hausnummer</label>
+                  <div style={s.inputWrap}>
+                    <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>location_on</span>
+                    <input value={newStreet} onChange={e => setNewStreet(e.target.value)} placeholder="Musterstraße 10" style={s.input}/>
                   </div>
-                ))}
-                <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:10 }}>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:16 }}>
                   <div>
                     <label style={s.fieldLabel}>PLZ</label>
                     <div style={s.inputWrap}>
@@ -3441,23 +3691,394 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     </div>
                   </div>
                 </div>
-                {/* Ansprechpartner */}
-                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px', marginTop:4, border:'1px solid var(--outline)' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:10, display:'flex', alignItems:'center', gap:5 }}>
-                    <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner
-                  </div>
-                  {[
-                    { label:'Name', val:newCpName, set:setNewCpName, ph:'Max Mustermann' },
-                    { label:'Funktion / Rolle', val:newCpRole, set:setNewCpRole, ph:'Verwalter' },
-                    { label:'Telefon', val:newCpPhone, set:setNewCpPhone, ph:'+49 561 …' },
-                    { label:'E-Mail', val:newCpEmail, set:setNewCpEmail, ph:'verwaltung@beispiel.de' },
-                  ].map(f => (
-                    <div key={f.label} style={{ marginBottom:8 }}>
-                      <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
-                      <div style={s.inputWrap}><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+
+                {/* Divider */}
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                  <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Hausverwaltung</span>
+                  <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                </div>
+
+                {/* HV Suche / Auswahl */}
+                {!selectedHv && !hvCreateMode && (
+                  <>
+                    <div style={s.inputWrap}>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>domain</span>
+                      <input
+                        value={hvQuery}
+                        onChange={e => searchHv(e.target.value)}
+                        placeholder="Hausverwaltung suchen …"
+                        style={s.input}
+                      />
+                      {hvSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                     </div>
+                    {hvResults.length > 0 && (
+                      <div style={{ background:'var(--surf-card)', borderRadius:12, border:'1px solid var(--outline)', marginTop:6, marginBottom:8, overflow:'hidden' }}>
+                        {hvResults.map((hv, i) => (
+                          <div key={hv.id} onClick={() => selectHv(hv)}
+                            style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom: i<hvResults.length-1?'1px solid var(--outline)':'none', cursor:'pointer', background:'var(--surf-low)' }}>
+                            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>business</span>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:13, fontWeight:700 }}>{hv.name}</div>
+                              {hv.contact_person && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{hv.contact_person}</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {hvQuery.trim().length >= 2 && hvResults.length === 0 && !hvSearching && (
+                      <button onClick={() => { setHvCreateMode(true); setHvNewName(hvQuery.trim()) }}
+                        style={{ ...s.btnOutline, width:'100%', marginTop:8, marginBottom:8 }}>
+                        <span className="material-symbols-outlined icon-sm">add</span>
+                        „{hvQuery.trim()}" neu anlegen
+                      </button>
+                    )}
+                    {hvQuery.trim().length < 2 && (
+                      <button onClick={() => setHvCreateMode(true)}
+                        style={{ ...s.btnOutline, width:'100%', marginTop:8, marginBottom:8, fontSize:12 }}>
+                        <span className="material-symbols-outlined icon-sm">add</span>
+                        Neue Hausverwaltung anlegen
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {/* HV ausgewählt */}
+                {selectedHv && !hvCreateMode && (
+                  <div style={{ background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:12, padding:'10px 14px', marginBottom:12 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>domain</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'var(--pri)' }}>{selectedHv.name}</div>
+                        {selectedHv.street && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{selectedHv.street}</div>}
+                      </div>
+                      <button onClick={() => { setSelectedHv(null); setHvQuery(''); setHvContacts([]); setSelectedCoContact(null) }}
+                        style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', padding:4 }}>
+                        <span className="material-symbols-outlined icon-sm">close</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* HV neu anlegen */}
+                {hvCreateMode && (
+                  <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px', border:'1px solid var(--outline)', marginBottom:12 }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', display:'flex', alignItems:'center', gap:5 }}>
+                        <span className="material-symbols-outlined icon-sm">domain</span> Neue Hausverwaltung
+                      </div>
+                      <button onClick={() => { setHvCreateMode(false); setHvQuery('') }}
+                        style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', padding:2 }}>
+                        <span className="material-symbols-outlined icon-sm">close</span>
+                      </button>
+                    </div>
+                    {[
+                      { label:'Name *', val:hvNewName, set:setHvNewName, ph:'Muster Hausverwaltung GmbH' },
+                      { label:'Straße + Hausnummer', val:hvNewStreet, set:setHvNewStreet, ph:'Beispielweg 5' },
+                    ].map(f => (
+                      <div key={f.label} style={{ marginBottom:8 }}>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
+                        <div style={s.inputWrap}><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+                      </div>
+                    ))}
+                    <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:8 }}>
+                      <div>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>PLZ</label>
+                        <div style={s.inputWrap}>
+                          <input value={hvNewPostal} onChange={e => lookupHvCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
+                          {hvNewPlzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>Ort</label>
+                        <div style={{ ...s.inputWrap, background: hvNewCityLocked ? 'var(--ok-bg)' : undefined }}>
+                          <input value={hvNewCity} onChange={e => { setHvNewCity(e.target.value); setHvNewCityLocked(false) }} placeholder="Melsungen" style={s.input}/>
+                          {hvNewCityLocked && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, marginTop:4, display:'flex', alignItems:'center', gap:5 }}>
+                      <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner HV (optional)
+                    </div>
+                    {[
+                      { label:'Name', val:hvNewCpName, set:setHvNewCpName, ph:'Max Mustermann' },
+                      { label:'Funktion', val:hvNewCpRole, set:setHvNewCpRole, ph:'Verwalter' },
+                      { label:'Telefon', val:hvNewCpPhone, set:setHvNewCpPhone, ph:'+49 561 …' },
+                      { label:'E-Mail', val:hvNewCpEmail, set:setHvNewCpEmail, ph:'verwaltung@beispiel.de' },
+                    ].map(f => (
+                      <div key={f.label} style={{ marginBottom:6 }}>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
+                        <div style={s.inputWrap}><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* c/o Ansprechpartner (aus HV-Kontakten) */}
+                {(selectedHv || hvCreateMode) && (
+                  <>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, marginTop:4 }}>
+                      <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                      <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>c/o Ansprechpartner</span>
+                      <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                    </div>
+                    {selectedHv && hvContacts.length > 0 ? (
+                      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
+                        {hvContacts.map(cp => (
+                          <div key={cp.id} onClick={() => setSelectedCoContact(selectedCoContact?.id===cp.id ? null : cp)}
+                            style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:12, border:`1.5px solid ${selectedCoContact?.id===cp.id?'var(--pri)':'var(--outline)'}`, background:selectedCoContact?.id===cp.id?'var(--pri-xl)':'var(--surf-low)', cursor:'pointer', transition:'all 0.15s' }}>
+                            <span className="material-symbols-outlined icon-sm" style={{ color:selectedCoContact?.id===cp.id?'var(--pri)':'var(--txt-muted)' }}>person</span>
+                            <div style={{ flex:1 }}>
+                              <div style={{ fontSize:13, fontWeight:700, color:selectedCoContact?.id===cp.id?'var(--pri)':'var(--txt)' }}>{cp.name}</div>
+                              {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{cp.role}</div>}
+                            </div>
+                            {selectedCoContact?.id===cp.id && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--pri)' }}>check_circle</span>}
+                          </div>
+                        ))}
+                        <div style={{ fontSize:11, color:'var(--txt-muted)', textAlign:'center', padding:'4px 0' }}>
+                          Kontakt auswählen oder leer lassen
+                        </div>
+                      </div>
+                    ) : selectedHv ? (
+                      <div style={{ fontSize:12, color:'var(--txt-muted)', textAlign:'center', padding:'8px 0', marginBottom:8 }}>
+                        Keine Kontakte bei dieser HV — im Kundenprofil ergänzen
+                      </div>
+                    ) : hvCreateMode && hvNewCpName.trim() ? (
+                      <div style={{ background:'var(--surf-low)', borderRadius:10, padding:'8px 12px', fontSize:12, color:'var(--txt-sec)', marginBottom:8 }}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)', verticalAlign:'middle', marginRight:4 }}>info</span>
+                        Der Ansprechpartner der neuen HV wird automatisch als c/o übernommen.
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </>)}
+
+              {/* ── Mietverwaltung ────────────────────────────────────────── */}
+              {newCustType === 'mietverwaltung' && (<>
+
+                {/* ── Eigentümer ── */}
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                  <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Eigentümer</span>
+                  <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                </div>
+
+                {/* Typ-Auswahl Eigentümer */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, marginBottom:14 }}>
+                  {([{v:'herr',l:'Herr'},{v:'frau',l:'Frau'},{v:'eheleute',l:'Eheleute'},{v:'firma',l:'Firma'}] as const).map(t => (
+                    <button key={t.v} onClick={() => { setMvEigTyp(t.v); if(t.v!=='eheleute'){setMvEigVorname2('');setMvEigNachname2('')} }}
+                      style={{ padding:'8px 4px', borderRadius:10, border:`1.5px solid ${mvEigTyp===t.v?'var(--pri)':'var(--outline)'}`, background:mvEigTyp===t.v?'var(--pri-xl)':'var(--surf-low)', color:mvEigTyp===t.v?'var(--pri)':'var(--txt)', fontSize:12, fontWeight:700, cursor:'pointer', transition:'all 0.15s' }}>
+                      {t.l}
+                    </button>
                   ))}
                 </div>
+
+                {/* Herr / Frau */}
+                {(mvEigTyp === 'herr' || mvEigTyp === 'frau') && (
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                    <div>
+                      <label style={s.fieldLabel}>Vorname *</label>
+                      <div style={s.inputWrap}><input value={mvEigVorname} onChange={e=>setMvEigVorname(e.target.value)} placeholder="Hans" style={s.input}/></div>
+                    </div>
+                    <div>
+                      <label style={s.fieldLabel}>Nachname *</label>
+                      <div style={s.inputWrap}><input value={mvEigNachname} onChange={e=>setMvEigNachname(e.target.value)} placeholder="Müller" style={s.input}/></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Eheleute */}
+                {mvEigTyp === 'eheleute' && (<>
+                  <div style={{ fontSize:11, fontWeight:600, color:'var(--txt-muted)', marginBottom:6 }}>Partner 1</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                    <div>
+                      <label style={s.fieldLabel}>Vorname *</label>
+                      <div style={s.inputWrap}><input value={mvEigVorname} onChange={e=>setMvEigVorname(e.target.value)} placeholder="Hans" style={s.input}/></div>
+                    </div>
+                    <div>
+                      <label style={s.fieldLabel}>Nachname *</label>
+                      <div style={s.inputWrap}><input value={mvEigNachname} onChange={e=>setMvEigNachname(e.target.value)} placeholder="Müller" style={s.input}/></div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:11, fontWeight:600, color:'var(--txt-muted)', marginBottom:6 }}>Partner 2</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                    <div>
+                      <label style={s.fieldLabel}>Vorname</label>
+                      <div style={s.inputWrap}><input value={mvEigVorname2} onChange={e=>setMvEigVorname2(e.target.value)} placeholder="Maria" style={s.input}/></div>
+                    </div>
+                    <div>
+                      <label style={s.fieldLabel}>Nachname</label>
+                      <div style={s.inputWrap}><input value={mvEigNachname2} onChange={e=>setMvEigNachname2(e.target.value)} placeholder="Müller" style={s.input}/></div>
+                    </div>
+                  </div>
+                </>)}
+
+                {/* Firma */}
+                {mvEigTyp === 'firma' && (
+                  <div style={{ marginBottom:10 }}>
+                    <label style={s.fieldLabel}>Firmenname *</label>
+                    <div style={s.inputWrap}>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>business</span>
+                      <input value={mvEigFirma} onChange={e=>setMvEigFirma(e.target.value)} placeholder="Muster GmbH" style={s.input}/>
+                    </div>
+                  </div>
+                )}
+
+                {/* Kontakt Eigentümer */}
+                {mvEigTyp !== '' && (
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:12 }}>
+                    <div>
+                      <label style={s.fieldLabel}>Telefon</label>
+                      <div style={s.inputWrap}><input value={mvEigPhone} onChange={e=>setMvEigPhone(e.target.value)} placeholder="+49 561 …" style={s.input}/></div>
+                    </div>
+                    <div>
+                      <label style={s.fieldLabel}>E-Mail</label>
+                      <div style={s.inputWrap}><input value={mvEigEmail} onChange={e=>setMvEigEmail(e.target.value)} placeholder="eigentümer@mail.de" style={s.input}/></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Adresse Eigentümer (optional) */}
+                {mvEigTyp !== '' && (<>
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={s.fieldLabel}>Adresse (optional)</label>
+                    <div style={s.inputWrap}>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>home</span>
+                      <input value={newStreet} onChange={e=>setNewStreet(e.target.value)} placeholder="Musterstraße 1" style={s.input}/>
+                    </div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:16 }}>
+                    <div>
+                      <label style={s.fieldLabel}>PLZ</label>
+                      <div style={s.inputWrap}>
+                        <input value={newPostal} onChange={e=>lookupNewCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
+                        {newPlzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={s.fieldLabel}>Ort</label>
+                      <div style={{ ...s.inputWrap, background:newCityLocked?'var(--ok-bg)':undefined }}>
+                        <input value={newCity} onChange={e=>{setNewCity(e.target.value);setNewCityLocked(false)}} placeholder="Melsungen" style={s.input}/>
+                        {newCityLocked && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>}
+                      </div>
+                    </div>
+                  </div>
+                </>)}
+
+                {/* ── Verwaltung ── */}
+                {mvEigTyp !== '' && (<>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                    <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                    <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Verwaltung</span>
+                    <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                  </div>
+
+                  {!selectedMvVerw && !mvVerwCreateMode && (
+                    <>
+                      <div style={s.inputWrap}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>home_work</span>
+                        <input value={mvVerwQuery} onChange={e=>searchMvVerw(e.target.value)} placeholder="Verwaltungsgesellschaft suchen …" style={s.input}/>
+                        {mvVerwSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+                      </div>
+                      {mvVerwResults.length > 0 && (
+                        <div style={{ background:'var(--surf-card)', borderRadius:12, border:'1px solid var(--outline)', marginTop:6, marginBottom:8, overflow:'hidden' }}>
+                          {mvVerwResults.map((v,i) => (
+                            <div key={v.id} onClick={() => { setSelectedMvVerw(v); setMvVerwQuery(v.name); setMvVerwResults([]); setMvVerwCreateMode(false) }}
+                              style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:i<mvVerwResults.length-1?'1px solid var(--outline)':'none', cursor:'pointer', background:'var(--surf-low)' }}>
+                              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>home_work</span>
+                              <div style={{ flex:1 }}>
+                                <div style={{ fontSize:13, fontWeight:700 }}>{v.name}</div>
+                                {v.contact_person && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{v.contact_person}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {mvVerwQuery.trim().length >= 2 && mvVerwResults.length === 0 && !mvVerwSearching && (
+                        <button onClick={() => { setMvVerwCreateMode(true); setMvVerwNewName(mvVerwQuery.trim()) }}
+                          style={{ ...s.btnOutline, width:'100%', marginTop:8, marginBottom:8 }}>
+                          <span className="material-symbols-outlined icon-sm">add</span>
+                          „{mvVerwQuery.trim()}" neu anlegen
+                        </button>
+                      )}
+                      {mvVerwQuery.trim().length < 2 && (
+                        <button onClick={() => setMvVerwCreateMode(true)}
+                          style={{ ...s.btnOutline, width:'100%', marginTop:8, marginBottom:4, fontSize:12 }}>
+                          <span className="material-symbols-outlined icon-sm">add</span>
+                          Verwaltungsgesellschaft überspringen / neu anlegen
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {selectedMvVerw && !mvVerwCreateMode && (
+                    <div style={{ background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:12, padding:'10px 14px', marginBottom:8 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>home_work</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'var(--pri)' }}>{selectedMvVerw.name}</div>
+                          {selectedMvVerw.street && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{selectedMvVerw.street}</div>}
+                        </div>
+                        <button onClick={() => { setSelectedMvVerw(null); setMvVerwQuery('') }}
+                          style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', padding:4 }}>
+                          <span className="material-symbols-outlined icon-sm">close</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {mvVerwCreateMode && (
+                    <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px', border:'1px solid var(--outline)', marginBottom:8 }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                        <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', display:'flex', alignItems:'center', gap:5 }}>
+                          <span className="material-symbols-outlined icon-sm">home_work</span> Neue Verwaltung
+                        </div>
+                        <button onClick={() => { setMvVerwCreateMode(false); setMvVerwQuery('') }}
+                          style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', padding:2 }}>
+                          <span className="material-symbols-outlined icon-sm">close</span>
+                        </button>
+                      </div>
+                      {[
+                        { label:'Name *', val:mvVerwNewName, set:setMvVerwNewName, ph:'Muster Verwaltungs GmbH' },
+                        { label:'Straße + Hausnummer', val:mvVerwNewStreet, set:setMvVerwNewStreet, ph:'Beispielweg 5' },
+                      ].map(f => (
+                        <div key={f.label} style={{ marginBottom:8 }}>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
+                          <div style={s.inputWrap}><input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+                        </div>
+                      ))}
+                      <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:8 }}>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>PLZ</label>
+                          <div style={s.inputWrap}>
+                            <input value={mvVerwNewPostal} onChange={e=>lookupMvVerwCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
+                            {mvVerwNewPlzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>Ort</label>
+                          <div style={{ ...s.inputWrap, background:mvVerwNewCityLocked?'var(--ok-bg)':undefined }}>
+                            <input value={mvVerwNewCity} onChange={e=>{setMvVerwNewCity(e.target.value);setMvVerwNewCityLocked(false)}} placeholder="Melsungen" style={s.input}/>
+                            {mvVerwNewCityLocked && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
+                        <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner (optional)
+                      </div>
+                      {[
+                        { label:'Name', val:mvVerwNewCpName, set:setMvVerwNewCpName, ph:'Max Mustermann' },
+                        { label:'Telefon', val:mvVerwNewCpPhone, set:setMvVerwNewCpPhone, ph:'+49 561 …' },
+                        { label:'E-Mail', val:mvVerwNewCpEmail, set:setMvVerwNewCpEmail, ph:'verwaltung@beispiel.de' },
+                      ].map(f => (
+                        <div key={f.label} style={{ marginBottom:6 }}>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
+                          <div style={s.inputWrap}><input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>)}
               </>)}
             </div>
           )}
@@ -3541,6 +4162,19 @@ const s: Record<string,React.CSSProperties> = {
 }
 
 // ─── Kunden List ─────────────────────────────────────────────────────────────
+const CUST_ICON: Record<string,string> = {
+  privatperson:   'person',
+  firma:          'business',
+  'weg-verwaltung': 'apartment',
+  mietverwaltung: 'home_work',
+}
+const CUST_LABEL: Record<string,string> = {
+  privatperson:   'Privatperson',
+  firma:          'Firma',
+  'weg-verwaltung': 'WEG-Verwaltung',
+  mietverwaltung: 'Mietverwaltung',
+}
+
 function KundenList({ customers, objects, loading, onSelect }: {
   customers: CustomerItem[]
   objects: ObjectItem[]
@@ -3736,13 +4370,14 @@ function KundenList({ customers, objects, loading, onSelect }: {
                   <div key={c.id} onClick={() => onSelect(c)}
                     style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:'1px solid var(--outline)', cursor:'pointer' }}>
                     <div style={{ width:40, height:40, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>{c.customer_type==='firma'?'business':'person'}</span>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>{CUST_ICON[c.customer_type]}</span>
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)' }}>{c.name}</div>
                       <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>
-                        {c.customer_type==='firma'?'Firma':'Privatperson'}
-                        {c.contact_person && ` · ${c.contact_person}`}
+                        {CUST_LABEL[c.customer_type]}
+                        {c.customer_type==='weg-verwaltung' && c.hausverwaltung && ` · ${c.hausverwaltung.name}`}
+                        {(c.customer_type==='firma'||c.customer_type==='mietverwaltung') && c.contact_person && ` · ${c.contact_person}`}
                         {objCount > 0 && <span style={{ marginLeft:8, color:'var(--pri)', fontWeight:600 }}>{objCount} Objekt{objCount!==1?'e':''}</span>}
                       </div>
                     </div>
@@ -3803,7 +4438,7 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
         </button>
         <div style={{ flex:1, minWidth:0 }}>
           <h1 style={{ fontSize:19, fontWeight:800, fontFamily:'var(--font-head)', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{customer.name}</h1>
-          <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{customer.customer_type==='firma'?'Firma':'Privatperson'}{customer.contract_type ? ` · ${customer.contract_type==='jahresvertrag'?'Jahresvertrag':'Einmalig'}` : ''}</div>
+          <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{CUST_LABEL[customer.customer_type]}{customer.contract_type ? ` · ${customer.contract_type==='jahresvertrag'?'Jahresvertrag':'Einmalig'}` : ''}</div>
         </div>
         <button onClick={() => setShowEdit(true)} style={{ background:'var(--pri)', border:'none', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
           <span className="material-symbols-outlined icon-sm" style={{ color:'#fff' }}>edit</span>
@@ -3819,7 +4454,26 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
           {customer.phone && <Row icon="phone" label="Telefon"><a href={`tel:${customer.phone}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.phone}</a></Row>}
           {customer.email && <Row icon="mail" label="E-Mail"><a href={`mailto:${customer.email}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.email}</a></Row>}
           {customer.notes && <Row icon="notes" label="Notizen"><span style={{ color:'var(--txt-sec)', lineHeight:1.5 }}>{customer.notes}</span></Row>}
-          {!customer.street && !customer.phone && !customer.email && !customer.notes && (
+          {/* WEG-spezifisch: Hausverwaltung + c/o */}
+          {customer.customer_type === 'weg-verwaltung' && customer.hausverwaltung && (
+            <Row icon="domain" label="Hausverwaltung">
+              <span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span>
+            </Row>
+          )}
+          {customer.customer_type === 'weg-verwaltung' && customer.co_contact && (
+            <Row icon="contact_phone" label="c/o Kontakt">
+              <span style={{ fontWeight:600 }}>{customer.co_contact.name}</span>
+              {customer.co_contact.role && <span style={{ color:'var(--txt-muted)' }}> · {customer.co_contact.role}</span>}
+              {customer.co_contact.phone && <><br/><a href={`tel:${customer.co_contact.phone}`} style={{ color:'var(--pri)', textDecoration:'none', fontSize:12 }}>{customer.co_contact.phone}</a></>}
+            </Row>
+          )}
+          {/* Mietverwaltung: Verwaltungsgesellschaft */}
+          {customer.customer_type === 'mietverwaltung' && customer.hausverwaltung && (
+            <Row icon="home_work" label="Verwaltung">
+              <span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span>
+            </Row>
+          )}
+          {!customer.street && !customer.phone && !customer.email && !customer.notes && !customer.hausverwaltung && !customer.co_contact && (
             <div style={{ fontSize:13, color:'var(--txt-muted)', textAlign:'center', padding:'4px 0' }}>Keine weiteren Stammdaten</div>
           )}
         </div>
@@ -4262,7 +4916,7 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
 function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
   customer: CustomerItem; onClose: () => void; onSaved: (c: CustomerItem) => void; onDelete: () => void
 }) {
-  const [custType, setCustType]       = useState<'firma'|'privatperson'>(customer.customer_type)
+  const [custType, setCustType]       = useState<CustomerType>(customer.customer_type)
   const [companyName, setCompanyName] = useState(customer.customer_type === 'firma' ? customer.name : '')
   const [firstName, setFirstName]   = useState(customer.first_name || (customer.customer_type === 'privatperson' ? (customer.name.split(' ')[0] || '') : ''))
   const [lastName, setLastName]     = useState(customer.last_name || (customer.customer_type === 'privatperson' ? (customer.name.split(' ').slice(1).join(' ') || '') : ''))

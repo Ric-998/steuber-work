@@ -47,6 +47,9 @@ export interface ObjectItem {
   postal_code?: string
   customer_id?: string
   notes?: string
+  access_note?: string
+  parking_note?: string
+  floor_info?: string
   is_active: boolean
   object_number?: string
   address_supplement?: string
