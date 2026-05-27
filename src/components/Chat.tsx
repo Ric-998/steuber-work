@@ -327,15 +327,16 @@ export function useChatUnread(currentUserId: string) {
 
   const load = async () => {
     if (!currentUserId) return
-    const { count } = await supabase
+    const { data } = await supabase
       .from('messages')
-      .select('id', { count: 'exact', head: true })
+      .select('id')
       .eq('receiver_id', currentUserId)
       .is('read_at', null)
-    setUnread(count || 0)
+    setUnread(data?.length || 0)
   }
 
   useEffect(() => {
+    if (!currentUserId) return
     load()
     const ch = supabase.channel(`unread-badge-${currentUserId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, load)
