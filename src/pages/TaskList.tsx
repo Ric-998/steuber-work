@@ -1726,21 +1726,32 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
   takingOver: boolean
   cancellingVertretung: string | null
 }) {
-  const [section, setSection] = useState<'uebersicht'|'antrag'|'tauschboerse'>('uebersicht')
+  const [showAntrag, setShowAntrag] = useState(false)
+  const [showTausch, setShowTausch]   = useState(false)
   const [reqType, setReqType] = useState<'urlaub'|'krankmeldung'>('urlaub')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [note, setNote] = useState('')
+  const [from, setFrom]   = useState('')
+  const [to, setTo]       = useState('')
+  const [note, setNote]   = useState('')
   const [sending, setSending] = useState(false)
-  const [msg, setMsg] = useState<{text:string;ok:boolean}|null>(null)
+  const [msg, setMsg]     = useState<{text:string;ok:boolean}|null>(null)
+  const [blackouts, setBlackouts] = useState<any[]>([])
   const [conflictAssigns, setConflictAssigns] = useState<any[]>([])
   const [showConflict, setShowConflict] = useState(false)
   const [swapRequested, setSwapRequested] = useState<Set<string>>(new Set())
-  const [editReq, setEditReq] = useState<any|null>(null)
+  const [editReq, setEditReq]   = useState<any|null>(null)
   const [editFrom, setEditFrom] = useState('')
-  const [editTo, setEditTo] = useState('')
+  const [editTo, setEditTo]     = useState('')
   const [editNote, setEditNote] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+
+  useEffect(() => {
+    supabase.from('vacation_blackouts')
+      .select('*')
+      .gte('to_date', new Date().toISOString().slice(0,10))
+      .then(({ data }) => setBlackouts(data ?? []))
+  }, [])
+
+  const today = new Date().toISOString().slice(0,10)
 
   const countDays = (l: any) => {
     let count = 0; const cur = new Date(l.from_date); const end = new Date(l.to_date)
@@ -1751,21 +1762,85 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
   const urlaubDays    = myLeaves.filter((l:any)=>l.request_type==='urlaub'&&l.status==='genehmigt').reduce((s:number,l:any)=>s+countDays(l),0)
   const urlaubPending = myLeaves.filter((l:any)=>l.request_type==='urlaub'&&l.status==='ausstehend').reduce((s:number,l:any)=>s+countDays(l),0)
   const urlaubLeft    = Math.max(0, vacationDaysPerYear - urlaubDays - urlaubPending)
-  const pendingReqs   = myLeaves.filter((l:any)=>l.status==='ausstehend')
+  const krankDays     = myLeaves.filter((l:any)=>l.request_type==='krankmeldung'&&l.status==='genehmigt').reduce((s:number,l:any)=>s+countDays(l),0)
+
+  const pendingReqs  = myLeaves.filter((l:any) => l.status === 'ausstehend')
+  const activeLeave  = myLeaves.find((l:any) => l.status === 'genehmigt' && l.from_date <= today && l.to_date >= today)
+  const upcomingLeaves = myLeaves
+    .filter((l:any) => l.status === 'genehmigt' && l.from_date > today)
+    .sort((a:any,b:any) => a.from_date.localeCompare(b.from_date))
+    .slice(0,3)
+
+  // Verlauf: abgeschlossene Einträge – nur zeigen wenn to_date noch nicht länger als 30 Tage her
+  const thirtyDaysAgo = new Date(Date.now() - 30*24*60*60*1000).toISOString().slice(0,10)
+  const verlauf = myLeaves
+    .filter((l:any) => l.status !== 'ausstehend' && l.to_date >= thirtyDaysAgo)
+    .sort((a:any,b:any) => b.from_date.localeCompare(a.from_date))
+
+  const tauschBadge = availableVertretungen.length + ownVertretungen.length
+
+  const overlaps = (aFrom: string, aTo: string, bFrom: string, bTo: string) =>
+    !(aTo < bFrom || aFrom > bTo)
 
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); setSending(true); setMsg(null)
-    const { error } = await supabase.from('leave_requests').insert({ user_id: userId, from_date: from, to_date: to, request_type: reqType, note: note || null })
+    e.preventDefault()
+    setSending(true)
+    setMsg(null)
+
+    // 1) Gegenteiligen Typ im gleichen Zeitraum prüfen
+    const oppositeType = reqType === 'urlaub' ? 'krankmeldung' : 'urlaub'
+    const conflict = myLeaves.find((l:any) =>
+      l.status !== 'abgelehnt' &&
+      l.request_type === oppositeType &&
+      overlaps(from, to, l.from_date, l.to_date)
+    )
+    if (conflict) {
+      const label = conflict.request_type === 'krankmeldung' ? 'einer Krankmeldung' : 'einem Urlaubsantrag'
+      setMsg({ text: `Nicht möglich: Im gewählten Zeitraum besteht bereits ${label}.`, ok: false })
+      setSending(false)
+      return
+    }
+
+    // 2) Gleicher Typ im gleichen Zeitraum prüfen (Duplikat)
+    const duplicate = myLeaves.find((l:any) =>
+      l.status !== 'abgelehnt' &&
+      l.request_type === reqType &&
+      overlaps(from, to, l.from_date, l.to_date)
+    )
+    if (duplicate) {
+      setMsg({ text: 'Für diesen Zeitraum wurde bereits ein Antrag gestellt.', ok: false })
+      setSending(false)
+      return
+    }
+
+    // 3) Urlaubssperren prüfen (nur für Urlaub)
+    if (reqType === 'urlaub') {
+      const blocked = blackouts.find(b => overlaps(from, to, b.from_date, b.to_date))
+      if (blocked) {
+        setMsg({ text: `Urlaubssperre aktiv: ${blocked.reason || 'In diesem Zeitraum können keine Urlaube beantragt werden.'}`, ok: false })
+        setSending(false)
+        return
+      }
+    }
+
+    // 4) Eintragen
+    const { error } = await supabase.from('leave_requests').insert({
+      user_id: userId, from_date: from, to_date: to, request_type: reqType, note: note || null
+    })
     if (!error) {
       const { data: affected } = await supabase
         .from('task_assignments')
         .select('id,due_date,status,tasks(title,categories(emoji,name),objects(address,city))')
-        .eq('user_id', userId).gte('due_date', from).lte('due_date', to).in('status', ['offen','in_arbeit']).order('due_date')
+        .eq('user_id', userId).gte('due_date', from).lte('due_date', to)
+        .in('status', ['offen','in_arbeit']).order('due_date')
       if (affected && affected.length > 0) { setConflictAssigns(affected); setShowConflict(true) }
       else setMsg({ text: reqType === 'krankmeldung' ? 'Krankmeldung übermittelt.' : 'Urlaubsantrag gesendet!', ok: true })
       setFrom(''); setTo(''); setNote('')
       await onLeavesChanged()
-    } else { setMsg({ text: error.message, ok: false }) }
+      if (!affected?.length) setShowAntrag(false)
+    } else {
+      setMsg({ text: error.message, ok: false })
+    }
     setSending(false)
   }
 
@@ -1774,343 +1849,400 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
     setSwapRequested(prev => new Set([...prev, assignId]))
   }
 
-  const tauschBadge = availableVertretungen.length + ownVertretungen.length
-  const krankDays = myLeaves.filter((l:any)=>l.request_type==='krankmeldung'&&l.status==='genehmigt').reduce((s:number,l:any)=>s+countDays(l),0)
-  const nextApproved = myLeaves.filter((l:any)=>l.request_type==='urlaub'&&l.status==='genehmigt'&&l.to_date>=new Date().toISOString().slice(0,10)).sort((a:any,b:any)=>a.from_date.localeCompare(b.from_date))[0]
+  const openAntrag = (type: 'urlaub'|'krankmeldung') => {
+    setReqType(type); setMsg(null); setFrom(''); setTo(''); setNote(''); setShowAntrag(true)
+  }
+
+  // Day count preview helper
+  const dayCount = (f: string, t: string) => {
+    if (!f || !t || f > t) return 0
+    let c = 0; const cur = new Date(f); const end = new Date(t)
+    while (cur <= end) { c++; cur.setDate(cur.getDate()+1) }
+    return c
+  }
+
+  const pct = Math.min(100, Math.round((urlaubDays / vacationDaysPerYear) * 100))
 
   return (
-    <div>
-      {/* ── Header ── */}
-      <div style={{ marginBottom:20 }}>
-        <h2 style={{ fontSize:22, fontWeight:800, fontFamily:'var(--font-head)', margin:0, lineHeight:1 }}>Zeitplan</h2>
-        <p style={{ fontSize:12, color:'var(--txt-muted)', margin:'4px 0 0', lineHeight:1.4 }}>
-          {new Date().toLocaleDateString('de-DE',{month:'long',year:'numeric'})} · {urlaubLeft} Urlaubstage verfügbar
-        </p>
-      </div>
+    <div style={{ paddingBottom: 16 }}>
 
-      {/* ── 3 Tabs ── */}
-      <div style={{ display:'flex', gap:5, marginBottom:22, background:'var(--surf-low)', borderRadius:16, padding:5 }}>
-        {([
-          { id:'uebersicht',   icon:'space_dashboard', label:'Übersicht',  badge: pendingReqs.length },
-          { id:'antrag',       icon:'edit_calendar',   label:'Antrag' },
-          { id:'tauschboerse', icon:'swap_horiz',      label:'Tauschbörse', badge: tauschBadge },
-        ] as const).map(t=>(
-          <button key={t.id} onClick={()=>setSection(t.id)} style={{ flex:1, padding:'9px 4px 8px', borderRadius:11, border:'none', background:section===t.id?'var(--surf-card)':'transparent', color:section===t.id?'var(--pri)':'var(--txt-muted)', fontSize:9, fontWeight:700, cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3, position:'relative', boxShadow:section===t.id?'0 1px 6px rgba(0,0,0,0.08)':'none', transition:'all 0.15s' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:18, color:section===t.id?'var(--pri)':'var(--txt-muted)' }}>{t.icon}</span>
-            <span style={{ letterSpacing:'0.01em' }}>{t.label}</span>
-            {'badge' in t && t.badge > 0 && <span style={{ position:'absolute', top:3, right:6, minWidth:15, height:15, borderRadius:999, background:'#ef4444', color:'#fff', fontSize:8, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{t.badge}</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Übersicht ── */}
-      {section === 'uebersicht' && (
-        <div>
-          {/* Urlaubskonto Card */}
-          <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:20, padding:'20px 18px', marginBottom:16, color:'#fff' }}>
-            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'0.1em', opacity:0.75, marginBottom:4 }}>URLAUBSKONTO {new Date().getFullYear()}</div>
-            <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:14 }}>
-              <div>
-                <div style={{ fontSize:42, fontWeight:800, fontFamily:'var(--font-head)', lineHeight:1 }}>{urlaubLeft}</div>
-                <div style={{ fontSize:13, opacity:0.8, marginTop:2 }}>Tage übrig von {vacationDaysPerYear}</div>
-              </div>
-              <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:22, fontWeight:800, fontFamily:'var(--font-head)'}}>{urlaubDays}</div>
-                <div style={{ fontSize:11, opacity:0.75 }}>genommen</div>
-              </div>
-            </div>
-            <div style={{ height:6, borderRadius:99, background:'rgba(255,255,255,0.25)', overflow:'hidden' }}>
-              <div style={{ height:'100%', borderRadius:99, background:'#fff', width:`${Math.min(100,Math.round((urlaubDays/vacationDaysPerYear)*100))}%`, transition:'width 0.4s' }}/>
-            </div>
-            {urlaubPending > 0 && (
-              <div style={{ marginTop:10, fontSize:12, opacity:0.85, display:'flex', alignItems:'center', gap:5 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:14 }}>hourglass_empty</span>
-                {urlaubPending} Tag{urlaubPending>1?'e':''} ausstehend
-              </div>
-            )}
+      {/* ── Urlaubskonto-Card ── */}
+      <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:22, padding:'20px 20px 18px', marginBottom:16, color:'#fff', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', right:-18, top:-18, width:100, height:100, borderRadius:'50%', background:'rgba(255,255,255,0.07)' }}/>
+        <div style={{ position:'absolute', right:20, bottom:-30, width:80, height:80, borderRadius:'50%', background:'rgba(255,255,255,0.05)' }}/>
+        <div style={{ fontSize:10, fontWeight:700, letterSpacing:'0.12em', opacity:0.7, marginBottom:10, textTransform:'uppercase' }}>
+          Urlaubskonto {new Date().getFullYear()}
+        </div>
+        <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:14 }}>
+          <div>
+            <div style={{ fontSize:48, fontWeight:900, fontFamily:'var(--font-head)', lineHeight:1 }}>{urlaubLeft}</div>
+            <div style={{ fontSize:13, opacity:0.8, marginTop:4 }}>Tage verfügbar von {vacationDaysPerYear}</div>
           </div>
-
-          {/* Mini Stats Row */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
-            <div style={{ background:'var(--surf-card)', borderRadius:16, padding:'12px 14px', border:'1px solid var(--outline)' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                <span className="material-symbols-outlined icon-fill" style={{ fontSize:16, color:'#e53935' }}>sick</span>
-                <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Krankentage</span>
-              </div>
-              <div style={{ fontSize:24, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', lineHeight:1 }}>{krankDays}</div>
-              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>{new Date().getFullYear()}</div>
-            </div>
-            <div style={{ background:'var(--surf-card)', borderRadius:16, padding:'12px 14px', border:'1px solid var(--outline)' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-                <span className="material-symbols-outlined icon-fill" style={{ fontSize:16, color:'var(--pri)' }}>event_available</span>
-                <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Nächster Urlaub</span>
-              </div>
-              {nextApproved ? (
-                <>
-                  <div style={{ fontSize:13, fontWeight:800, color:'var(--txt)', lineHeight:1.2 }}>
-                    {new Date(nextApproved.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}
-                  </div>
-                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>
-                    bis {new Date(nextApproved.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:4 }}>–</div>
-              )}
-            </div>
+          <div style={{ textAlign:'right', paddingBottom:4 }}>
+            <div style={{ fontSize:11, opacity:0.65, marginBottom:2 }}>genommen</div>
+            <div style={{ fontSize:28, fontWeight:800, fontFamily:'var(--font-head)', lineHeight:1 }}>{urlaubDays}</div>
           </div>
-
-          {/* Ausstehende Anträge */}
-          {pendingReqs.length > 0 && (
-            <div style={{ marginBottom:20 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Ausstehend</div>
-              {pendingReqs.map((r:any)=>{
-                const isKrank = r.request_type==='krankmeldung'
-                return (
-                  <div key={r.id} style={{ background:'#fffbeb', borderRadius:14, padding:'14px 16px', marginBottom:8, border:'1.5px solid #fbbf24', display:'flex', alignItems:'center', gap:12 }}>
-                    <div style={{ width:38, height:38, borderRadius:12, background:isKrank?'#ffeaea':'#fff8e6', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:isKrank?'#e53935':'#b45309' }}>{isKrank?'sick':'beach_access'}</span>
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{isKrank?'Krankmeldung':'Urlaub'}</div>
-                      <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>
-                        {new Date(r.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – {new Date(r.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
-                      </div>
-                      {r.note && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>„{r.note}"</div>}
-                    </div>
-                    <div style={{ display:'flex', gap:5, flexShrink:0 }}>
-                      <button onClick={()=>{setEditReq(r);setEditFrom(r.from_date);setEditTo(r.to_date);setEditNote(r.note??'')} }
-                        style={{ padding:'7px 10px', borderRadius:9, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', color:'var(--txt)', display:'flex', alignItems:'center' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:15 }}>edit</span>
-                      </button>
-                      <button onClick={async()=>{ if (!confirm('Antrag stornieren?')) return; await supabase.from('leave_requests').delete().eq('id',r.id); await onLeavesChanged() }}
-                        style={{ padding:'7px 10px', borderRadius:9, border:'1px solid #fca5a5', background:'transparent', cursor:'pointer', color:'#dc2626', display:'flex', alignItems:'center' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:15 }}>close</span>
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+        </div>
+        <div style={{ height:5, borderRadius:99, background:'rgba(255,255,255,0.2)', overflow:'hidden', marginBottom:10 }}>
+          <div style={{ height:'100%', borderRadius:99, background:'#fff', width:`${pct}%`, transition:'width 0.5s ease' }}/>
+        </div>
+        <div style={{ display:'flex', gap:16, fontSize:12, opacity:0.85 }}>
+          {urlaubPending > 0 && (
+            <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:14 }}>hourglass_empty</span>
+              {urlaubPending} ausstehend
+            </span>
           )}
+          <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <span className="material-symbols-outlined icon-fill" style={{ fontSize:14 }}>sick</span>
+            {krankDays} Krankentage
+          </span>
+        </div>
+      </div>
 
-          {/* Verlauf */}
-          {myLeaves.filter((l:any)=>l.status!=='ausstehend').length > 0 && (
+      {/* ── Aktive Abwesenheit Banner ── */}
+      {activeLeave && (() => {
+        const isKrank = activeLeave.request_type === 'krankmeldung'
+        return (
+          <div style={{ background: isKrank ? '#fef2f2' : 'var(--pri-xl)', border:`1.5px solid ${isKrank?'#fca5a5':'var(--pri)'}`, borderRadius:16, padding:'14px 16px', marginBottom:14, display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:42, height:42, borderRadius:14, background: isKrank?'#fee2e2':'rgba(255,255,255,0.7)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <span className="material-symbols-outlined icon-fill" style={{ fontSize:22, color:isKrank?'#dc2626':'var(--pri)' }}>{isKrank?'sick':'beach_access'}</span>
+            </div>
             <div>
-              <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Verlauf</div>
-              {myLeaves.filter((l:any)=>l.status!=='ausstehend').slice(0,10).map((r:any)=>{
-                const isKrank = r.request_type==='krankmeldung'
-                const stColor: Record<string,string> = { genehmigt:'var(--ok)', abgelehnt:'#dc2626' }
-                const stBg: Record<string,string> = { genehmigt:'var(--ok-bg)', abgelehnt:'#fef2f2' }
-                return (
-                  <div key={r.id} style={{ background:'var(--surf-card)', borderRadius:12, padding:'11px 14px', marginBottom:7, border:'1px solid var(--outline)', display:'flex', alignItems:'center', gap:10 }}>
-                    <span className="material-symbols-outlined icon-fill" style={{ color:isKrank?'#e53935':'var(--pri)', flexShrink:0, fontSize:20 }}>{isKrank?'sick':'beach_access'}</span>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>
-                        {isKrank?'Krankmeldung':'Urlaub'} · {new Date(r.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – {new Date(r.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
-                      </div>
-                      {r.note && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>„{r.note}"</div>}
-                    </div>
-                    <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20, background:stBg[r.status]??'var(--surf-high)', color:stColor[r.status]??'var(--txt-muted)', flexShrink:0 }}>
-                      {r.status==='genehmigt'?'✓ Genehmigt':'✕ Abgelehnt'}
-                    </span>
-                  </div>
-                )
-              })}
+              <div style={{ fontSize:14, fontWeight:800, color:isKrank?'#b91c1c':'var(--pri)', fontFamily:'var(--font-head)' }}>
+                {isKrank ? 'Du bist heute krank gemeldet' : 'Du bist heute im Urlaub'}
+              </div>
+              <div style={{ fontSize:12, color:isKrank?'#dc2626':'var(--pri)', opacity:0.8, marginTop:1 }}>
+                bis {new Date(activeLeave.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'long'})}
+              </div>
             </div>
-          )}
+          </div>
+        )
+      })()}
 
-          {myLeaves.length === 0 && (
-            <div style={{ textAlign:'center', padding:'28px 0 8px', color:'var(--txt-muted)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize:38, display:'block', marginBottom:8, opacity:0.25 }}>beach_access</span>
-              <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>Noch keine Anträge</div>
-              <div style={{ fontSize:12, marginTop:4, lineHeight:1.5 }}>Tippe auf <strong>Antrag stellen</strong>, um Urlaub zu beantragen oder eine Krankmeldung einzureichen.</div>
-              <button onClick={()=>setSection('antrag')} style={{ marginTop:14, padding:'10px 20px', borderRadius:12, border:'none', background:'var(--pri-xl)', color:'var(--pri)', fontSize:13, fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:6 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:16 }}>edit_calendar</span>Antrag stellen
-              </button>
-            </div>
-          )}
+      {/* ── Schnellaktionen ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:18 }}>
+        <button onClick={()=>openAntrag('urlaub')} style={{ padding:'14px 12px', borderRadius:16, border:'1.5px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left' }}>
+          <div style={{ width:38, height:38, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:'var(--pri)' }}>beach_access</span>
+          </div>
+          <div>
+            <div style={{ fontSize:13, fontWeight:800, color:'var(--txt)' }}>Urlaub</div>
+            <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>beantragen</div>
+          </div>
+        </button>
+        <button onClick={()=>openAntrag('krankmeldung')} style={{ padding:'14px 12px', borderRadius:16, border:'1.5px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left' }}>
+          <div style={{ width:38, height:38, borderRadius:12, background:'#fef2f2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:'#dc2626' }}>sick</span>
+          </div>
+          <div>
+            <div style={{ fontSize:13, fontWeight:800, color:'var(--txt)' }}>Krank</div>
+            <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>melden</div>
+          </div>
+        </button>
+      </div>
+
+      {/* ── Tauschbörse-Hinweis ── */}
+      {tauschBadge > 0 && (
+        <button onClick={()=>setShowTausch(true)} style={{ width:'100%', background:'#f3e8ff', border:'1.5px solid #d8b4fe', borderRadius:16, padding:'13px 16px', display:'flex', alignItems:'center', gap:12, cursor:'pointer', marginBottom:16, textAlign:'left' }}>
+          <div style={{ width:38, height:38, borderRadius:12, background:'#ede9fe', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:'#7c3aed' }}>swap_horiz</span>
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#5b21b6' }}>Tauschbörse</div>
+            <div style={{ fontSize:11, color:'#7c3aed', marginTop:1 }}>{availableVertretungen.length > 0 ? `${availableVertretungen.length} Vertretung${availableVertretungen.length>1?'en':''} verfügbar` : `${ownVertretungen.length} eigene${ownVertretungen.length>1?'':''} Angebot${ownVertretungen.length>1?'e':''}`}</div>
+          </div>
+          <span style={{ background:'#7c3aed', color:'#fff', borderRadius:999, minWidth:22, height:22, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, padding:'0 5px' }}>{tauschBadge}</span>
+        </button>
+      )}
+
+      {/* ── Ausstehende Anträge ── */}
+      {pendingReqs.length > 0 && (
+        <div style={{ marginBottom:18 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:10 }}>Ausstehend</div>
+          {pendingReqs.map((r:any) => {
+            const isKrank = r.request_type === 'krankmeldung'
+            return (
+              <div key={r.id} style={{ background:'#fffbeb', borderRadius:16, padding:'14px 16px', marginBottom:8, border:'1.5px solid #fbbf24', display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:40, height:40, borderRadius:13, background:isKrank?'#fee2e2':'#fff3cd', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:isKrank?'#dc2626':'#b45309' }}>{isKrank?'sick':'beach_access'}</span>
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{isKrank?'Krankmeldung':'Urlaubsantrag'}</div>
+                  <div style={{ fontSize:12, color:'#92400e', marginTop:2 }}>
+                    {new Date(r.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – {new Date(r.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+                    {' · '}{countDays(r)} Tag{countDays(r)>1?'e':''}
+                  </div>
+                  {r.note && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>„{r.note}"</div>}
+                </div>
+                <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                  <button onClick={()=>{setEditReq(r);setEditFrom(r.from_date);setEditTo(r.to_date);setEditNote(r.note??'')}}
+                    style={{ width:34, height:34, borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:16 }}>edit</span>
+                  </button>
+                  <button onClick={async()=>{ if (!confirm('Antrag stornieren?')) return; await supabase.from('leave_requests').delete().eq('id',r.id); await onLeavesChanged() }}
+                    style={{ width:34, height:34, borderRadius:10, border:'1px solid #fca5a5', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#dc2626' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:16 }}>close</span>
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* ── Antrag stellen ── */}
-      {section === 'antrag' && (
-        <div>
-          {/* Typ-Toggle */}
-          <div style={{ display:'flex', background:'var(--surf-low)', borderRadius:14, padding:4, marginBottom:20, gap:4 }}>
-            {([
-              { id:'urlaub' as const, icon:'beach_access', label:'Urlaub' },
-              { id:'krankmeldung' as const, icon:'sick', label:'Krankmeldung' },
-            ]).map(t=>(
-              <button key={t.id} onClick={()=>{setReqType(t.id);setMsg(null)}} style={{ flex:1, padding:'10px 8px', borderRadius:11, border:'none', background:reqType===t.id?'var(--surf-card)':'transparent', color:reqType===t.id?(t.id==='krankmeldung'?'#dc2626':'var(--pri)'):'var(--txt-muted)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, boxShadow:reqType===t.id?'0 1px 4px rgba(0,0,0,0.08)':'none', transition:'all 0.15s' }}>
-                <span className="material-symbols-outlined icon-sm">{t.icon}</span>{t.label}
-              </button>
-            ))}
-          </div>
-
-          {reqType === 'krankmeldung' && (
-            <div style={{ background:'#fef2f2', borderRadius:12, padding:'12px 14px', marginBottom:16, display:'flex', gap:10, alignItems:'flex-start' }}>
-              <span className="material-symbols-outlined" style={{ color:'#dc2626', fontSize:18, flexShrink:0, marginTop:1 }}>info</span>
-              <div style={{ fontSize:12, color:'#991b1b', lineHeight:1.5 }}>Nur bei echter Erkrankung nutzen. Till wird sofort benachrichtigt.</div>
-            </div>
-          )}
-
-          <form onSubmit={submit}>
-            <div style={{ display:'flex', gap:10, marginBottom:12 }}>
-              <div style={{ flex:1 }}>
-                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{reqType==='krankmeldung'?'Erkrankt ab':'Von'}</label>
-                <input type="date" value={from} onChange={e=>setFrom(e.target.value)} required
-                  style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
-              </div>
-              <div style={{ flex:1 }}>
-                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{reqType==='krankmeldung'?'Voraus. bis':'Bis'}</label>
-                <input type="date" value={to} onChange={e=>setTo(e.target.value)} required
-                  style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
-              </div>
-            </div>
-            <div style={{ marginBottom:16 }}>
-              <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Notiz (optional)</label>
-              <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder={reqType==='krankmeldung'?'z.B. Arztbesuch notwendig':'z.B. Familienurlaub'}
-                style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
-            </div>
-            {/* Day count preview */}
-          {from && to && from <= to && (() => {
-            let c = 0; const cur = new Date(from); const end = new Date(to)
-            while (cur <= end) { c++; cur.setDate(cur.getDate()+1) }
+      {/* ── Geplante Abwesenheiten ── */}
+      {upcomingLeaves.length > 0 && (
+        <div style={{ marginBottom:18 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:10 }}>Geplant</div>
+          {upcomingLeaves.map((r:any) => {
+            const isKrank = r.request_type === 'krankmeldung'
             return (
-              <div style={{ background:'var(--surf-low)', borderRadius:10, padding:'9px 14px', marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
-                <span className="material-symbols-outlined icon-fill" style={{ fontSize:16, color:'var(--pri)' }}>info</span>
-                <span style={{ fontSize:13, color:'var(--txt)', fontWeight:600 }}>{c} Tag{c>1?'e':''}</span>
-                <span style={{ fontSize:12, color:'var(--txt-muted)' }}>
-                  {new Date(from).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – {new Date(to).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+              <div key={r.id} style={{ background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, border:'1px solid var(--outline)', display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:38, height:38, borderRadius:12, background:isKrank?'#fee2e2':'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:19, color:isKrank?'#dc2626':'var(--pri)' }}>{isKrank?'sick':'beach_access'}</span>
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{isKrank?'Krankmeldung':'Urlaub'}</div>
+                  <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>
+                    {new Date(r.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'short'})} – {new Date(r.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'short',year:'numeric'})}
+                  </div>
+                </div>
+                <span style={{ fontSize:10, fontWeight:700, padding:'3px 9px', borderRadius:20, background:'var(--ok-bg)', color:'var(--ok)' }}>✓ Genehmigt</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Verlauf (letzte 30 Tage) ── */}
+      {verlauf.length > 0 && (
+        <div style={{ marginBottom:18 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:10 }}>Verlauf</div>
+          {verlauf.slice(0,8).map((r:any) => {
+            const isKrank = r.request_type === 'krankmeldung'
+            const stColor: Record<string,string> = { genehmigt:'var(--ok)', abgelehnt:'#dc2626' }
+            const stBg: Record<string,string> = { genehmigt:'var(--ok-bg)', abgelehnt:'#fef2f2' }
+            return (
+              <div key={r.id} style={{ background:'var(--surf-card)', borderRadius:12, padding:'10px 14px', marginBottom:7, border:'1px solid var(--outline)', display:'flex', alignItems:'center', gap:10 }}>
+                <span className="material-symbols-outlined icon-fill" style={{ color:isKrank?'#e53935':'var(--pri)', flexShrink:0, fontSize:18 }}>{isKrank?'sick':'beach_access'}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--txt)' }}>
+                    {isKrank?'Krank':'Urlaub'} · {new Date(r.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – {new Date(r.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+                  </div>
+                  {r.note && <div style={{ fontSize:11, color:'var(--txt-muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>„{r.note}"</div>}
+                </div>
+                <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:20, background:stBg[r.status]??'var(--surf-low)', color:stColor[r.status]??'var(--txt-muted)', flexShrink:0, whiteSpace:'nowrap' }}>
+                  {r.status==='genehmigt'?'✓ Genehmigt':'✕ Abgelehnt'}
                 </span>
               </div>
             )
-          })()}
-          {msg && (
-              <div style={{ background:msg.ok?'var(--ok-bg)':'#fef2f2', color:msg.ok?'var(--ok)':'#dc2626', borderRadius:10, padding:'11px 14px', fontSize:13, display:'flex', gap:8, marginBottom:14, alignItems:'center' }}>
-                <span className="material-symbols-outlined icon-sm icon-fill">{msg.ok?'check_circle':'error'}</span>{msg.text}
+          })}
+        </div>
+      )}
+
+      {/* Leerstate */}
+      {myLeaves.length === 0 && (
+        <div style={{ textAlign:'center', padding:'32px 0 12px', color:'var(--txt-muted)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize:44, display:'block', marginBottom:10, opacity:0.2 }}>event_available</span>
+          <div style={{ fontSize:15, fontWeight:700, color:'var(--txt)' }}>Noch keine Anträge</div>
+          <div style={{ fontSize:13, marginTop:6, lineHeight:1.5 }}>Nutze die Buttons oben, um Urlaub oder eine Krankmeldung einzureichen.</div>
+        </div>
+      )}
+
+      {/* ══ Antrag-Bottom-Sheet ══ */}
+      {showAntrag && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:500, display:'flex', alignItems:'flex-end' }} onClick={e=>{if(e.target===e.currentTarget)setShowAntrag(false)}}>
+          <div style={{ background:'var(--bg)', borderRadius:'22px 22px 0 0', width:'100%', padding:'20px 18px 36px', maxHeight:'90vh', overflowY:'auto' }}>
+            {/* Handle */}
+            <div style={{ width:36, height:4, borderRadius:99, background:'var(--outline)', margin:'0 auto 16px' }}/>
+
+            {/* Typ-Toggle */}
+            <div style={{ display:'flex', background:'var(--surf-low)', borderRadius:14, padding:4, marginBottom:18, gap:4 }}>
+              {([{id:'urlaub' as const,icon:'beach_access',label:'Urlaub'},{id:'krankmeldung' as const,icon:'sick',label:'Krankmeldung'}]).map(t=>(
+                <button key={t.id} onClick={()=>{setReqType(t.id);setMsg(null)}}
+                  style={{ flex:1, padding:'11px 8px', borderRadius:11, border:'none', background:reqType===t.id?'var(--surf-card)':'transparent', color:reqType===t.id?(t.id==='krankmeldung'?'#dc2626':'var(--pri)'):'var(--txt-muted)', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:7, boxShadow:reqType===t.id?'0 1px 4px rgba(0,0,0,0.08)':'none', transition:'all 0.15s' }}>
+                  <span className="material-symbols-outlined icon-sm">{t.icon}</span>{t.label}
+                </button>
+              ))}
+            </div>
+
+            {reqType === 'krankmeldung' && (
+              <div style={{ background:'#fef2f2', borderRadius:12, padding:'12px 14px', marginBottom:16, display:'flex', gap:10, alignItems:'flex-start' }}>
+                <span className="material-symbols-outlined" style={{ color:'#dc2626', fontSize:18, flexShrink:0, marginTop:1 }}>info</span>
+                <div style={{ fontSize:12, color:'#991b1b', lineHeight:1.5 }}>Nur bei echter Erkrankung nutzen. Till wird sofort benachrichtigt.</div>
               </div>
             )}
-            <button type="submit" disabled={sending||!from||!to} style={{ width:'100%', padding:14, borderRadius:14, border:'none', background:reqType==='krankmeldung'?'linear-gradient(135deg,#dc2626,#ef4444)':'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8, cursor:'pointer', opacity:(!from||!to)?0.5:1 }}>
-              <span className="material-symbols-outlined icon-sm">{sending?'hourglass_empty':reqType==='krankmeldung'?'sick':'send'}</span>
-              {sending?'Wird gesendet…':reqType==='krankmeldung'?'Krankmeldung senden':'Urlaub beantragen'}
-            </button>
-          </form>
-        </div>
-      )}
 
-      {/* ── Tauschbörse ── */}
-      {section === 'tauschboerse' && (
-        <div>
-          <div style={{ marginBottom:20 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-              <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Verfügbare Vertretungen</h3>
-              <span style={{ background:'var(--pri)', color:'#fff', borderRadius:999, fontSize:10, fontWeight:800, padding:'2px 8px' }}>{availableVertretungen.length}</span>
-            </div>
-            {availableVertretungen.length === 0 ? (
-              <div style={{ background:'var(--surf-low)', borderRadius:14, padding:'24px 16px', textAlign:'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:32, color:'var(--txt-muted)', display:'block', marginBottom:6, opacity:0.4 }}>swap_horiz</span>
-                <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Aktuell sucht kein Kollege eine Vertretung.</div>
-              </div>
-            ) : availableVertretungen.map(v => {
-              const task = v.tasks; const obj = task?.objects
-              const dateStr = new Date(v.due_date).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})
-              return (
-                <div key={v.id} style={{ background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:10, border:'1.5px solid #e9d5ff' }}>
-                  <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:12 }}>
-                    <div style={{ width:40, height:40, borderRadius:12, background:'#f3e8ff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{task?.categories?.emoji||'📋'}</div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:14, fontWeight:700 }}>{task?.title||'–'}</div>
-                      {obj && <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{obj.address}, {obj.city}</div>}
-                      <div style={{ fontSize:12, color:'#7c3aed', marginTop:3, fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:14 }}>event</span>{dateStr}
-                      </div>
-                      {v.users?.full_name && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>Von: {v.users.full_name}</div>}
-                    </div>
-                  </div>
-                  <button onClick={() => onTakeOver(v)} disabled={takingOver}
-                    style={{ width:'100%', padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#5b21b6,#7c3aed)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:16 }}>swap_horiz</span>Vertretung übernehmen
-                  </button>
+            <form onSubmit={submit}>
+              <div style={{ display:'flex', gap:10, marginBottom:12 }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{reqType==='krankmeldung'?'Erkrankt ab':'Von'}</label>
+                  <input type="date" value={from} onChange={e=>setFrom(e.target.value)} required
+                    style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
                 </div>
-              )
-            })}
-          </div>
-          <div>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-              <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Meine Angebote</h3>
-              <span style={{ background:'var(--surf-high)', color:'var(--txt-muted)', borderRadius:999, fontSize:10, fontWeight:800, padding:'2px 8px' }}>{ownVertretungen.length}</span>
-            </div>
-            {ownVertretungen.length === 0 ? (
-              <div style={{ background:'var(--surf-low)', borderRadius:14, padding:'16px', textAlign:'center' }}>
-                <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Keine eigenen Angebote.</div>
-                <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Aufgaben können im Aufgaben-Tab angeboten werden.</div>
+                <div style={{ flex:1 }}>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>{reqType==='krankmeldung'?'Voraus. bis':'Bis'}</label>
+                  <input type="date" value={to} onChange={e=>setTo(e.target.value)} required
+                    style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                </div>
               </div>
-            ) : ownVertretungen.map(v => {
-              const task = v.tasks; const obj = task?.objects
-              const dateStr = new Date(v.due_date).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})
-              return (
-                <div key={v.id} style={{ background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:10, border:'1px solid var(--outline)', display:'flex', alignItems:'flex-start', gap:10 }}>
-                  <div style={{ width:40, height:40, borderRadius:12, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{task?.categories?.emoji||'📋'}</div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:700 }}>{task?.title||'–'}</div>
-                    {obj && <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{obj.address}, {obj.city}</div>}
-                    <div style={{ fontSize:12, color:'#7c3aed', marginTop:3, fontWeight:600 }}>{dateStr}</div>
-                    <span style={{ display:'inline-flex', alignItems:'center', gap:4, marginTop:6, fontSize:10, fontWeight:700, color:'#7c3aed', background:'#f3e8ff', borderRadius:999, padding:'2px 8px' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:12 }}>hourglass_empty</span>Wird gesucht…
+
+              {from && to && from <= to && (() => {
+                const c = dayCount(from, to)
+                return (
+                  <div style={{ background:'var(--surf-low)', borderRadius:10, padding:'9px 14px', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+                    <span className="material-symbols-outlined icon-fill" style={{ fontSize:16, color:'var(--pri)' }}>info</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{c} Tag{c>1?'e':''}</span>
+                    <span style={{ fontSize:12, color:'var(--txt-muted)' }}>
+                      {new Date(from).toLocaleDateString('de-DE',{day:'2-digit',month:'short'})} – {new Date(to).toLocaleDateString('de-DE',{day:'2-digit',month:'short',year:'2-digit'})}
                     </span>
                   </div>
-                  <button onClick={() => onCancelVertretung(v.id)} disabled={cancellingVertretung === v.id}
-                    style={{ flexShrink:0, background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, padding:'7px 10px', cursor:'pointer', color:'#dc2626', display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:700 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:14 }}>close</span>
-                    {cancellingVertretung === v.id ? '…' : 'Zurückziehen'}
-                  </button>
+                )
+              })()}
+
+              <div style={{ marginBottom:14 }}>
+                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Notiz (optional)</label>
+                <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder={reqType==='krankmeldung'?'z.B. Arztbesuch notwendig':'z.B. Familienurlaub'}
+                  style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+              </div>
+
+              {msg && (
+                <div style={{ background:msg.ok?'var(--ok-bg)':'#fef2f2', color:msg.ok?'var(--ok)':'#dc2626', borderRadius:10, padding:'11px 14px', fontSize:13, display:'flex', gap:8, marginBottom:14, alignItems:'center' }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:16 }}>{msg.ok?'check_circle':'error'}</span>{msg.text}
                 </div>
-              )
-            })}
+              )}
+
+              <button type="submit" disabled={sending||!from||!to||from>to}
+                style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:reqType==='krankmeldung'?'linear-gradient(135deg,#dc2626,#ef4444)':'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:15, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8, cursor:'pointer', opacity:(!from||!to||from>to)?0.5:1, transition:'opacity 0.15s' }}>
+                <span className="material-symbols-outlined icon-sm">{sending?'hourglass_empty':reqType==='krankmeldung'?'sick':'send'}</span>
+                {sending?'Wird gesendet…':reqType==='krankmeldung'?'Krankmeldung senden':'Urlaub beantragen'}
+              </button>
+            </form>
           </div>
         </div>
       )}
 
-      {/* ── Edit Overlay ── */}
+      {/* ══ Tauschbörse-Sheet ══ */}
+      {showTausch && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:500, display:'flex', alignItems:'flex-end' }} onClick={e=>{if(e.target===e.currentTarget)setShowTausch(false)}}>
+          <div style={{ background:'var(--bg)', borderRadius:'22px 22px 0 0', width:'100%', padding:'20px 18px 36px', maxHeight:'85vh', overflowY:'auto' }}>
+            <div style={{ width:36, height:4, borderRadius:99, background:'var(--outline)', margin:'0 auto 18px' }}/>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+              <h3 style={{ fontSize:18, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Tauschbörse</h3>
+              <button onClick={()=>setShowTausch(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {availableVertretungen.length > 0 && (
+              <div style={{ marginBottom:22 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:10 }}>Verfügbare Vertretungen</div>
+                {availableVertretungen.map(v => {
+                  const task = v.tasks; const obj = task?.objects
+                  const dateStr = new Date(v.due_date).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})
+                  return (
+                    <div key={v.id} style={{ background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:10, border:'1.5px solid #e9d5ff' }}>
+                      <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:12 }}>
+                        <div style={{ width:40, height:40, borderRadius:12, background:'#f3e8ff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{task?.categories?.emoji||'📋'}</div>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:14, fontWeight:700 }}>{task?.title||'–'}</div>
+                          {obj && <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{obj.address}, {obj.city}</div>}
+                          <div style={{ fontSize:12, color:'#7c3aed', marginTop:3, fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:14 }}>event</span>{dateStr}
+                          </div>
+                          {v.users?.full_name && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>Von: {v.users.full_name}</div>}
+                        </div>
+                      </div>
+                      <button onClick={()=>onTakeOver(v)} disabled={takingOver}
+                        style={{ width:'100%', padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#5b21b6,#7c3aed)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:16 }}>swap_horiz</span>Vertretung übernehmen
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {ownVertretungen.length > 0 && (
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.09em', marginBottom:10 }}>Meine Angebote</div>
+                {ownVertretungen.map(v => {
+                  const task = v.tasks; const obj = task?.objects
+                  const dateStr = new Date(v.due_date).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit'})
+                  return (
+                    <div key={v.id} style={{ background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:10, border:'1px solid var(--outline)', display:'flex', alignItems:'flex-start', gap:10 }}>
+                      <div style={{ width:40, height:40, borderRadius:12, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>{task?.categories?.emoji||'📋'}</div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:14, fontWeight:700 }}>{task?.title||'–'}</div>
+                        {obj && <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{obj.address}, {obj.city}</div>}
+                        <div style={{ fontSize:12, color:'#7c3aed', marginTop:3, fontWeight:600 }}>{dateStr}</div>
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:4, marginTop:6, fontSize:10, fontWeight:700, color:'#7c3aed', background:'#f3e8ff', borderRadius:999, padding:'2px 8px' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:12 }}>hourglass_empty</span>Wird gesucht…
+                        </span>
+                      </div>
+                      <button onClick={()=>onCancelVertretung(v.id)} disabled={cancellingVertretung===v.id}
+                        style={{ flexShrink:0, background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, padding:'7px 10px', cursor:'pointer', color:'#dc2626', display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:700 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:14 }}>close</span>
+                        {cancellingVertretung===v.id?'…':'Zurückziehen'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {availableVertretungen.length === 0 && ownVertretungen.length === 0 && (
+              <div style={{ textAlign:'center', padding:'24px 0', color:'var(--txt-muted)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:36, display:'block', marginBottom:8, opacity:0.3 }}>swap_horiz</span>
+                <div style={{ fontSize:13 }}>Keine Vertretungen verfügbar.</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ══ Antrag-Edit-Sheet ══ */}
       {editReq && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:500, display:'flex', alignItems:'flex-end' }}>
-          <div style={{ background:'var(--bg)', borderRadius:'20px 20px 0 0', width:'100%', padding:'20px 18px 32px' }}>
+          <div style={{ background:'var(--bg)', borderRadius:'22px 22px 0 0', width:'100%', padding:'20px 18px 36px' }}>
+            <div style={{ width:36, height:4, borderRadius:99, background:'var(--outline)', margin:'0 auto 16px' }}/>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
               <h3 style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Antrag bearbeiten</h3>
-              <button onClick={()=>setEditReq(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex' }}><span className="material-symbols-outlined">close</span></button>
+              <button onClick={()=>setEditReq(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
             </div>
             <div style={{ display:'flex', gap:10, marginBottom:12 }}>
               <div style={{ flex:1 }}>
-                <label style={{ fontSize:11, fontWeight:600, color:'var(--txt-sec)', display:'block', marginBottom:4 }}>Von</label>
-                <input type="date" value={editFrom} onChange={e=>setEditFrom(e.target.value)} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', display:'block', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.07em' }}>Von</label>
+                <input type="date" value={editFrom} onChange={e=>setEditFrom(e.target.value)} style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
               </div>
               <div style={{ flex:1 }}>
-                <label style={{ fontSize:11, fontWeight:600, color:'var(--txt-sec)', display:'block', marginBottom:4 }}>Bis</label>
-                <input type="date" value={editTo} onChange={e=>setEditTo(e.target.value)} style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                <label style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', display:'block', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.07em' }}>Bis</label>
+                <input type="date" value={editTo} onChange={e=>setEditTo(e.target.value)} style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
               </div>
             </div>
             <div style={{ marginBottom:16 }}>
-              <label style={{ fontSize:11, fontWeight:600, color:'var(--txt-sec)', display:'block', marginBottom:4 }}>Notiz (optional)</label>
-              <input type="text" value={editNote} onChange={e=>setEditNote(e.target.value)} placeholder="Grund, Reise, …" style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+              <label style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', display:'block', marginBottom:4, textTransform:'uppercase', letterSpacing:'0.07em' }}>Notiz (optional)</label>
+              <input type="text" value={editNote} onChange={e=>setEditNote(e.target.value)} placeholder="Grund, Reise, …" style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
             </div>
             <button disabled={editSaving||!editFrom||!editTo} onClick={async()=>{
               setEditSaving(true)
               await supabase.from('leave_requests').update({ from_date:editFrom, to_date:editTo, note:editNote||null, status:'ausstehend' }).eq('id',editReq.id)
               await onLeavesChanged(); setEditReq(null); setEditSaving(false)
             }} style={{ width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', opacity:editSaving?0.6:1 }}>
-              {editSaving ? 'Wird gespeichert…' : 'Änderungen speichern'}
+              {editSaving?'Wird gespeichert…':'Änderungen speichern'}
             </button>
             <p style={{ textAlign:'center', fontSize:11, color:'var(--txt-muted)', marginTop:10 }}>Geänderte Anträge werden erneut zur Genehmigung vorgelegt.</p>
           </div>
         </div>
       )}
 
-      {/* ── Urlaubskonflikt Modal ── */}
+      {/* ══ Urlaubskonflikt-Modal ══ */}
       {showConflict && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:400, display:'flex', alignItems:'flex-end' }}>
-          <div style={{ background:'var(--bg)', borderRadius:'20px 20px 0 0', width:'100%', maxHeight:'80vh', display:'flex', flexDirection:'column' }}>
+          <div style={{ background:'var(--bg)', borderRadius:'22px 22px 0 0', width:'100%', maxHeight:'80vh', display:'flex', flexDirection:'column' }}>
             <div style={{ padding:'16px 18px 14px', display:'flex', alignItems:'center', gap:12, borderBottom:'1px solid var(--outline)', flexShrink:0 }}>
               <div style={{ width:40, height:40, borderRadius:12, background:'var(--warn-bg)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <span className="material-symbols-outlined" style={{ color:'var(--warn)' }}>warning</span>
@@ -2132,11 +2264,11 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
                         <div style={{ fontSize:13, fontWeight:700 }}>{a.tasks?.title}</div>
                         <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{a.tasks?.objects?.address} · {new Date(a.due_date).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}</div>
                       </div>
-                      {done && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--ok)' }}>check_circle</span>}
+                      {done && <span className="material-symbols-outlined" style={{ color:'var(--ok)', fontSize:18 }}>check_circle</span>}
                     </div>
                     {!done ? (
-                      <button onClick={() => requestSwap(a.id)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1.5px solid var(--pri)', background:'var(--pri-xl)', color:'var(--pri)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                        <span className="material-symbols-outlined icon-sm">swap_horiz</span>Vertretung anfragen
+                      <button onClick={()=>requestSwap(a.id)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1.5px solid var(--pri)', background:'var(--pri-xl)', color:'var(--pri)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:16 }}>swap_horiz</span>Vertretung anfragen
                       </button>
                     ) : (
                       <div style={{ fontSize:12, color:'var(--ok)', fontWeight:600, textAlign:'center', padding:'6px 0' }}>Vertretungsanfrage gesendet ✓</div>
@@ -2146,9 +2278,9 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
               })}
             </div>
             <div style={{ padding:'14px 18px', borderTop:'1px solid var(--outline)', flexShrink:0 }}>
-              <button onClick={() => { setShowConflict(false); setConflictAssigns([]); setSwapRequested(new Set()); setMsg({ text:'Antrag gespeichert!', ok:true }) }}
+              <button onClick={()=>{ setShowConflict(false); setConflictAssigns([]); setSwapRequested(new Set()); setShowAntrag(false); setMsg({ text:'Antrag gespeichert!', ok:true }) }}
                 style={{ width:'100%', padding:13, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
-                Fertig
+                Schließen
               </button>
             </div>
           </div>

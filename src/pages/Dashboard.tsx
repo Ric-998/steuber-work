@@ -118,6 +118,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
   const [showTodayOverlay, setShowTodayOverlay] = useState(false)
   const [showMonthOverlay, setShowMonthOverlay] = useState(false)
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
+  const [blackouts, setBlackouts] = useState<any[]>([])
+  const [showBlackoutForm, setShowBlackoutForm] = useState(false)
+  const [blackoutFrom, setBlackoutFrom] = useState('')
+  const [blackoutTo, setBlackoutTo] = useState('')
+  const [blackoutReason, setBlackoutReason] = useState('')
+  const [blackoutSaving, setBlackoutSaving] = useState(false)
   const [leaveConflictReq, setLeaveConflictReq] = useState<LeaveRequest|null>(null)
   const [leaveConflictAssigns, setLeaveConflictAssigns] = useState<any[]>([])
   const [leaveConflictLoading, setLeaveConflictLoading] = useState(false)
@@ -227,7 +233,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
   const loadAll = async () => {
     setLoading(true)
-    const [stRes, prRes, tmRes, tkRes, obRes, catRes, custRes, lvRes] = await Promise.all([
+    const [stRes, prRes, tmRes, tkRes, obRes, catRes, custRes, lvRes, bkRes] = await Promise.all([
       supabase.rpc('get_dashboard_stats'),
       supabase.rpc('get_dashboard_problems'),
       supabase.from('users').select('id,full_name,phone,email,is_active,role_id,street,postal_code,city,created_at,employed_since,work_days,work_hours_per_week,work_hours_type,hourly_wage,admin_setup_done,is_onboarded,vacation_days_per_year').order('full_name'),
@@ -236,6 +242,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.from('categories').select('*').order('name'),
       supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,contract_type,hausverwaltung_id,co_contact_id,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name'),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
+      supabase.from('vacation_blackouts').select('*').order('from_date',{ascending:true}),
     ])
     if (stRes.data) setStats(stRes.data)
     if (prRes.data) setProblems((prRes.data || []) as unknown as Problem[])
@@ -245,6 +252,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     if (catRes.data) setCategories(catRes.data)
     if (custRes?.data) setCustomers(custRes.data as unknown as CustomerItem[])
     if (lvRes?.data) setLeaveRequests(lvRes.data as unknown as LeaveRequest[])
+    if (bkRes?.data) setBlackouts(bkRes.data)
 
     // Tauschbörse: assignments with status=vertretung
     const todayStr = new Date().toISOString().split('T')[0]
@@ -476,23 +484,24 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {!isDesktop && (
         <div style={s.tabBar}>
           {([
-            { id:'overview',   icon:'dashboard',  label:'Übersicht', badge: reportNewCount },
-            { id:'objekte',    icon:'apartment',   label:'Objekte',   badge: 0 },
-            { id:'bericht',    icon:'summarize',   label:'Bericht',   badge: pendingCount + reportNewCount },
-            { id:'chat',       icon:'chat_bubble', label:'Chat',      badge: chatUnread },
-            { id:'team',       icon:'group',       label:'Team',      badge: teamBadge },
-            { id:'profil',     icon:'person',      label:'Profil',    badge: 0 },
+            { id:'overview',   icon:'dashboard',     label:'Übersicht', badge: reportNewCount },
+            { id:'objekte',    icon:'apartment',      label:'Objekte',   badge: 0 },
+            { id:'team',       icon:'group',          label:'Team',      badge: teamBadge },
+            { id:'chat',       icon:'chat_bubble',    label:'Chat',      badge: chatUnread },
+            { id:'profil',     icon:'person',         label:'Profil',    badge: 0 },
           ] as const).map(t=>(
-            <div key={t.id} onClick={()=>{ setTab(t.id); if(t.id==='bericht'||t.id==='overview'){ const now=Date.now(); setReportSeen(now); localStorage.setItem('sw_report_seen',String(now)) } }} style={{ ...s.tabItem, color:tab===t.id?'var(--pri)':'var(--txt-muted)', borderBottom:tab===t.id?'2.5px solid var(--pri)':'2.5px solid transparent', fontWeight:tab===t.id?700:500, position:'relative' }}>
-              <span className={`material-symbols-outlined icon-sm${tab===t.id?' icon-fill':''}`}>{t.icon}</span>
+            <div key={t.id} onClick={()=>{ setTab(t.id); if(t.id==='overview'){ const now=Date.now(); setReportSeen(now); localStorage.setItem('sw_report_seen',String(now)) } }} style={{ ...s.tabItem, color:tab===t.id?'var(--pri)':'var(--txt-muted)', fontWeight:tab===t.id?700:500, position:'relative' }}>
+              <div style={{ width:44, height:30, borderRadius:99, background:tab===t.id?'var(--pri-xl)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.15s', position:'relative' }}>
+                <span className={`material-symbols-outlined${tab===t.id?' icon-fill':''}`} style={{ fontSize:22 }}>{t.icon}</span>
+                {t.badge > 0 && <span style={{ position:'absolute', top:2, right:4, minWidth:16, height:16, borderRadius:999, background:'#e53935', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{t.badge}</span>}
+              </div>
               {t.label}
-              {t.badge > 0 && <span style={{ position:'absolute', top:4, right:'50%', transform:'translateX(14px)', minWidth:16, height:16, borderRadius:999, background:'#e53935', color:'#fff', fontSize:10, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{t.badge}</span>}
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ ...s.content, padding: isDesktop ? '0 32px 32px' : '0 18px 24px' }}>
+      <div style={{ ...s.content, padding: isDesktop ? '0 32px 32px' : '0 18px 90px' }}>
         <div style={{ maxWidth:1200, margin:'0 auto', width:'100%' }}>
 
         {/* ── ÜBERSICHT ── */}
@@ -923,6 +932,98 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 </div>
               )
             })}
+
+            {/* ── Urlaubssperren ── */}
+            <div style={{ marginTop:28 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                <div>
+                  <h3 style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', margin:0, color:'var(--txt)' }}>Urlaubssperren</h3>
+                  <p style={{ fontSize:12, color:'var(--txt-muted)', margin:'2px 0 0' }}>Zeiträume, in denen kein Urlaub beantragt werden kann</p>
+                </div>
+                <button onClick={()=>{setBlackoutFrom('');setBlackoutTo('');setBlackoutReason('');setShowBlackoutForm(true)}}
+                  style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:12, border:'none', background:'#fef2f2', color:'#dc2626', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:16 }}>block</span>
+                  Sperre
+                </button>
+              </div>
+
+              {blackouts.length === 0 ? (
+                <div style={{ background:'var(--surf-low)', borderRadius:14, padding:'18px 16px', textAlign:'center' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:28, color:'var(--txt-muted)', display:'block', marginBottom:6, opacity:0.4 }}>event_available</span>
+                  <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Keine aktiven Urlaubssperren</div>
+                </div>
+              ) : (
+                <div>
+                  {blackouts.map((b:any) => (
+                    <div key={b.id} style={{ background:'#fef2f2', borderRadius:14, padding:'12px 16px', marginBottom:8, border:'1.5px solid #fca5a5', display:'flex', alignItems:'center', gap:12 }}>
+                      <div style={{ width:38, height:38, borderRadius:12, background:'#fee2e2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:'#dc2626' }}>block</span>
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:700, color:'#991b1b' }}>
+                          {new Date(b.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})} – {new Date(b.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
+                        </div>
+                        {b.reason && <div style={{ fontSize:12, color:'#dc2626', marginTop:1 }}>{b.reason}</div>}
+                      </div>
+                      <button onClick={async()=>{
+                        if (!confirm('Sperre entfernen?')) return
+                        await supabase.from('vacation_blackouts').delete().eq('id', b.id)
+                        setBlackouts(prev => prev.filter((x:any) => x.id !== b.id))
+                      }} style={{ width:32, height:32, borderRadius:9, border:'1px solid #fca5a5', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#dc2626', flexShrink:0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:16 }}>delete</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Sperre-Formular */}
+              {showBlackoutForm && (
+                <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:600, display:'flex', alignItems:'flex-end' }} onClick={e=>{if(e.target===e.currentTarget)setShowBlackoutForm(false)}}>
+                  <div style={{ background:'var(--bg)', borderRadius:'22px 22px 0 0', width:'100%', padding:'20px 18px 36px', maxWidth:540, margin:'0 auto' }}>
+                    <div style={{ width:36, height:4, borderRadius:99, background:'var(--outline)', margin:'0 auto 18px' }}/>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+                      <h3 style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Urlaubssperre anlegen</h3>
+                      <button onClick={()=>setShowBlackoutForm(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex' }}>
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <div style={{ background:'#fef2f2', borderRadius:12, padding:'11px 14px', marginBottom:16, display:'flex', gap:8 }}>
+                      <span className="material-symbols-outlined" style={{ color:'#dc2626', fontSize:16, flexShrink:0, marginTop:1 }}>info</span>
+                      <div style={{ fontSize:12, color:'#991b1b', lineHeight:1.5 }}>In diesem Zeitraum können Mitarbeiter keinen Urlaub beantragen. Krankmeldungen sind weiterhin möglich.</div>
+                    </div>
+                    <div style={{ display:'flex', gap:10, marginBottom:12 }}>
+                      <div style={{ flex:1 }}>
+                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Von</label>
+                        <input type="date" value={blackoutFrom} onChange={e=>setBlackoutFrom(e.target.value)}
+                          style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Bis</label>
+                        <input type="date" value={blackoutTo} onChange={e=>setBlackoutTo(e.target.value)}
+                          style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                      </div>
+                    </div>
+                    <div style={{ marginBottom:16 }}>
+                      <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Begründung (optional)</label>
+                      <input type="text" value={blackoutReason} onChange={e=>setBlackoutReason(e.target.value)} placeholder="z.B. Hochsaison, Messe, Projektwoche"
+                        style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                    </div>
+                    <button disabled={blackoutSaving||!blackoutFrom||!blackoutTo||blackoutFrom>blackoutTo}
+                      onClick={async()=>{
+                        setBlackoutSaving(true)
+                        const { data, error } = await supabase.from('vacation_blackouts').insert({ from_date:blackoutFrom, to_date:blackoutTo, reason:blackoutReason||null, created_by:currentUserId }).select().single()
+                        if (!error && data) { setBlackouts(prev=>[...prev, data].sort((a:any,b:any)=>a.from_date.localeCompare(b.from_date))); setShowBlackoutForm(false) }
+                        setBlackoutSaving(false)
+                      }}
+                      style={{ width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,#dc2626,#ef4444)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', opacity:(!blackoutFrom||!blackoutTo||blackoutFrom>blackoutTo)?0.5:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:18 }}>{blackoutSaving?'hourglass_empty':'block'}</span>
+                      {blackoutSaving?'Wird gespeichert…':'Urlaubssperre setzen'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
 
@@ -1229,6 +1330,28 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 </div>
               ))}
             </div>
+
+            {/* Mobile-Shortcuts für versteckte Tabs */}
+            {!isDesktop && (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
+                {([
+                  { id:'bericht', icon:'summarize', label:'Tagesbericht', badge: pendingCount + reportNewCount, color:'#0369a1', bg:'#e0f2fe' },
+                  { id:'kunden', icon:'business', label:'Kunden', badge: 0, color:'#7c3aed', bg:'#f3e8ff' },
+                ] as const).map(t=>(
+                  <button key={t.id} onClick={()=>setTab(t.id as any)}
+                    style={{ padding:'14px 12px', borderRadius:16, border:'1.5px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', gap:10, textAlign:'left', position:'relative' }}>
+                    <div style={{ width:38, height:38, borderRadius:12, background:t.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:20, color:t.color }}>{t.icon}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:800, color:'var(--txt)' }}>{t.label}</div>
+                      <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>öffnen</div>
+                    </div>
+                    {t.badge > 0 && <span style={{ position:'absolute', top:8, right:10, minWidth:18, height:18, borderRadius:999, background:'#e53935', color:'#fff', fontSize:10, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px' }}>{t.badge}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Einstellungen */}
             <AdminKontoSection userName={userName} />
@@ -4130,9 +4253,9 @@ const s: Record<string,React.CSSProperties> = {
   topBarLeft:    { display:'flex', alignItems:'center', gap:10 },
   topAva:        { width:36, height:36, borderRadius:'50%', background:'var(--sec-c)', color:'var(--pri)', fontSize:13, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-head)' },
   topTitle:      { fontSize:18, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)', letterSpacing:'-0.03em' },
-  tabBar:        { display:'flex', background:'var(--surf-card)', borderBottom:'1px solid var(--outline)', flexShrink:0 },
-  tabItem:       { flex:1, textAlign:'center', padding:'10px 0', fontSize:11, cursor:'pointer', transition:'color 0.15s', display:'flex', flexDirection:'column', alignItems:'center', gap:2 },
-  content:       { height:0, flex:1, overflowY:'auto', padding:'0 18px 24px' },
+  tabBar:        { display:'flex', position:'fixed', bottom:0, left:0, right:0, background:'rgba(248,249,250,0.92)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:'1px solid var(--outline)', paddingBottom:'env(safe-area-inset-bottom, 0px)', zIndex:200 },
+  tabItem:       { flex:1, textAlign:'center' as const, padding:'8px 0 10px', fontSize:10, cursor:'pointer', transition:'color 0.15s', display:'flex', flexDirection:'column' as const, alignItems:'center', gap:3 },
+  content:       { height:0, flex:1, overflowY:'auto' as const, padding:'0 18px 24px' },
   h1:            { fontSize:26, fontWeight:800, fontFamily:'var(--font-head)', letterSpacing:'-0.03em', marginBottom:4 },
   sub:           { fontSize:14, color:'var(--txt-muted)' },
   bento:         { display:'grid', gridTemplateColumns:'2fr 1fr', gap:12, marginBottom:14 },

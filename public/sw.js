@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steuberwork-v5'
+const CACHE_NAME = 'steuberwork-v6'
 const VAPID_PUBLIC_KEY = 'BIVxcSSeFZEXfg82j5-GQR6x4nOZxgiFVaPbRxkBarjj8oP2y7auEww2-aWuj_PpOcBuXXzrBbqU_D8eNqTEZik'
 
 // Install & cache
