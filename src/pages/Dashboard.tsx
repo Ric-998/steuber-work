@@ -513,8 +513,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 const greet = hr < 12 ? 'Guten Morgen' : hr < 18 ? 'Guten Mittag' : 'Guten Abend'
                 const firstName = userName.split(' ')[0]
                 return (
-                  <p style={{ fontSize:12, fontWeight:600, color:'rgba(255,255,255,0.6)', letterSpacing:0.3, marginBottom:4, marginTop:0 }}>
-                    {greet}, {firstName}
+                  <p style={{ fontSize:13, fontWeight:700, color:'var(--txt-muted)', letterSpacing:0.2, marginBottom:2, marginTop:0 }}>
+                    {greet}, {firstName} 👋
                   </p>
                 )
               })()}

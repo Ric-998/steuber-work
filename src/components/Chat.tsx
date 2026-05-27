@@ -241,12 +241,16 @@ export function ChatTab({ currentUserId }: { currentUserName?: string; currentUs
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 90, position: 'relative' }}>
-      <div style={{ padding: '10px 0 8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: 'var(--surf-card)', border: '1px solid var(--outline)', borderRadius: 14 }}>
+      <div style={{ padding: '10px 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: 'var(--surf-card)', border: '1px solid var(--outline)', borderRadius: 14 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--txt-muted)' }}>search</span>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Suche"
             style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: 'var(--txt)', fontFamily: 'inherit' }} />
         </div>
+        <button onClick={() => setShowNewChat(true)}
+          style={{ width: 42, height: 42, borderRadius: 13, background: 'var(--pri-xl)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--pri)', fontVariationSettings: "'FILL' 1" }}>add</span>
+        </button>
       </div>
 
       {loading ? (
@@ -255,7 +259,7 @@ export function ChatTab({ currentUserId }: { currentUserName?: string; currentUs
         <div style={{ textAlign: 'center', padding: 40 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--txt-muted)', display: 'block', marginBottom: 10 }}>chat_bubble</span>
           <div style={{ fontSize: 14, color: 'var(--txt-muted)' }}>{search ? 'Keine Ergebnisse' : 'Noch keine Nachrichten'}</div>
-          {!search && <div style={{ fontSize: 12, color: 'var(--txt-muted)', marginTop: 4 }}>Tippe auf + um eine Unterhaltung zu starten</div>}
+          {!search && <div style={{ fontSize: 12, color: 'var(--txt-muted)', marginTop: 4 }}>Tippe auf + neben der Suche, um eine Unterhaltung zu starten</div>}
         </div>
       ) : (
         <>
@@ -289,12 +293,7 @@ export function ChatTab({ currentUserId }: { currentUserName?: string; currentUs
         </>
       )}
 
-      <div style={{ position: 'sticky', bottom: 80, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none', zIndex: 50 }}>
-        <button onClick={() => setShowNewChat(true)}
-          style={{ pointerEvents: 'all', width: 48, height: 48, borderRadius: '50%', background: 'var(--pri)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(8,93,104,0.35)' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#fff', fontVariationSettings: "'FILL' 1" }}>add</span>
-        </button>
-      </div>
+
 
       {showNewChat && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
