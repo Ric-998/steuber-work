@@ -230,7 +230,7 @@ export function ChatTab({ currentUserId }: { currentUserName?: string; currentUs
   const filtered = usersWithMsg.filter(u => u.full_name.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div style={{ paddingBottom: 90 }}>
+    <div style={{ maxWidth: 600, margin: '0 auto', paddingBottom: 90, position: 'relative' }}>
       <div style={{ padding: '10px 0 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: 'var(--surf-card)', border: '1px solid var(--outline)', borderRadius: 14 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--txt-muted)' }}>search</span>
@@ -279,10 +279,12 @@ export function ChatTab({ currentUserId }: { currentUserName?: string; currentUs
         </>
       )}
 
-      <button onClick={() => setShowNewChat(true)}
-        style={{ position: 'fixed', bottom: 90, right: 16, width: 48, height: 48, borderRadius: '50%', background: 'var(--pri)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(8,93,104,0.35)', zIndex: 50 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#fff', fontVariationSettings: "'FILL' 1" }}>add</span>
-      </button>
+      <div style={{ position: 'sticky', bottom: 80, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'none', zIndex: 50 }}>
+        <button onClick={() => setShowNewChat(true)}
+          style={{ pointerEvents: 'all', width: 48, height: 48, borderRadius: '50%', background: 'var(--pri)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(8,93,104,0.35)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#fff', fontVariationSettings: "'FILL' 1" }}>add</span>
+        </button>
+      </div>
 
       {showNewChat && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
