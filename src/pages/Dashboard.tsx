@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import * as XLSX from 'xlsx'
 import BugReport from '../components/BugReport'
-import { ChatTab } from '../components/Chat'
+import { ChatTab, useChatUnread } from '../components/Chat'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import { WasIstNeu } from '../components/WasIstNeu'
 import QRCode from '../components/QRCode'
@@ -198,6 +198,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
   const today = new Date()
   const initials = userName.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()
   const [currentUserId, setCurrentUserId] = useState('')
+  const chatUnread = useChatUnread(currentUserId)
   useEffect(() => {
     supabase.auth.getUser().then(({data})=>{ if(data.user) setCurrentUserId(data.user.id) })
   }, [])
@@ -407,7 +408,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     { id:'objekte',  icon:'apartment',  label:'Objekte',      badge: 0 },
     { id:'kunden',   icon:'contacts',   label:'Kunden',       badge: 0 },
     { id:'bericht',  icon:'summarize',  label:'Tagesbericht', badge: pendingCount + reportNewCount },
-    { id:'chat',     icon:'chat_bubble',label:'Nachrichten',  badge: 0 },
+    { id:'chat',     icon:'chat_bubble',label:'Nachrichten',  badge: chatUnread },
     { id:'team',     icon:'group',      label:'Team',         badge: teamBadge },
     { id:'profil',   icon:'person',     label:'Profil',       badge: 0 },
   ]
@@ -478,7 +479,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             { id:'overview',   icon:'dashboard',  label:'Übersicht', badge: reportNewCount },
             { id:'objekte',    icon:'apartment',   label:'Objekte',   badge: 0 },
             { id:'bericht',    icon:'summarize',   label:'Bericht',   badge: pendingCount + reportNewCount },
-            { id:'chat',       icon:'chat_bubble', label:'Chat',      badge: 0 },
+            { id:'chat',       icon:'chat_bubble', label:'Chat',      badge: chatUnread },
             { id:'team',       icon:'group',       label:'Team',      badge: teamBadge },
             { id:'profil',     icon:'person',      label:'Profil',    badge: 0 },
           ] as const).map(t=>(

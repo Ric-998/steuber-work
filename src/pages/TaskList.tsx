@@ -4,7 +4,7 @@ import { OnboardingTour, InstallGuide, useOnboarding, resetTour } from '../compo
 import { WasIstNeu } from '../components/WasIstNeu'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import BugReport from '../components/BugReport'
-import { ChatTab } from '../components/Chat'
+import { ChatTab, useChatUnread } from '../components/Chat'
 import MapView from '../components/MapView'
 import { registerServiceWorker, subscribeToPush, unsubscribeFromPush, isPushSubscribed, isPushSupported } from '../lib/push'
 import { TaskAssignment } from '../types'
@@ -121,6 +121,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
   // Push notification state
   const [pushEnabled, setPushEnabled] = useState(false)
+  const chatUnread = useChatUnread(userId)
   const [pushSupported, setPushSupported] = useState(false)
 
   useEffect(() => {
@@ -866,15 +867,16 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
         {([
           { id: 'start',   icon: 'home',           label: 'Start' },
           { id: 'tasks',   icon: 'task_alt',        label: 'Aufgaben' },
-          { id: 'chat',    icon: 'chat_bubble',     label: 'Chat' },
+          { id: 'chat',    icon: 'chat_bubble',     label: 'Chat',   badge: chatUnread },
           { id: 'zeit',    icon: 'calendar_month',  label: 'Zeitplan' },
           { id: 'profile', icon: 'person',          label: 'Profil' },
         ] as const).map(item => {
           const isOn = activeTab === item.id
           return (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} style={{ ...s.navItem, ...(isOn ? s.navItemOn : {}) }}>
+            <button key={item.id} onClick={() => setActiveTab(item.id)} style={{ ...s.navItem, ...(isOn ? s.navItemOn : {}), position: 'relative' }}>
               <span className={`material-symbols-outlined${isOn ? ' icon-fill' : ''}`} style={{ fontSize: 22 }}>{item.icon}</span>
               <span style={{ fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.label}</span>
+              {'badge' in item && (item as any).badge > 0 && <span style={{ position: 'absolute', top: 4, right: 8, minWidth: 16, height: 16, borderRadius: 999, background: '#ef4444', color: '#fff', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{(item as any).badge}</span>}
             </button>
           )
         })}

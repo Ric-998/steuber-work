@@ -91,6 +91,16 @@ export function ChatConversation({ contact, currentUserId, onBack }: {
     const text = input.trim(); if (!text || sending) return
     setSending(true); setInput('')
     await supabase.from('messages').insert({ sender_id: currentUserId, receiver_id: contact.id, text })
+    // Push notification to receiver
+    supabase.functions.invoke('send-push', {
+      body: {
+        user_id: contact.id,
+        title: '💬 Neue Nachricht',
+        body: text.length > 80 ? text.slice(0, 80) + '…' : text,
+        url: '/',
+        tag: `chat-${currentUserId}`,
+      }
+    }).catch(() => {}) // fire-and-forget
     await loadMessages()
     setSending(false)
   }
@@ -98,7 +108,7 @@ export function ChatConversation({ contact, currentUserId, onBack }: {
   let lastDateDiv = ''
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)', background: 'var(--bg)' }}>
+    <div style={{ maxWidth: 600, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)', background: 'var(--bg)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', background: 'var(--surf-card)', borderBottom: '1px solid var(--outline)', flexShrink: 0 }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', display: 'flex', alignItems: 'center', color: 'var(--pri)' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
@@ -309,4 +319,29 @@ export function ChatTab({ currentUserId }: { currentUserName?: string; currentUs
       )}
     </div>
   )
+}
+
+// ─── Hook: unread count for badge ────────────────────────────────────────────
+export function useChatUnread(currentUserId: string) {
+  const [unread, setUnread] = useState(0)
+
+  const load = async () => {
+    if (!currentUserId) return
+    const { count } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', currentUserId)
+      .is('read_at', null)
+    setUnread(count || 0)
+  }
+
+  useEffect(() => {
+    load()
+    const ch = supabase.channel(`unread-badge-${currentUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, load)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [currentUserId])
+
+  return unread
 }
