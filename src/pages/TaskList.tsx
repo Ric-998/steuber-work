@@ -489,7 +489,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
 
       {/* Content */}
-      <div style={{ ...s.content, paddingTop: activeTab === 'start' ? 0 : undefined, padding: activeTab === 'chat' ? '0 14px' : undefined }}>
+      <div style={{ ...s.content, paddingTop: activeTab === 'start' ? 0 : activeTab === 'tasks' ? 0 : undefined, padding: activeTab === 'chat' ? '0 14px' : undefined }}>
         {activeTab === 'start' && (() => {
           const todayStr2 = today.toISOString().split('T')[0]
           const todayAll = assignments.filter(a => a.due_date === todayStr2)
@@ -675,7 +675,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
           return (
           <>
             {/* ── Date Nav Bar ── */}
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14, marginTop:12 }}>
               <button onClick={() => shiftDay(-1)} style={{ width:40, height:48, borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                 <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--txt)' }}>chevron_left</span>
               </button>
@@ -783,11 +783,11 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
                         </div>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)', display:'flex', alignItems:'center', gap:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                            {obj ? (obj.name || obj.address) : 'Objekt unbekannt'}
+                            {obj ? (obj.name && obj.name !== obj.address ? obj.name : `${obj.address}, ${obj.city}`) : 'Objekt unbekannt'}
                             {obj && <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--txt-muted)', flexShrink:0 }}>arrow_forward_ios</span>}
                           </div>
                           <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                            {obj ? `${obj.address}, ${obj.city}` : ''} · {tasks.length} Aufgabe{tasks.length>1?'n':''}
+                            {[obj?.postal_code, obj?.city].filter(Boolean).join(' ')} · {tasks.length} Aufgabe{tasks.length>1?'n':''}
                           </div>
                         </div>
                         {groupCount > 1 && (
