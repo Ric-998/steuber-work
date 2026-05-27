@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import * as XLSX from 'xlsx'
 import BugReport from '../components/BugReport'
+import { ChatTab } from '../components/Chat'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import { WasIstNeu } from '../components/WasIstNeu'
 import QRCode from '../components/QRCode'
@@ -109,7 +110,7 @@ const MOTIVATIONS = [
 
 export default function Dashboard({ userName, onLogout }: Props) {
   const [motivation] = useState(() => MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)])
-  const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'team'|'bericht'|'profil'>('overview')
+  const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'team'|'bericht'|'chat'|'profil'>('overview')
   const [selectedObject, setSelectedObject] = useState<ObjectItem|null>(null)
   const [selectedProblem, setSelectedProblem] = useState<Problem|null>(null)
   const [selectedMember, setSelectedMember] = useState<TeamMember|null>(null)
@@ -406,6 +407,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     { id:'objekte',  icon:'apartment',  label:'Objekte',      badge: 0 },
     { id:'kunden',   icon:'contacts',   label:'Kunden',       badge: 0 },
     { id:'bericht',  icon:'summarize',  label:'Tagesbericht', badge: pendingCount + reportNewCount },
+    { id:'chat',     icon:'chat_bubble',label:'Nachrichten',  badge: 0 },
     { id:'team',     icon:'group',      label:'Team',         badge: teamBadge },
     { id:'profil',   icon:'person',     label:'Profil',       badge: 0 },
   ]
@@ -476,6 +478,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             { id:'overview',   icon:'dashboard',  label:'Übersicht', badge: reportNewCount },
             { id:'objekte',    icon:'apartment',   label:'Objekte',   badge: 0 },
             { id:'bericht',    icon:'summarize',   label:'Bericht',   badge: pendingCount + reportNewCount },
+            { id:'chat',       icon:'chat_bubble', label:'Chat',      badge: 0 },
             { id:'team',       icon:'group',       label:'Team',      badge: teamBadge },
             { id:'profil',     icon:'person',      label:'Profil',    badge: 0 },
           ] as const).map(t=>(
@@ -1184,6 +1187,13 @@ export default function Dashboard({ userName, onLogout }: Props) {
             </>
           )
         })()}
+
+        {/* ── CHAT ── */}
+        {tab === 'chat' && currentUserId && (
+          <div style={{ paddingTop: 8 }}>
+            <ChatTab currentUserId={currentUserId} />
+          </div>
+        )}
 
         {/* ── PROFIL ── */}
         {tab === 'profil' && (
