@@ -1398,8 +1398,8 @@ function ChatTab({ currentUserId }: { currentUserName: string; currentUserId: st
 
       {/* FAB: Neue Unterhaltung */}
       <button onClick={() => setShowNewChat(true)}
-        style={{ position: 'fixed', bottom: 90, right: 20, width: 52, height: 52, borderRadius: '50%', background: 'var(--pri)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(8,93,104,0.35)', zIndex: 50 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#fff', fontVariationSettings: "'FILL' 1" }}>edit</span>
+        style={{ position: 'fixed', bottom: 90, right: 16, width: 48, height: 48, borderRadius: '50%', background: 'var(--pri)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(8,93,104,0.35)', zIndex: 50 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 26, color: '#fff', fontVariationSettings: "'FILL' 1" }}>add</span>
       </button>
 
       {/* New Chat Sheet */}
