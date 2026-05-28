@@ -6113,128 +6113,142 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
           </div>
 
           {editMode ? (
-            <div style={{ padding:'14px 16px', display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ padding:'20px 18px', display:'flex', flexDirection:'column', gap:20 }}>
+
+              {/* Beschäftigt seit */}
               <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--txt-sec)', marginBottom:6 }}>Beschäftigt seit</label>
-                <input type="date" value={employedSince} onChange={e => setEmployedSince(e.target.value)}
-                  style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)', fontSize:14, color:'var(--txt)', fontFamily:'var(--font-body)', boxSizing:'border-box' }} />
+                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Beschäftigt seit</label>
+                <div style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>event</span>
+                  <input type="date" value={employedSince} onChange={e => setEmployedSince(e.target.value)}
+                    style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', fontFamily:'var(--font-body)', minWidth:0 }} />
+                </div>
               </div>
+
+              {/* Arbeitstage */}
               <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--txt-sec)', marginBottom:8 }}>Arbeitstage</label>
+                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Arbeitstage</label>
                 <div style={{ display:'flex', gap:6 }}>
                   {WEEKDAYS.map(({key, label}) => (
                     <button key={key} type="button" onClick={() => toggleDay(key)}
-                      style={{ flex:1, padding:'8px 0', borderRadius:10, border:`1.5px solid ${workDays.includes(key)?'var(--pri)':'var(--outline)'}`, background: workDays.includes(key)?'var(--pri)':'var(--surf-low)', color: workDays.includes(key)?'#fff':'var(--txt-muted)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                      style={{ flex:1, padding:'10px 0', borderRadius:12, border:`1.5px solid ${workDays.includes(key)?'var(--pri)':'var(--outline)'}`, background: workDays.includes(key)?'var(--pri)':'var(--surf-card)', color: workDays.includes(key)?'#fff':'var(--txt-muted)', fontSize:12, fontWeight:700, cursor:'pointer', transition:'all 0.15s' }}>
                       {label}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* Arbeitsstunden */}
               <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--txt-sec)', marginBottom:8 }}>Arbeitsstunden</label>
-                <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Arbeitsstunden</label>
+                <div style={{ display:'flex', gap:8, marginBottom:10 }}>
                   {(['fest','variabel'] as const).map(t => (
                     <button key={t} type="button" onClick={() => setHoursType(t)}
-                      style={{ flex:1, padding:'9px 0', borderRadius:10, border:`1.5px solid ${hoursType===t?'var(--pri)':'var(--outline)'}`,
-                        background:hoursType===t?'var(--pri-xl)':'transparent', color:hoursType===t?'var(--pri)':'var(--txt-muted)',
-                        fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                      {t === 'fest' ? '⏱ Fest' : '↕ Variabel'}
+                      style={{ flex:1, padding:'11px 0', borderRadius:12, border:`1.5px solid ${hoursType===t?'var(--pri)':'var(--outline)'}`, background:hoursType===t?'var(--pri-xl)':'var(--surf-card)', color:hoursType===t?'var(--pri)':'var(--txt-muted)', fontSize:13, fontWeight:700, cursor:'pointer', transition:'all 0.15s', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:16 }}>{t === 'fest' ? 'schedule' : 'swap_vert'}</span>
+                      {t === 'fest' ? 'Fest' : 'Variabel'}
                     </button>
                   ))}
                 </div>
                 {hoursType === 'fest' && (
-                  <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>schedule</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>schedule</span>
                     <input type="number" min="1" max="60" value={hoursPerWeek} onChange={e => setHoursPerWeek(e.target.value)}
-                      placeholder="40" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', fontFamily:'var(--font-body)' }} />
-                    <span style={{ fontSize:13, color:'var(--txt-muted)' }}>Std/Woche</span>
+                      placeholder="40" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, fontWeight:600, color:'var(--txt)', fontFamily:'var(--font-body)', minWidth:0 }} />
+                    <span style={{ fontSize:13, color:'var(--txt-muted)', flexShrink:0 }}>Std/Woche</span>
                   </div>
                 )}
                 {hoursType === 'variabel' && (
-                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'8px 12px', borderRadius:10, background:'var(--surf-low)', fontStyle:'italic' }}>
+                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'10px 14px', borderRadius:12, background:'var(--surf-low)', border:'1px solid var(--outline)' }}>
                     Stunden werden flexibel erfasst – kein festes Wochenkontingent.
                   </div>
                 )}
               </div>
-              <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--txt-sec)', marginBottom:6 }}>Stundenlohn (€)</label>
-                <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>euro</span>
-                  <input type="number" min="0" step="0.01" value={hourlyWage} onChange={e => setHourlyWage(e.target.value)}
-                    placeholder="13.00" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', fontFamily:'var(--font-body)' }} />
-                  <span style={{ fontSize:13, color:'var(--txt-muted)' }}>€/Std</span>
+
+              {/* Stundenlohn + Urlaubstage nebeneinander */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Stundenlohn</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)', flexShrink:0 }}>euro</span>
+                    <input type="number" min="0" step="0.01" value={hourlyWage} onChange={e => setHourlyWage(e.target.value)}
+                      placeholder="13.00" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, fontWeight:600, color:'var(--txt)', fontFamily:'var(--font-body)', minWidth:0, width:'100%' }} />
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>€/Stunde</div>
+                </div>
+                <div>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Urlaubstage</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)', flexShrink:0 }}>beach_access</span>
+                    <input type="number" min="0" max="365" value={vacationDays} onChange={e => setVacationDays(e.target.value)}
+                      placeholder="30" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, fontWeight:600, color:'var(--txt)', fontFamily:'var(--font-body)', minWidth:0, width:'100%' }} />
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Tage/Jahr</div>
                 </div>
               </div>
-              <div>
-                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'var(--txt-sec)', marginBottom:6 }}>Urlaubstage pro Jahr</label>
-                <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>beach_access</span>
-                  <input type="number" min="0" max="365" value={vacationDays} onChange={e => setVacationDays(e.target.value)}
-                    placeholder="30" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', fontFamily:'var(--font-body)' }} />
-                  <span style={{ fontSize:13, color:'var(--txt-muted)' }}>Tage/Jahr</span>
-                </div>
-              </div>
-              {saveErr && <div style={{ background:'var(--err-bg)', color:'var(--err)', borderRadius:10, padding:'10px 14px', fontSize:13, display:'flex', gap:8 }}>
-                <span className="material-symbols-outlined icon-sm">error</span>{saveErr}
+
+              {saveErr && <div style={{ background:'var(--err-bg)', color:'var(--err)', borderRadius:12, padding:'11px 14px', fontSize:13, display:'flex', gap:8, alignItems:'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:16 }}>error</span>{saveErr}
               </div>}
-              <button onClick={handleSave} disabled={saving} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 14px rgba(8,93,104,0.25)' }}>
+              <button onClick={handleSave} disabled={saving} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 14px rgba(8,93,104,0.25)', opacity:saving?0.7:1 }}>
                 <span className="material-symbols-outlined icon-sm">{saving?'hourglass_empty':'save'}</span>
                 {saving ? 'Wird gespeichert…' : 'Änderungen speichern'}
               </button>
             </div>
           ) : (
-            <div style={{ padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>event</span>
+            <div style={{ padding:'16px 18px', display:'flex', flexDirection:'column', gap:16 }}>
+              {/* Beschäftigt seit – full row */}
+              <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, background:'var(--surf-low)' }}>
+                <div style={{ width:36, height:36, borderRadius:10, background:'var(--surf-card)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color:'var(--pri)' }}>event</span>
+                </div>
                 <div>
-                  <div style={{ fontSize:11, color:'var(--txt-muted)' }}>Beschäftigt seit</div>
-                  <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>
-                    {member.employed_since ? new Date(member.employed_since).toLocaleDateString('de-DE', { day:'2-digit', month:'long', year:'numeric' }) : <span style={{ fontStyle:'italic', color:'var(--txt-muted)' }}>Nicht hinterlegt</span>}
+                  <div style={{ fontSize:11, fontWeight:600, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Beschäftigt seit</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)', marginTop:1 }}>
+                    {member.employed_since
+                      ? new Date(member.employed_since).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})
+                      : <span style={{ fontStyle:'italic', color:'var(--txt-muted)', fontWeight:400 }}>Nicht hinterlegt</span>}
                   </div>
                 </div>
               </div>
-              <div style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0, marginTop:2 }}>calendar_today</span>
-                <div>
-                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:4 }}>Arbeitstage</div>
-                  {member.work_days && member.work_days.length > 0 ? (
-                    <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                      {WEEKDAYS.map(({key,label}) => (
-                        <span key={key} style={{ padding:'3px 9px', borderRadius:8, fontSize:12, fontWeight:700, background: member.work_days!.includes(key) ? 'var(--pri)' : 'var(--surf-low)', color: member.work_days!.includes(key) ? '#fff' : 'var(--txt-muted)' }}>{label}</span>
-                      ))}
-                    </div>
-                  ) : <span style={{ fontSize:14, color:'var(--txt-muted)', fontStyle:'italic' }}>Nicht hinterlegt</span>}
+
+              {/* Arbeitstage */}
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Arbeitstage</div>
+                <div style={{ display:'flex', gap:5 }}>
+                  {WEEKDAYS.map(({key,label}) => {
+                    const active = member.work_days?.includes(key)
+                    return (
+                      <div key={key} style={{ flex:1, textAlign:'center', padding:'8px 0', borderRadius:10, fontSize:12, fontWeight:700,
+                        background: active ? 'var(--pri)' : 'var(--surf-low)',
+                        color: active ? '#fff' : 'var(--txt-muted)' }}>
+                        {label}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>schedule</span>
-                <div>
-                  <div style={{ fontSize:11, color:'var(--txt-muted)' }}>Arbeitsstunden</div>
-                  <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>
-                    {member.work_hours_type === 'variabel'
-                      ? 'Variabel'
-                      : member.work_hours_per_week
-                        ? `${member.work_hours_per_week} Std/Woche`
-                        : <span style={{ fontStyle:'italic', color:'var(--txt-muted)' }}>Nicht hinterlegt</span>}
+
+              {/* Stats 2-column grid */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color:'var(--pri)', display:'block', marginBottom:4 }}>schedule</span>
+                  <div style={{ fontSize:15, fontWeight:800, color:'var(--txt)', lineHeight:1 }}>
+                    {member.work_hours_type === 'variabel' ? '~' : (member.work_hours_per_week ?? '–')}
                   </div>
+                  <div style={{ fontSize:10, color:'var(--txt-muted)', marginTop:3, fontWeight:600 }}>Std/Woche</div>
                 </div>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>euro</span>
-                <div>
-                  <div style={{ fontSize:11, color:'var(--txt-muted)' }}>Stundenlohn</div>
-                  <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>
-                    {member.hourly_wage
-                      ? `${Number(member.hourly_wage).toFixed(2)} €/Std`
-                      : <span style={{ fontStyle:'italic', color:'var(--txt-muted)' }}>Nicht hinterlegt</span>}
+                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color:'#16a34a', display:'block', marginBottom:4 }}>euro</span>
+                  <div style={{ fontSize:15, fontWeight:800, color:'var(--txt)', lineHeight:1 }}>
+                    {member.hourly_wage ? Number(member.hourly_wage).toFixed(2) : '–'}
                   </div>
+                  <div style={{ fontSize:10, color:'var(--txt-muted)', marginTop:3, fontWeight:600 }}>€/Stunde</div>
                 </div>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>beach_access</span>
-                <div>
-                  <div style={{ fontSize:11, color:'var(--txt-muted)' }}>Urlaubstage pro Jahr</div>
-                  <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{member.vacation_days_per_year ?? 30} Tage</div>
+                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color:'var(--pri)', display:'block', marginBottom:4 }}>beach_access</span>
+                  <div style={{ fontSize:15, fontWeight:800, color:'var(--txt)', lineHeight:1 }}>{member.vacation_days_per_year ?? 30}</div>
+                  <div style={{ fontSize:10, color:'var(--txt-muted)', marginTop:3, fontWeight:600 }}>Tage/Jahr</div>
                 </div>
               </div>
             </div>
