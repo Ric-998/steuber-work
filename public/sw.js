@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steuberwork-v6'
+const CACHE_NAME = 'steuberwork-v7'
 const VAPID_PUBLIC_KEY = 'BIVxcSSeFZEXfg82j5-GQR6x4nOZxgiFVaPbRxkBarjj8oP2y7auEww2-aWuj_PpOcBuXXzrBbqU_D8eNqTEZik'
 
 // Install & cache
@@ -22,9 +22,34 @@ self.addEventListener('activate', e => {
   )
 })
 
-// Fetch – network first, fallback to cache
+// Fetch handler
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
+
+  const url = e.request.url
+
+  // Cache-first für Google Fonts (Icons + Schriften)
+  // Ohne das bleiben Icons auf dem ersten Aufruf unsichtbar, weil der
+  // Font nicht im Browser-Cache des Besuchers ist und display=block greift.
+  if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
+    e.respondWith(
+      caches.open(CACHE_NAME).then(cache =>
+        cache.match(e.request).then(cached => {
+          if (cached) return cached
+          return fetch(e.request).then(response => {
+            // Nur gültige Antworten cachen
+            if (response && response.status === 200) {
+              cache.put(e.request, response.clone())
+            }
+            return response
+          })
+        })
+      )
+    )
+    return
+  }
+
+  // Network-first, Fallback auf Cache für alles andere
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
   )
