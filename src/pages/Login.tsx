@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 // ─── DEV ONLY ────────────────────────────────────────────────────────────────
-const DEV_MODE = false
+const DEV_MODE = true
 const DEV_ACCOUNTS = [
   { label: '👔 Admin (Till)', email: 'till@steuber-dienstleistungen.de', password: 'Steuber2024' },
 ]
@@ -71,7 +71,7 @@ export default function Login({ onDevBypass: _onDevBypass }: { onDevBypass?: () 
               <div style={s.inputWrap}>
                 <span className="material-symbols-outlined" style={s.inputIcon}>mail</span>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="name@steuber-dienstleistungen.de" required style={s.input} autoComplete="email" />
+                  placeholder="name@steuber-work.de" required style={s.input} autoComplete="email" />
               </div>
             </div>
             <div style={s.field}>
@@ -115,7 +115,7 @@ export default function Login({ onDevBypass: _onDevBypass }: { onDevBypass?: () 
                   <div style={s.inputWrap}>
                     <span className="material-symbols-outlined" style={s.inputIcon}>mail</span>
                     <input type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)}
-                      placeholder="name@steuber-dienstleistungen.de" required style={s.input} autoFocus />
+                      placeholder="name@steuber-work.de" required style={s.input} autoFocus />
                   </div>
                 </div>
                 {resetMsg && !resetMsg.ok && (
