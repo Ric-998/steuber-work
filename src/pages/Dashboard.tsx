@@ -5615,7 +5615,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
   isDesktop: boolean
   onClose: () => void
 }) {
-  const STEUBER_DOMAIN = 'steuber-dienstleistungen.de'
+  const STEUBER_DOMAIN = 'steuber-work.de'
 
   const toEmailPrefix = (first: string, last: string) => {
     const clean = (s: string) => s.toLowerCase()
