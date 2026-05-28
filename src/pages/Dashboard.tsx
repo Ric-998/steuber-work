@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
-import * as XLSX from 'xlsx'
+// xlsx loaded dynamically on demand
 import BugReport from '../components/BugReport'
 import { ChatTab, useChatUnread } from '../components/Chat'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import { WasIstNeu } from '../components/WasIstNeu'
 import QRCode from '../components/QRCode'
-import MapView from '../components/MapView'
+const MapView = lazy(() => import('../components/MapView'))
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Stats { heute_faellig:number; in_arbeit:number; gesamt_offen:number; diese_woche_done:number; probleme:number; probleme_heute:number }
@@ -1854,11 +1854,13 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
 
         {/* ── Karte ── */}
         <div style={{ marginBottom:14 }}>
-          <MapView
+          <Suspense fallback={<div style={{height:160,borderRadius:16,background:'var(--surf-low)'}}/>}>
+            <MapView
             address={obj.address}
             city={obj.city}
             postalCode={obj.postal_code}
           />
+          </Suspense>
         </div>
 
         {/* ── Leistungen ── */}
@@ -5887,6 +5889,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
       return
     }
 
+    const XLSX = await import('xlsx')
     const ws = XLSX.utils.json_to_sheet(rows)
     ws['!cols'] = [
       {wch:4},{wch:12},{wch:35},{wch:22},{wch:28},{wch:30},{wch:10},{wch:12}

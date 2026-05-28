@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
 import { OnboardingTour, InstallGuide, useOnboarding, resetTour } from '../components/OnboardingTour'
 import { WasIstNeu } from '../components/WasIstNeu'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import BugReport from '../components/BugReport'
 import { ChatTab, useChatUnread } from '../components/Chat'
-import MapView from '../components/MapView'
+const MapView = lazy(() => import('../components/MapView'))
 import { registerServiceWorker, subscribeToPush, unsubscribeFromPush, isPushSubscribed, isPushSupported } from '../lib/push'
 import { TaskAssignment } from '../types'
 
@@ -927,11 +927,13 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
             {detail.tasks?.objects && (
               <>
                 <p style={{ ...s.secLabel, marginTop: 20 }}>Objekt</p>
-                <MapView
+                <Suspense fallback={<div style={{height:160,borderRadius:16,background:'var(--surf-low)'}}/>}>
+                  <MapView
                   address={detail.tasks.objects.address}
                   city={detail.tasks.objects.city}
                   postalCode={detail.tasks.objects.postal_code}
                 />
+                </Suspense>
               </>
             )}
 

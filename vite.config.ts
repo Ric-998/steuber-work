@@ -4,10 +4,20 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true,   // im LAN erreichbar (0.0.0.0)
+    host: true,
     port: 5173,
   },
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-xlsx':     ['xlsx'],
+          'vendor-leaflet':  ['leaflet'],
+        },
+      },
+    },
   },
 })
