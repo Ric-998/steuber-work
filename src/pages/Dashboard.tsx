@@ -897,7 +897,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 <span className="material-symbols-outlined" style={{ fontSize:40, display:'block', marginBottom:8, opacity:0.4 }}>group</span>
                 Noch keine Mitarbeiter
               </div>
-            ) : team.map(m => {
+            ) : [...team].sort((a,b)=>a.full_name.localeCompare(b.full_name,'de')).map(m => {
               const role = m.role_name || 'mitarbeiter'
               const ini = m.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
               const roleColor: Record<string,string> = { admin:'#7c3aed', objektleiter:'#0369a1', mitarbeiter:'var(--pri)' }
@@ -918,7 +918,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                       <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color: roleColor[role]||'var(--pri)', background: roleBg[role]||'var(--pri-xl)', borderRadius:20, padding:'3px 8px' }}>
                         <span className="material-symbols-outlined" style={{ fontSize:12 }}>badge</span>{ROLE_LABELS[role]||role}
                       </span>
-                      {m.phone && <span style={{ fontSize:11, color:'var(--txt-muted)' }}>{m.phone}</span>}
+                
                     </div>
                   </div>
                   {/* Status + Chevron */}
@@ -6313,18 +6313,19 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
                   ))}
                 </div>
 
-                {/* Month chips – horizontal scroll */}
-                <div style={{ display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
-                  {([{label:'Gesamt', val:null as number|null}] as {label:string,val:number|null}[]).concat(
-                    MONTH_NAMES_SHORT.map((m,i)=>({label:m, val:i}))
-                  ).map(m => (
-                    <button key={m.val??'all'} onClick={()=>setMaStatsMonth(m.val)}
-                      style={{ flexShrink:0, padding:'6px 14px', borderRadius:20, border:'none', cursor:'pointer', fontSize:12, fontWeight:700,
-                        background: maStatsMonth===m.val ? 'var(--pri-xl)' : 'var(--surf-low)',
-                        color: maStatsMonth===m.val ? 'var(--pri)' : 'var(--txt-muted)' }}>
-                      {m.label}
-                    </button>
-                  ))}
+                {/* Month dropdown */}
+                <div style={{ position:'relative' }}>
+                  <select value={maStatsMonth ?? 'all'}
+                    onChange={e => setMaStatsMonth(e.target.value === 'all' ? null : parseInt(e.target.value))}
+                    style={{ width:'100%', padding:'9px 36px 9px 14px', borderRadius:12, border:'1.5px solid var(--outline)',
+                      background:'var(--surf-card)', color:'var(--txt)', fontSize:13, fontWeight:700,
+                      appearance:'none', WebkitAppearance:'none', cursor:'pointer', outline:'none' }}>
+                    <option value="all">Gesamtes Jahr</option>
+                    {MONTH_NAMES_SHORT.map((m,i) => (
+                      <option key={i} value={i}>{m}</option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:18, color:'var(--txt-muted)', pointerEvents:'none' }}>expand_more</span>
                 </div>
 
                 {/* KPI grid */}
@@ -6363,14 +6364,17 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
                   </div>
                 )}
 
-                {/* Leave history */}
-                {filtLeaves.length > 0 && (
+                {/* Leave history – only show entries where to_date is within last 30 days or in the future */}
+                {(() => {
+                  const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+                  const recentLeaves = filtLeaves.filter(l => new Date(l.to_date) >= thirtyDaysAgo)
+                  return recentLeaves.length > 0 && (
                   <div>
                     <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
                       Antragshistorie
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      {filtLeaves.map(l => {
+                      {recentLeaves.map(l => {
                         const from = new Date(l.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})
                         const to   = new Date(l.to_date  ).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})
                         const days = daysBetween(l.from_date, l.to_date)
@@ -6395,8 +6399,9 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
                       })}
                     </div>
                   </div>
-                )}
-                {filtLeaves.length === 0 && (
+                  )
+                })()}
+                {filtLeaves.filter(l => new Date(l.to_date) >= (() => { const d=new Date(); d.setDate(d.getDate()-30); return d; })()).length === 0 && (
                   <div style={{ textAlign:'center', padding:'16px 0', color:'var(--txt-muted)', fontSize:13 }}>
                     Keine Einträge für diesen Zeitraum
                   </div>
