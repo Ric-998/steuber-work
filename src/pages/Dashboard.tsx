@@ -430,12 +430,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
         <aside style={{ width:220, flexShrink:0, background:'var(--surf-card)', borderRight:'1px solid var(--outline)', display:'flex', flexDirection:'column', height:'100dvh', overflowY:'auto' }}>
           {/* Logo */}
           <div style={{ padding:'20px 20px 16px', borderBottom:'1px solid var(--outline)' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <div style={s.topAva}>{initials}</div>
-              <div>
-                <div style={{ fontSize:14, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)', letterSpacing:'-0.02em' }}>SteuberWork</div>
-                <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600 }}>Admin</div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={s.topLogo}>
+                <span style={s.topLogoBold}>STEUBER</span>
+                <span style={s.topLogoLight}> WORK</span>
               </div>
+              <div style={s.topAva} onClick={()=>setTab('profil')}>{initials}</div>
             </div>
           </div>
           {/* Nav */}
@@ -472,11 +472,13 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {!isDesktop && (
         <header style={s.topBar}>
           <div style={s.topBarInner}>
-            <div style={s.topBarLeft}>
-              <div style={s.topAva}>{initials}</div>
-              <span style={s.topTitle}>SteuberWork</span>
+            {/* Logo links */}
+            <div style={s.topLogo}>
+              <span style={s.topLogoBold}>STEUBER</span>
+              <span style={s.topLogoLight}> WORK</span>
             </div>
-            <span style={{ fontSize:12, color:'var(--txt-muted)', fontWeight:600 }}>Admin</span>
+            {/* Profil-Avatar rechts */}
+            <div style={s.topAva} onClick={()=>setTab('profil')}>{initials}</div>
           </div>
         </header>
       )}
@@ -4281,8 +4283,10 @@ const s: Record<string,React.CSSProperties> = {
   topBar:        { background:'rgba(248,249,250,0.88)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(191,200,202,0.4)', flexShrink:0, paddingTop:'env(safe-area-inset-top, 0px)' },
   topBarInner:   { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px' },
   topBarLeft:    { display:'flex', alignItems:'center', gap:10 },
-  topAva:        { width:36, height:36, borderRadius:'50%', background:'var(--sec-c)', color:'var(--pri)', fontSize:13, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-head)' },
-  topTitle:      { fontSize:18, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)', letterSpacing:'-0.03em' },
+  topAva:        { width:36, height:36, borderRadius:'50%', background:'var(--sec-c)', color:'var(--pri)', fontSize:13, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-head)', cursor:'pointer', flexShrink:0 },
+  topLogo:       { display:'flex', alignItems:'baseline', gap:0 },
+  topLogoBold:   { fontFamily:'Manrope,sans-serif', fontWeight:800, fontSize:18, color:'var(--pri)', letterSpacing:'-0.5px', textTransform:'uppercase' as const },
+  topLogoLight:  { fontFamily:'Manrope,sans-serif', fontWeight:300, fontSize:18, color:'var(--pri-c)', letterSpacing:'5px', textTransform:'uppercase' as const },
   tabBar:        { display:'flex', position:'fixed', bottom:0, left:0, right:0, background:'rgba(248,249,250,0.92)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:'1px solid var(--outline)', paddingBottom:'env(safe-area-inset-bottom, 0px)', zIndex:200 },
   tabItem:       { flex:1, textAlign:'center' as const, padding:'8px 0 10px', fontSize:10, cursor:'pointer', transition:'color 0.15s', display:'flex', flexDirection:'column' as const, alignItems:'center', gap:3 },
   content:       { height:0, flex:1, overflowY:'auto' as const, padding:'0 18px 24px' },
