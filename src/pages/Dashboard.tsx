@@ -429,22 +429,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {isDesktop && (
         <aside style={{ width:220, flexShrink:0, background:'var(--surf-card)', borderRight:'1px solid var(--outline)', display:'flex', flexDirection:'column', height:'100dvh', overflowY:'auto' }}>
           {/* Logo */}
-          <div style={{ padding:'24px 20px 18px', borderBottom:'1px solid var(--outline)' }}>
-            {/* Gestapeltes Logo */}
-            <div style={{ marginBottom:18 }}>
-              <div style={{ fontFamily:'Manrope,sans-serif', fontWeight:800, fontSize:20, color:'var(--pri)', letterSpacing:'-0.3px', lineHeight:1.1, textTransform:'uppercase' }}>STEUBER</div>
-              <div style={{ fontFamily:'Manrope,sans-serif', fontWeight:300, fontSize:20, color:'var(--pri-c)', letterSpacing:'5px', lineHeight:1.1, textTransform:'uppercase' }}>WORK</div>
-            </div>
-            {/* Avatar + Name */}
-            <div style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', padding:'8px 10px', borderRadius:12, background:'var(--surf-low)', border:'1px solid var(--outline)' }}
-              onClick={()=>setTab('profil')}>
-              <div style={s.topAva}>{initials}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{userName}</div>
-                <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>Administrator</div>
-              </div>
-              <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)' }}>chevron_right</span>
-            </div>
+          <div style={{ padding:'24px 20px 20px', borderBottom:'1px solid var(--outline)' }}>
+            <div style={{ fontFamily:'Manrope,sans-serif', fontWeight:800, fontSize:22, color:'var(--pri)', letterSpacing:'-0.3px', lineHeight:1.1, textTransform:'uppercase' }}>STEUBER</div>
+            <div style={{ fontFamily:'Manrope,sans-serif', fontWeight:300, fontSize:22, color:'var(--pri-c)', letterSpacing:'5px', lineHeight:1.1, textTransform:'uppercase' }}>WORK</div>
           </div>
           {/* Nav */}
           <nav style={{ padding:'10px 0', flex:1 }}>
@@ -458,17 +445,26 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 </div>
               ))}
           </nav>
-          {/* Footer */}
-          <div style={{ padding:'12px 16px', borderTop:'1px solid var(--outline)' }}>
-            <button onClick={onLogout} style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, border:'none', background:'transparent', color:'var(--txt-muted)', fontSize:13, fontWeight:600, cursor:'pointer', transition:'background 0.15s' }}
+          {/* Footer: Avatar + Name + Logout */}
+          <div style={{ padding:'12px 14px', borderTop:'1px solid var(--outline)' }}>
+            {/* User-Karte */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:12, cursor:'pointer', transition:'background 0.15s', marginBottom:4 }}
+              onClick={()=>setTab('profil')}
+              onMouseEnter={e=>(e.currentTarget.style.background='var(--surf-low)')}
+              onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+              <div style={s.topAva}>{initials}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{userName}</div>
+                <div style={{ fontSize:11, color:'var(--txt-muted)' }}>Administrator</div>
+              </div>
+            </div>
+            {/* Logout */}
+            <button onClick={onLogout} style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:12, border:'none', background:'transparent', fontSize:13, fontWeight:600, cursor:'pointer', transition:'background 0.15s' }}
               onMouseEnter={e=>(e.currentTarget.style.background='var(--err-bg)')}
               onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
               <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--err-dot)' }}>logout</span>
               <span style={{ color:'var(--err-dot)' }}>Abmelden</span>
             </button>
-            <div style={{ fontSize:10, color:'var(--txt-muted)', paddingLeft:12, marginTop:6, lineHeight:1.4 }}>
-              Steuber Dienstleistungen GmbH
-            </div>
           </div>
         </aside>
       )}
