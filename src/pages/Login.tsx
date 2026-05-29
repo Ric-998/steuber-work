@@ -59,7 +59,7 @@ export default function Login({ onDevBypass: _onDevBypass }: { onDevBypass?: () 
           <img src="/icon-192.png" alt="SteuberWork" style={s.logoImg} />
           <div style={s.logoText}>
             <span style={s.logoTextBold}>STEUBER</span>
-            <span style={s.logoTextLight}> WORK</span>
+            <span style={s.logoTextLight}>WORK</span>
           </div>
           <p style={s.logoSub}>{view === 'reset' ? 'Passwort zurücksetzen' : 'Auftragsmanagement'}</p>
         </div>
@@ -177,9 +177,9 @@ const s: Record<string, React.CSSProperties> = {
   card:      { background: 'var(--surf-card)', borderRadius: 24, padding: '40px 28px 28px', width: '100%', maxWidth: 380, boxShadow: '0 4px 32px rgba(8,93,104,0.08)' },
   logoWrap:  { textAlign: 'center', marginBottom: 32 },
   logoImg:   { width: 60, height: 60, borderRadius: 18, display: 'block', margin: '0 auto 14px', boxShadow: '0 8px 24px rgba(8,93,104,0.25)' },
-  logoText:     { display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 6, marginBottom: 4 },
+  logoText:     { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, lineHeight: 1.05, marginBottom: 4 },
   logoTextBold: { fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: 26, color: '#096a70', letterSpacing: '-0.5px', textTransform: 'uppercase' as const },
-  logoTextLight:{ fontFamily: 'Manrope, sans-serif', fontWeight: 300, fontSize: 26, color: '#0c8f85', letterSpacing: '6px', textTransform: 'uppercase' as const },
+  logoTextLight:{ fontFamily: 'Manrope, sans-serif', fontWeight: 300, fontSize: 26, color: '#0c8f85', letterSpacing: '6px', textTransform: 'uppercase' as const, textAlign: 'center' as const },
   logoSub:   { fontSize: 13, color: 'var(--txt-muted)' },
   form:      { display: 'flex', flexDirection: 'column', gap: 16 },
   field:     { display: 'flex', flexDirection: 'column', gap: 6 },
