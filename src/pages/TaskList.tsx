@@ -470,22 +470,13 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       {/* Konfetti overlay */}
       {showKonfetti && <Konfetti />}
       {/* ── TOP BAR: teal, only name + date + bell ── */}
-      <header style={{ ...s.appHead, display: activeTab === 'start' ? 'none' : undefined }}>
+      <header style={s.appHead}>
         <div style={s.topBarInner}>
-          <div style={s.topBarLeft}>
-            <div style={s.topAva}>{initials}</div>
-            <div>
-              <div style={{ fontSize:17, fontWeight:800, color:'#fff', fontFamily:'Manrope,sans-serif', letterSpacing:'-0.02em' }}>
-                {activeTab === 'tasks' ? 'Aufgaben' : activeTab === 'zeit' ? 'Zeitplan' : activeTab === 'chat' ? 'Nachrichten' : activeTab === 'profile' ? 'Profil' : firstName}
-              </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginTop:1 }}>{today.getDate()}. {MONTHS[today.getMonth()]} {today.getFullYear()}</div>
-            </div>
+          <div style={s.topLogo}>
+            <span style={s.topLogoBold}>STEUBER</span>
+            <span style={s.topLogoLight}>WORK</span>
           </div>
-          <button
-            onClick={() => setActiveTab('profile')}
-            style={{ background: activeTab==='profile'?'rgba(255,255,255,0.30)':'rgba(255,255,255,0.15)', border:`2px solid ${activeTab==='profile'?'#fff':'rgba(255,255,255,0.3)'}`, width:36, height:36, borderRadius:'50%', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Manrope,sans-serif', fontSize:13, fontWeight:800, color:'#fff', flexShrink:0, transition:'all 0.15s' }}>
-            {initials}
-          </button>
+          <div style={s.topAva} onClick={() => setActiveTab('profile')}>{initials}</div>
         </div>
       </header>
 
@@ -542,67 +533,49 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
           return (
             <div style={{ paddingBottom:8 }}>
-              {/* ── Hero Header ── */}
-              <div style={{
-                background:'linear-gradient(160deg,var(--pri) 0%,var(--pri-c) 100%)',
-                borderRadius:'0 0 32px 32px', padding:'48px 18px 20px',
-                margin:'0 -16px 0 -16px',
-              }}>
-                {/* Top row */}
-                <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
-                  <div style={{ width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.18)', border:'1.5px solid rgba(255,255,255,0.3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:800, color:'#fff', fontFamily:'Manrope,sans-serif', flexShrink:0, cursor:'pointer' }}
-                    onClick={() => setActiveTab('profile')}>
-                    {initials}
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:10, opacity:0.7, letterSpacing:'0.1em', textTransform:'uppercase', fontWeight:700, color:'#fff' }}>{greeting}</div>
-                    <div style={{ fontSize:17, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'#fff' }}>{firstName} 👋</div>
-                  </div>
-                  <button onClick={() => setActiveTab('chat')}
-                    style={{ position:'relative', width:36, height:36, borderRadius:'50%', background:'rgba(255,255,255,0.18)', border:'1px solid rgba(255,255,255,0.25)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color:'#fff' }}>chat</span>
-                    {unreadCount > 0 && (
-                      <span style={{ position:'absolute', top:-2, right:-2, minWidth:16, height:16, borderRadius:99, background:'#fff', color:'var(--pri)', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px' }}>{unreadCount}</span>
-                    )}
-                  </button>
+              {/* ── Clean Greeting ── */}
+              <div style={{ padding:'20px 0 16px' }}>
+                <div style={{ fontSize:13, color:'var(--txt-muted)', fontWeight:600, marginBottom:6 }}>
+                  {greeting}, {firstName} 👋
                 </div>
-
-                {/* Datum + Status */}
-                <div style={{ marginBottom:16 }}>
-                  <div style={{ fontSize:36, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'#fff', lineHeight:1, letterSpacing:'-0.02em' }}>{dayName}</div>
-                  <div style={{ fontSize:13, opacity:0.75, color:'#fff', marginTop:5, fontWeight:600 }}>
-                    {dayNum}. {monthStr2} · {todayTotal2===0 ? 'Kein Einsatz heute' : todayOpen2===0 ? '🎉 Alles erledigt!' : `noch ${todayOpen2} offen`}
+                <div style={{ fontSize:28, fontWeight:800, fontFamily:'Manrope,sans-serif', letterSpacing:'-0.03em', color:'var(--txt)', lineHeight:1.1, marginBottom:4 }}>
+                  {dayName}
+                </div>
+                <div style={{ fontSize:13, color:'var(--txt-muted)', marginBottom: todayTotal2 > 0 && todayOpen2 > 0 ? 10 : 0 }}>
+                  {dayNum}. {monthStr2}{todayTotal2 > 0 ? ` · ${todayOpen2 === 0 ? 'Alles erledigt ✓' : `${todayOpen2} offen`}` : ''}
+                </div>
+                {todayTotal2 > 0 && todayOpen2 > 0 && (
+                  <div style={{ height:3, borderRadius:99, background:'var(--surf-high)', overflow:'hidden' }}>
+                    <div style={{ height:'100%', borderRadius:99, background:'var(--pri)', width:`${pct}%`, transition:'width 0.6s' }}/>
                   </div>
-                  {todayTotal2 > 0 && todayOpen2 > 0 && (
-                    <div style={{ height:3, borderRadius:99, background:'rgba(255,255,255,0.2)', overflow:'hidden', marginTop:10 }}>
-                      <div style={{ height:'100%', borderRadius:99, background:'#fff', width:`${pct}%`, transition:'width 0.6s' }}/>
-                    </div>
-                  )}
-                </div>
-
-                {/* Mo–Sa Strip */}
-                <div style={{ display:'flex', gap:5 }}>
-                  {weekStrip.map(({ d, ds, count, hasProb, allDone }) => {
-                    const isToday3 = ds === todayStr2
-                    const DAY_ABBR2 = ['So','Mo','Di','Mi','Do','Fr','Sa']
-                    const dotColor = hasProb ? '#fca5a5' : allDone ? '#4ade80' : 'rgba(255,255,255,0.6)'
-                    return (
-                      <div key={ds}
-                        onClick={() => { setSelectedDay(new Date(ds+'T12:00:00')); setActiveTab('tasks') }}
-                        style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'8px 4px', borderRadius:14, cursor:'pointer', background:isToday3?'rgba(255,255,255,0.22)':'rgba(0,0,0,0.12)', border:isToday3?'1.5px solid rgba(255,255,255,0.45)':'1px solid transparent' }}>
-                        <span style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.65)', textTransform:'uppercase', letterSpacing:'0.06em' }}>{DAY_ABBR2[d.getDay()]}</span>
-                        <span style={{ fontSize:15, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'#fff' }}>{d.getDate()}</span>
-                        {count > 0
-                          ? <span style={{ width:5, height:5, borderRadius:'50%', background:dotColor }}/>
-                          : <span style={{ width:5, height:5 }}/>
-                        }
-                      </div>
-                    )
-                  })}
-                </div>
+                )}
               </div>
 
-              <div style={{ padding:'18px 0 0' }}>
+              {/* ── Wochenstreifen ── */}
+              <div style={{ display:'flex', gap:5, marginBottom:18 }}>
+                {weekStrip.map(({ d, ds, count, hasProb, allDone }) => {
+                  const isToday3 = ds === todayStr2
+                  const DAY_ABBR2 = ['So','Mo','Di','Mi','Do','Fr','Sa']
+                  const dotColor = hasProb ? 'var(--err)' : allDone ? 'var(--ok)' : 'var(--txt-muted)'
+                  return (
+                    <div key={ds}
+                      onClick={() => { setSelectedDay(new Date(ds+'T12:00:00')); setActiveTab('tasks') }}
+                      style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 4px', borderRadius:14, cursor:'pointer',
+                        background: isToday3 ? 'var(--pri)' : 'var(--surf-card)',
+                        border: isToday3 ? 'none' : '1px solid var(--outline)',
+                        boxShadow: isToday3 ? '0 4px 12px rgba(9,106,112,0.2)' : 'none',
+                      }}>
+                      <span style={{ fontSize:9, fontWeight:700, color: isToday3 ? 'rgba(255,255,255,0.75)' : 'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>{DAY_ABBR2[d.getDay()]}</span>
+                      <span style={{ fontSize:15, fontWeight:800, fontFamily:'Manrope,sans-serif', color: isToday3 ? '#fff' : 'var(--txt)' }}>{d.getDate()}</span>
+                      {count > 0
+                        ? <span style={{ width:5, height:5, borderRadius:'50%', background: isToday3 ? 'rgba(255,255,255,0.8)' : dotColor }}/>
+                        : <span style={{ width:5, height:5 }}/>}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ padding:'0' }}>
                 {/* Was heute ansteht */}
                 <button onClick={() => { setSelectedDay(new Date(todayStr2+'T12:00:00')); setActiveTab('tasks') }}
                   style={{ width:'100%', padding:'16px 18px', background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:20, cursor:'pointer', textAlign:'left', marginBottom:16, display:'block', boxShadow:'0 2px 12px rgba(9,106,112,0.07)' }}>
@@ -2670,11 +2643,14 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
 
 const s: Record<string, React.CSSProperties> = {
   shell: { display:'flex', flexDirection:'column', height:'100dvh', maxWidth:480, margin:'0 auto', background:'var(--bg)', position:'relative', overflow:'hidden' },
-  appHead: { background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', flexShrink:0, borderRadius:'0 0 22px 22px', boxShadow:'0 4px 20px rgba(9,106,112,0.18)', zIndex:10, position:'relative' as const },
+  appHead: { background:'rgba(248,249,250,0.92)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(191,200,202,0.4)', flexShrink:0, paddingTop:'env(safe-area-inset-top, 0px)', zIndex:10 },
   topBar: { position:'sticky', top:0, zIndex:50, background:'rgba(248,249,250,0.8)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(191,200,202,0.4)', flexShrink:0 },
   topBarInner: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 18px' },
   topBarLeft: { display:'flex', alignItems:'center', gap:10 },
-  topAva: { width:36, height:36, borderRadius:'50%', background:'var(--sec-c)', color:'var(--pri)', fontSize:13, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-head)' },
+  topAva: { width:36, height:36, borderRadius:'50%', background:'var(--sec-c)', color:'var(--pri)', fontSize:13, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-head)', cursor:'pointer', flexShrink:0 },
+  topLogo:      { display:'flex', alignItems:'baseline', gap:7 },
+  topLogoBold:  { fontFamily:'Manrope,sans-serif', fontWeight:800, fontSize:17, color:'var(--pri)', letterSpacing:'-0.3px', textTransform:'uppercase' as const },
+  topLogoLight: { fontFamily:'Manrope,sans-serif', fontWeight:300, fontSize:17, color:'var(--pri-c)', letterSpacing:'4px', textTransform:'uppercase' as const },
   topTitle: { fontSize:18, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)', letterSpacing:'-0.03em' },
   iconBtn: { background:'none', border:'none', padding:8, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center' },
   content: { flex:1, overflowY:'auto', padding:'0 16px 24px' },

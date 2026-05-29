@@ -433,7 +433,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <div style={s.topLogo}>
                 <span style={s.topLogoBold}>STEUBER</span>
-                <span style={s.topLogoLight}> WORK</span>
+                <span style={s.topLogoLight}>WORK</span>
               </div>
               <div style={s.topAva} onClick={()=>setTab('profil')}>{initials}</div>
             </div>
@@ -475,7 +475,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             {/* Logo links */}
             <div style={s.topLogo}>
               <span style={s.topLogoBold}>STEUBER</span>
-              <span style={s.topLogoLight}> WORK</span>
+              <span style={s.topLogoLight}>WORK</span>
             </div>
             {/* Profil-Avatar rechts */}
             <div style={s.topAva} onClick={()=>setTab('profil')}>{initials}</div>
@@ -4284,9 +4284,9 @@ const s: Record<string,React.CSSProperties> = {
   topBarInner:   { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px' },
   topBarLeft:    { display:'flex', alignItems:'center', gap:10 },
   topAva:        { width:36, height:36, borderRadius:'50%', background:'var(--sec-c)', color:'var(--pri)', fontSize:13, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-head)', cursor:'pointer', flexShrink:0 },
-  topLogo:       { display:'flex', alignItems:'baseline', gap:0 },
-  topLogoBold:   { fontFamily:'Manrope,sans-serif', fontWeight:800, fontSize:18, color:'var(--pri)', letterSpacing:'-0.5px', textTransform:'uppercase' as const },
-  topLogoLight:  { fontFamily:'Manrope,sans-serif', fontWeight:300, fontSize:18, color:'var(--pri-c)', letterSpacing:'5px', textTransform:'uppercase' as const },
+  topLogo:       { display:'flex', alignItems:'baseline', gap:7 },
+  topLogoBold:   { fontFamily:'Manrope,sans-serif', fontWeight:800, fontSize:17, color:'var(--pri)', letterSpacing:'-0.3px', textTransform:'uppercase' as const },
+  topLogoLight:  { fontFamily:'Manrope,sans-serif', fontWeight:300, fontSize:17, color:'var(--pri-c)', letterSpacing:'4px', textTransform:'uppercase' as const },
   tabBar:        { display:'flex', position:'fixed', bottom:0, left:0, right:0, background:'rgba(248,249,250,0.92)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:'1px solid var(--outline)', paddingBottom:'env(safe-area-inset-bottom, 0px)', zIndex:200 },
   tabItem:       { flex:1, textAlign:'center' as const, padding:'8px 0 10px', fontSize:10, cursor:'pointer', transition:'color 0.15s', display:'flex', flexDirection:'column' as const, alignItems:'center', gap:3 },
   content:       { height:0, flex:1, overflowY:'auto' as const, padding:'0 18px 24px' },
