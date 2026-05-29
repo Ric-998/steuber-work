@@ -56,9 +56,7 @@ export default function Login({ onDevBypass: _onDevBypass }: { onDevBypass?: () 
       <div style={s.card}>
         {/* Logo */}
         <div style={s.logoWrap}>
-          <div style={s.logoGrad}>
-            <span style={{ fontFamily: 'Manrope', fontWeight: 800, fontSize: 26, color: '#fff' }}>S</span>
-          </div>
+          <img src="/icon-192.png" alt="SteuberWork" style={s.logoImg} />
           <h1 style={s.logoText}>SteuberWork</h1>
           <p style={s.logoSub}>{view === 'reset' ? 'Passwort zurücksetzen' : 'Auftragsmanagement'}</p>
         </div>
@@ -175,7 +173,7 @@ const s: Record<string, React.CSSProperties> = {
   root:      { minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 },
   card:      { background: 'var(--surf-card)', borderRadius: 24, padding: '40px 28px 28px', width: '100%', maxWidth: 380, boxShadow: '0 4px 32px rgba(8,93,104,0.08)' },
   logoWrap:  { textAlign: 'center', marginBottom: 32 },
-  logoGrad:  { width: 60, height: 60, borderRadius: 18, background: 'linear-gradient(135deg, var(--pri) 0%, var(--pri-c) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 8px 24px rgba(8,93,104,0.25)' },
+  logoImg:   { width: 60, height: 60, borderRadius: 18, display: 'block', margin: '0 auto 14px', boxShadow: '0 8px 24px rgba(8,93,104,0.25)' },
   logoText:  { fontSize: 24, fontWeight: 800, color: 'var(--txt)', marginBottom: 4, fontFamily: 'var(--font-head)' },
   logoSub:   { fontSize: 13, color: 'var(--txt-muted)' },
   form:      { display: 'flex', flexDirection: 'column', gap: 16 },
