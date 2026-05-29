@@ -482,7 +482,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
 
       {/* Content */}
-      <div style={{ ...s.content, paddingTop: activeTab === 'start' ? 0 : activeTab === 'tasks' ? 0 : undefined, padding: activeTab === 'chat' ? '0 14px' : undefined }}>
+      <div style={{ ...s.content, paddingTop: activeTab === 'start' ? 12 : activeTab === 'tasks' ? 0 : undefined, padding: activeTab === 'chat' ? '0 14px' : undefined }}>
         {activeTab === 'start' && (() => {
           const todayStr2 = today.toISOString().split('T')[0]
           const todayAll = assignments.filter(a => a.due_date === todayStr2)
@@ -576,23 +576,24 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
               </div>
 
               <div style={{ padding:'0' }}>
-                {/* Was heute ansteht */}
-                <button onClick={() => { setSelectedDay(new Date(todayStr2+'T12:00:00')); setActiveTab('tasks') }}
-                  style={{ width:'100%', padding:'16px 18px', background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:20, cursor:'pointer', textAlign:'left', marginBottom:16, display:'block', boxShadow:'0 2px 12px rgba(9,106,112,0.07)' }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>Was heute ansteht</div>
-                    <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>arrow_forward_ios</span>
-                  </div>
-                  {todayTotal2 === 0
-                    ? <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Heute kein Einsatz 🌟</div>
-                    : <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-                        {todayOpen2 > 0 && <span style={{ fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:99, background:'#fff8e6', color:'#92400e' }}>{todayOpen2} offen</span>}
-                        {todayDone2 > 0 && <span style={{ fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:99, background:'var(--ok-bg)', color:'var(--ok)' }}>{todayDone2} erledigt</span>}
-                        {todayProb2 > 0 && <span style={{ fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:99, background:'var(--err-bg)', color:'var(--err)' }}>{todayProb2} Problem</span>}
-                        {todayOpen2===0&&todayProb2===0 && <span style={{ fontSize:12, fontWeight:700, padding:'5px 12px', borderRadius:99, background:'var(--ok-bg)', color:'var(--ok)' }}>Alles erledigt 🎉</span>}
-                      </div>
-                  }
-                </button>
+                {/* KPI-Kacheln */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:16 }}>
+                  <button onClick={() => { setSelectedDay(new Date(todayStr2+'T12:00:00')); setActiveTab('tasks') }}
+                    style={{ background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:16, padding:'14px 10px', cursor:'pointer', textAlign:'center', boxShadow:'0 1px 6px rgba(9,106,112,0.05)' }}>
+                    <div style={{ fontSize:26, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'var(--pri)', lineHeight:1 }}>{todayOpen2}</div>
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4, fontWeight:600 }}>Offen</div>
+                  </button>
+                  <button onClick={() => { setSelectedDay(new Date(todayStr2+'T12:00:00')); setActiveTab('tasks') }}
+                    style={{ background: todayDone2 > 0 ? 'var(--ok-bg)' : 'var(--surf-card)', border:`1px solid ${todayDone2 > 0 ? '#b6dec5' : 'var(--outline)'}`, borderRadius:16, padding:'14px 10px', cursor:'pointer', textAlign:'center', boxShadow:'0 1px 6px rgba(9,106,112,0.05)' }}>
+                    <div style={{ fontSize:26, fontWeight:800, fontFamily:'Manrope,sans-serif', color: todayDone2 > 0 ? 'var(--ok)' : 'var(--txt-muted)', lineHeight:1 }}>{todayDone2}</div>
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4, fontWeight:600 }}>Erledigt</div>
+                  </button>
+                  <button onClick={() => { setSelectedDay(new Date(todayStr2+'T12:00:00')); setActiveTab('tasks') }}
+                    style={{ background: todayProb2 > 0 ? 'var(--err-bg)' : 'var(--surf-card)', border:`1px solid ${todayProb2 > 0 ? '#fca5a5' : 'var(--outline)'}`, borderRadius:16, padding:'14px 10px', cursor:'pointer', textAlign:'center', boxShadow:'0 1px 6px rgba(9,106,112,0.05)' }}>
+                    <div style={{ fontSize:26, fontWeight:800, fontFamily:'Manrope,sans-serif', color: todayProb2 > 0 ? 'var(--err)' : 'var(--txt-muted)', lineHeight:1 }}>{todayProb2}</div>
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4, fontWeight:600 }}>Probleme</div>
+                  </button>
+                </div>
 
                 {/* Mitteilungen */}
                 <div style={{ marginBottom:24 }}>
@@ -689,7 +690,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
             {availableVertretungen.length > 0 && (
               <div
                 onClick={() => setVertretungDetail(availableVertretungen[0])}
-                style={{ display:'flex', alignItems:'center', gap:12, background:'linear-gradient(135deg,#5b21b6,#7c3aed)', borderRadius:16, padding:'14px 16px', marginBottom:14, cursor:'pointer', boxShadow:'0 4px 16px rgba(91,33,182,0.25)' }}
+                style={{ display:'flex', alignItems:'center', gap:12, background:'linear-gradient(135deg,var(--pri),var(--pri-c))', borderRadius:16, padding:'14px 16px', marginBottom:14, cursor:'pointer', boxShadow:'0 4px 16px rgba(9,106,112,0.22)' }}
               >
                 <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                   <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:22 }}>swap_horiz</span>
@@ -740,9 +741,9 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
             ) : (
               <>
                 {filteredByDay.some((a: TaskAssignment) => a.status === 'offen' || a.status === 'in_arbeit') && (
-                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:12, padding:'8px 12px', background:'var(--surf-low)', borderRadius:10, border:'1px dashed var(--outline)', display:'flex', alignItems:'center', gap:8 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--pri)' }}>swipe</span>
-                    <span><b>Tipp:</b> rechts = erledigt · links = Problem · Buttons = Schnellaktionen</span>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:12, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:13, color:'var(--pri)', opacity:0.7 }}>swipe</span>
+                    <span style={{ opacity:0.7 }}>Wischen zum Abschließen oder Melden</span>
                   </div>
                 )}
                 {sortedGroupEntries.map(([objectKey, tasks], groupIdx) => {
