@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steuberwork-v1'
+const CACHE_NAME = 'steuberwork-v7'
 const VAPID_PUBLIC_KEY = 'BIVxcSSeFZEXfg82j5-GQR6x4nOZxgiFVaPbRxkBarjj8oP2y7auEww2-aWuj_PpOcBuXXzrBbqU_D8eNqTEZik'
 
 // Install & cache
@@ -6,18 +6,29 @@ self.addEventListener('install', e => {
   self.skipWaiting()
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
-      cache.addAll(['/', '/index.html'])
+      cache.addAll(['/', '/index.html', '/fonts/material-symbols-outlined.woff2'])
     )
   )
 })
 
+// Activate: delete all old caches
 self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim())
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      )
+    ).then(() => clients.claim())
+  )
 })
 
-// Fetch – network first, fallback to cache
+// Fetch handler
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return
+
+  const url = e.request.url
+
+  // Network-first, Fallback auf Cache für alles andere
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
   )
@@ -51,4 +62,9 @@ self.addEventListener('notificationclick', e => {
       return clients.openWindow(url)
     })
   )
+})
+
+// Update on demand: main.tsx sendet SKIP_WAITING wenn Nutzer "Jetzt laden" klickt
+self.addEventListener('message', e => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting()
 })

@@ -484,7 +484,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       {/* Content */}
       <div style={{ ...s.content, paddingTop: activeTab === 'start' ? 12 : activeTab === 'tasks' ? 0 : undefined, padding: activeTab === 'chat' ? '0 14px' : undefined }}>
         {activeTab === 'start' && (() => {
-          const todayStr2 = today.toISOString().split('T')[0]
+          const todayStr2 = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
           const todayAll = assignments.filter(a => a.due_date === todayStr2)
           const todayOpen2 = todayAll.filter(a => a.status==='offen'||a.status==='in_arbeit').length
           const todayDone2 = todayAll.filter(a => a.status==='erledigt').length
@@ -641,8 +641,8 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
       {activeTab === 'tasks' && (() => {
           const DAY_FULL = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag']
-          const selStr = selectedDay.toISOString().split('T')[0]
-          const todayStr2 = today.toISOString().split('T')[0]
+          const selStr = `${selectedDay.getFullYear()}-${String(selectedDay.getMonth()+1).padStart(2,'0')}-${String(selectedDay.getDate()).padStart(2,'0')}`
+          const todayStr2 = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`
           const isTodaySelected = selStr === todayStr2
           const shiftDay = (n: number) => { const d = new Date(selectedDay); d.setDate(d.getDate()+n); setSelectedDay(d) }
           const dayTotal = filteredByDay.length
@@ -650,38 +650,79 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
           const dayProgress = dayTotal > 0 ? Math.round((dayDone/dayTotal)*100) : 0
           return (
           <>
-            {/* ── Date Nav Bar ── */}
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14, marginTop:12 }}>
-              <button onClick={() => shiftDay(-1)} style={{ width:40, height:48, borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--txt)' }}>chevron_left</span>
-              </button>
-              <button onClick={() => setMonthSheetOpen(true)} style={{ flex:1, height:48, padding:'0 14px', borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-                <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
-                  <span style={{ fontSize:15, fontWeight:800, fontFamily:'Manrope,sans-serif', color:'var(--txt)' }}>
-                    {DAY_FULL[selectedDay.getDay()]}, {selectedDay.getDate()}. {selectedDay.toLocaleDateString('de-DE',{month:'short'})}
-                  </span>
-                  {isTodaySelected && <span style={{ fontSize:10, background:'var(--pri)', color:'#fff', padding:'2px 7px', borderRadius:99, fontWeight:700 }}>HEUTE</span>}
+            {/* ── Wochenstreifen ── */}
+            {(() => {
+              const mondayOffset = (selectedDay.getDay() + 6) % 7
+              const weekDays = Array.from({length:6}, (_:unknown, i:number) => {
+                const d = new Date(selectedDay)
+                d.setDate(selectedDay.getDate() - mondayOffset + i)
+                const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+                const dayAssignments = assignments.filter((a:any) => a.due_date === ds)
+                return { d, ds, count: dayAssignments.length, hasProb: dayAssignments.some((a:any)=>a.status==='problem'), allDone: dayAssignments.length>0&&dayAssignments.every((a:any)=>a.status==='erledigt') }
+              })
+              const DAY_ABBR = ['So','Mo','Di','Mi','Do','Fr','Sa']
+              const kw = (() => { const d=new Date(selectedDay); d.setHours(0,0,0,0); d.setDate(d.getDate()+4-(d.getDay()||7)); const y=new Date(d.getFullYear(),0,1); return Math.ceil(((d.getTime()-y.getTime())/86400000+1)/7) })()
+              return (
+                <div style={{ marginTop:12, marginBottom:14 }}>
+                  {/* Header Zeile */}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <button onClick={() => shiftDay(-7)} style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)' }}>chevron_left</span>
+                      </button>
+                      <span style={{ fontSize:12, fontWeight:700, color:'var(--txt-muted)' }}>KW {kw}</span>
+                      <button onClick={() => shiftDay(7)} style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)' }}>chevron_right</span>
+                      </button>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      {!isTodaySelected && (
+                        <button onClick={() => setSelectedDay(new Date())} style={{ fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:99, border:'1px solid var(--pri)', background:'transparent', color:'var(--pri)', cursor:'pointer' }}>
+                          Heute
+                        </button>
+                      )}
+                      <button onClick={() => setMonthSheetOpen(true)} style={{ width:28, height:28, borderRadius:8, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)' }}>calendar_month</span>
+                      </button>
+                    </div>
+                  </div>
+                  {/* Tages-Streifen */}
+                  <div style={{ display:'flex', gap:5 }}>
+                    {weekDays.map(({ d, ds, count, hasProb, allDone }) => {
+                      const isSelected = ds === selStr
+                      const isToday = ds === todayStr2
+                      const dotColor = hasProb ? 'var(--err)' : allDone ? 'var(--ok)' : 'rgba(255,255,255,0.8)'
+                      return (
+                        <div key={ds} onClick={() => setSelectedDay(new Date(ds+'T12:00:00'))}
+                          style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 4px', borderRadius:14, cursor:'pointer', transition:'all 0.15s',
+                            background: isSelected ? 'var(--pri)' : 'var(--surf-card)',
+                            border: isSelected ? 'none' : isToday ? '1.5px solid var(--pri)' : '1px solid var(--outline)',
+                            boxShadow: isSelected ? '0 4px 12px rgba(9,106,112,0.22)' : 'none',
+                          }}>
+                          <span style={{ fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em', color: isSelected ? 'rgba(255,255,255,0.75)' : 'var(--txt-muted)' }}>{DAY_ABBR[d.getDay()]}</span>
+                          <span style={{ fontSize:15, fontWeight:800, fontFamily:'Manrope,sans-serif', color: isSelected ? '#fff' : isToday ? 'var(--pri)' : 'var(--txt)' }}>{d.getDate()}</span>
+                          {count > 0
+                            ? <span style={{ width:5, height:5, borderRadius:'50%', background: isSelected ? dotColor : hasProb ? 'var(--err)' : allDone ? 'var(--ok)' : 'var(--outline)' }}/>
+                            : <span style={{ width:5, height:5 }}/>}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>calendar_month</span>
-              </button>
-              <button onClick={() => shiftDay(1)} style={{ width:40, height:48, borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-card)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--txt)' }}>chevron_right</span>
-              </button>
-            </div>
+              )
+            })()}
 
-            {/* ── Progress Ring ── */}
+            {/* ── Fortschritt (slim) ── */}
             {dayTotal > 0 && (
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', borderRadius:14, background: dayProgress===100 ? 'var(--ok-bg)' : 'var(--surf-card)', border:`1px solid ${dayProgress===100 ? '#b6dec5' : 'var(--outline)'}`, marginBottom:14 }}>
-                <div>
-                  <div style={{ fontSize:13, fontWeight:700, color: dayProgress===100 ? 'var(--ok)' : 'var(--txt)' }}>
-                    {dayProgress===100 ? '🎉 Alle erledigt!' : `${dayDone} von ${dayTotal} erledigt`}
-                  </div>
-                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>
-                    {dayTotal-dayDone > 0 ? `${dayTotal-dayDone} noch offen` : 'Super Tag!'}
-                  </div>
+              <div style={{ marginBottom:12 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:5 }}>
+                  <span style={{ fontSize:12, fontWeight:600, color: dayProgress===100 ? 'var(--ok)' : 'var(--txt-muted)' }}>
+                    {dayProgress===100 ? 'Alle erledigt ✓' : `${dayDone} von ${dayTotal} erledigt`}
+                  </span>
+                  <span style={{ fontSize:12, fontWeight:700, color: dayProgress===100 ? 'var(--ok)' : 'var(--pri)' }}>{dayProgress}%</span>
                 </div>
-                <div style={{ width:44, height:44, borderRadius:'50%', background:`conic-gradient(var(--ok) ${dayProgress}%, var(--outline) ${dayProgress}%)`, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <div style={{ width:34, height:34, borderRadius:'50%', background: dayProgress===100 ? 'var(--ok-bg)' : 'var(--surf-card)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color: dayProgress===100 ? 'var(--ok)' : 'var(--txt)', fontFamily:'Manrope,sans-serif' }}>{dayProgress}%</div>
+                <div style={{ height:4, borderRadius:99, background:'var(--surf-high)', overflow:'hidden' }}>
+                  <div style={{ height:'100%', borderRadius:99, background: dayProgress===100 ? 'var(--ok)' : 'var(--pri)', width:`${dayProgress}%`, transition:'width 0.5s' }}/>
                 </div>
               </div>
             )}
@@ -716,7 +757,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
               <div style={s.empty}><span className="material-symbols-outlined" style={{ fontSize: 40, color: 'var(--txt-muted)', opacity: 0.4 }}>hourglass_empty</span><p style={s.emptyTxt}>Wird geladen...</p></div>
             ) : filteredByDay.length === 0 ? (
               (() => {
-                const dStr2 = selectedDay.toISOString().split('T')[0]
+                const dStr2 = `${selectedDay.getFullYear()}-${String(selectedDay.getMonth()+1).padStart(2,'0')}-${String(selectedDay.getDate()).padStart(2,'0')}`
                 const activLeave = myLeaves.find((l: any) => l.status !== 'abgelehnt' && dStr2 >= l.from_date && dStr2 <= l.to_date)
                 if (activLeave) {
                   const isKrank = activLeave.request_type === 'krankmeldung'
