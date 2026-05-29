@@ -53,7 +53,7 @@ export default function BugReport({ userId, onClose }: Props) {
                 <label style={{ display:'block', fontSize:11, fontWeight:600, color:'#3f484a', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>Beschreibung (optional)</label>
                 <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Was habe ich gemacht bevor der Fehler auftrat..." rows={3} style={{ width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid #DDE8E9', fontSize:14, resize:'vertical', fontFamily:'inherit', boxSizing:'border-box' }}/>
               </div>
-              <button type="submit" disabled={sending || !title.trim()} style={{ padding:13, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085d68,#2f7681)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', opacity:(!title.trim()||sending)?0.5:1, fontFamily:'Manrope,sans-serif' }}>
+              <button type="submit" disabled={sending || !title.trim()} style={{ padding:13, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', opacity:(!title.trim()||sending)?0.5:1, fontFamily:'Manrope,sans-serif' }}>
                 {sending ? 'Wird gesendet...' : '📨 Absenden'}
               </button>
               <button type="button" onClick={onClose} style={{ padding:12, borderRadius:14, border:'none', background:'#F0F4F4', color:'#6B7A7B', fontSize:14, fontWeight:600, cursor:'pointer' }}>
@@ -66,7 +66,7 @@ export default function BugReport({ userId, onClose }: Props) {
             <div style={{ fontSize:48, marginBottom:12 }}>✅</div>
             <h2 style={{ fontSize:18, fontWeight:800, fontFamily:'Manrope,sans-serif', marginBottom:8 }}>Danke für dein Feedback!</h2>
             <p style={{ fontSize:14, color:'#6B7A7B', marginBottom:20, lineHeight:1.6 }}>Der Bericht wurde übermittelt und wird so schnell wie möglich behoben.</p>
-            <button onClick={onClose} style={{ width:'100%', padding:13, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085d68,#2f7681)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+            <button onClick={onClose} style={{ width:'100%', padding:13, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
               Schließen
             </button>
           </div>

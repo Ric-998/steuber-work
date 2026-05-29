@@ -605,7 +605,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
               <div style={{ padding:'18px 0 0' }}>
                 {/* Was heute ansteht */}
                 <button onClick={() => { setSelectedDay(new Date(todayStr2+'T12:00:00')); setActiveTab('tasks') }}
-                  style={{ width:'100%', padding:'16px 18px', background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:20, cursor:'pointer', textAlign:'left', marginBottom:16, display:'block', boxShadow:'0 2px 12px rgba(8,93,104,0.07)' }}>
+                  style={{ width:'100%', padding:'16px 18px', background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:20, cursor:'pointer', textAlign:'left', marginBottom:16, display:'block', boxShadow:'0 2px 12px rgba(9,106,112,0.07)' }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
                     <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>Was heute ansteht</div>
                     <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>arrow_forward_ios</span>
@@ -1552,7 +1552,7 @@ function Konfetti() {
     delay: Math.random()*0.8,
     dur: 2.2 + Math.random()*1.2,
     size: 6 + Math.random()*8,
-    color: ['#085d68','#16a34a','#f59e0b','#3b82f6','#8b5cf6','#ec4899'][i%6],
+    color: ['#096a70','#16a34a','#f59e0b','#3b82f6','#8b5cf6','#ec4899'][i%6],
     shape: i%3===0 ? 'circle' : 'rect',
   }))
   return (
@@ -2670,7 +2670,7 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
 
 const s: Record<string, React.CSSProperties> = {
   shell: { display:'flex', flexDirection:'column', height:'100dvh', maxWidth:480, margin:'0 auto', background:'var(--bg)', position:'relative', overflow:'hidden' },
-  appHead: { background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', flexShrink:0, borderRadius:'0 0 22px 22px', boxShadow:'0 4px 20px rgba(8,93,104,0.18)', zIndex:10, position:'relative' as const },
+  appHead: { background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', flexShrink:0, borderRadius:'0 0 22px 22px', boxShadow:'0 4px 20px rgba(9,106,112,0.18)', zIndex:10, position:'relative' as const },
   topBar: { position:'sticky', top:0, zIndex:50, background:'rgba(248,249,250,0.8)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderBottom:'1px solid rgba(191,200,202,0.4)', flexShrink:0 },
   topBarInner: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 18px' },
   topBarLeft: { display:'flex', alignItems:'center', gap:10 },
@@ -2682,18 +2682,18 @@ const s: Record<string, React.CSSProperties> = {
   welcomeHead: { fontSize:26, fontWeight:800, fontFamily:'var(--font-head)', letterSpacing:'-0.03em', marginBottom:4 },
   welcomeSub: { fontSize:14, color:'var(--txt-muted)' },
   bento: { display:'grid', gridTemplateColumns:'2fr 1fr', gap:12, marginBottom:20 },
-  bentoMain: { background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:20, padding:'20px 18px', minHeight:140, display:'flex', flexDirection:'column', justifyContent:'space-between', boxShadow:'0 8px 24px rgba(8,93,104,0.2)' },
+  bentoMain: { background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:20, padding:'20px 18px', minHeight:140, display:'flex', flexDirection:'column', justifyContent:'space-between', boxShadow:'0 8px 24px rgba(9,106,112,0.2)' },
   bentoLabel: { fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.65)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6 },
   bentoNum: { fontSize:18, fontWeight:800, color:'#fff', fontFamily:'var(--font-head)', lineHeight:1.2 },
   bentoPills: { display:'flex', gap:8, flexWrap:'wrap', marginTop:12 },
   bentoPill: { display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.15)', padding:'4px 10px', borderRadius:999, fontSize:11, color:'#fff', fontWeight:500 },
   bentoPillDot: { width:7, height:7, borderRadius:'50%', background:'#fff', flexShrink:0 },
-  bentoSide: { background:'var(--surf-card)', borderRadius:20, padding:'18px 16px', display:'flex', flexDirection:'column', justifyContent:'space-between', boxShadow:'0 2px 12px rgba(8,93,104,0.06)' },
+  bentoSide: { background:'var(--surf-card)', borderRadius:20, padding:'18px 16px', display:'flex', flexDirection:'column', justifyContent:'space-between', boxShadow:'0 2px 12px rgba(9,106,112,0.06)' },
   bentoCatLabel: { fontSize:11, fontWeight:600, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' },
   bentoBigNum: { fontSize:36, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)', lineHeight:1 },
   bentoBar: { height:6, borderRadius:999, background:'var(--surf-high)', overflow:'hidden', marginTop:10 },
   bentoBarFill: { height:'100%', borderRadius:999, background:'var(--pri)', transition:'width 0.4s ease' },
-  weekWrap: { background:'var(--surf-card)', borderRadius:20, padding:'12px 8px', marginBottom:20, boxShadow:'0 2px 12px rgba(8,93,104,0.05)' },
+  weekWrap: { background:'var(--surf-card)', borderRadius:20, padding:'12px 8px', marginBottom:20, boxShadow:'0 2px 12px rgba(9,106,112,0.05)' },
   weekStrip: { display:'flex', gap:2, overflowX:'auto', scrollbarWidth:'none' },
   wday: { display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'8px 10px', borderRadius:14, cursor:'pointer', flexShrink:0, transition:'background 0.15s', minWidth:42 },
   wdName: { fontSize:9, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' },
@@ -2707,7 +2707,7 @@ const s: Record<string, React.CSSProperties> = {
   emptySub: { fontSize:13, color:'var(--txt-muted)', opacity:0.7 },
   groupHead: { display:'flex', alignItems:'center', gap:6, marginBottom:10 },
   groupName: { fontSize:12, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.05em' },
-  tcard: { background:'var(--surf-card)', borderRadius:16, padding:'14px 14px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 1px 8px rgba(8,93,104,0.06)', transition:'transform 0.15s' },
+  tcard: { background:'var(--surf-card)', borderRadius:16, padding:'14px 14px', display:'flex', alignItems:'center', gap:12, boxShadow:'0 1px 8px rgba(9,106,112,0.06)', transition:'transform 0.15s' },
   tcardIcon: { width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
   tcardTitle: { fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', marginBottom:6 },
   tcardMeta: { display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' },
@@ -2715,9 +2715,9 @@ const s: Record<string, React.CSSProperties> = {
   tcardDue: { display:'flex', alignItems:'center', gap:3, fontSize:11 },
   statusBadge: { display:'flex', alignItems:'center', gap:4, fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999, whiteSpace:'nowrap', flexShrink:0 },
   chevronBtn: { background:'none', border:'none', padding:4, color:'var(--txt-muted)', display:'flex', alignItems:'center', flexShrink:0 },
-  botNav: { background:'rgba(248,249,250,0.85)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:'1px solid rgba(191,200,202,0.4)', display:'flex', justifyContent:'space-around', padding:'8px 8px calc(16px + env(safe-area-inset-bottom, 0px))', flexShrink:0, boxShadow:'0 -8px 24px rgba(8,93,104,0.06)' },
+  botNav: { background:'rgba(248,249,250,0.85)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderTop:'1px solid rgba(191,200,202,0.4)', display:'flex', justifyContent:'space-around', padding:'8px 8px calc(16px + env(safe-area-inset-bottom, 0px))', flexShrink:0, boxShadow:'0 -8px 24px rgba(9,106,112,0.06)' },
   navItem: { display:'flex', flexDirection:'column', alignItems:'center', gap:3, padding:'8px 20px', borderRadius:14, border:'none', background:'transparent', color:'#6b7a7b', cursor:'pointer', transition:'all 0.15s' },
-  navItemOn: { background:'var(--pri)', color:'#fff', boxShadow:'0 4px 12px rgba(8,93,104,0.25)' },
+  navItemOn: { background:'var(--pri)', color:'#fff', boxShadow:'0 4px 12px rgba(9,106,112,0.25)' },
   overlay: { position:'absolute', inset:0, background:'var(--bg)', display:'flex', flexDirection:'column', zIndex:100, overflow:'hidden' },
   backBtn: { background:'var(--surf-low)', border:'none', width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt)', cursor:'pointer', flexShrink:0 },
   detScroll: { flex:1, overflowY:'auto', padding:18 },
@@ -2726,7 +2726,7 @@ const s: Record<string, React.CSSProperties> = {
   descCard: { background:'var(--surf-card)', borderRadius:14, padding:16, border:'1px solid var(--outline)', fontSize:14, lineHeight:1.7, color:'var(--txt)' },
   detFooter: { padding:'14px 18px 20px', borderTop:'1px solid var(--outline)', display:'flex', gap:10, flexShrink:0, background:'var(--surf-card)' },
   btnWarn: { flex:1, padding:13, borderRadius:14, border:'1.5px solid var(--err-dot)', background:'transparent', color:'var(--err-dot)', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:6 },
-  btnPri: { flex:2, padding:13, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:6, boxShadow:'0 4px 14px rgba(8,93,104,0.25)' },
+  btnPri: { flex:2, padding:13, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:6, boxShadow:'0 4px 14px rgba(9,106,112,0.25)' },
   backdrop: { position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:200, display:'flex', alignItems:'flex-end' },
   sheet: { background:'var(--surf-card)', width:'100%', borderRadius:'24px 24px 0 0', padding:'18px 18px 32px', boxShadow:'0 -8px 40px rgba(0,0,0,0.15)' },
   sheetHandle: { width:36, height:4, borderRadius:2, background:'var(--outline)', margin:'0 auto 20px' },

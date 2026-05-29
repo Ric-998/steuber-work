@@ -50,11 +50,11 @@ function showUpdateBanner(worker: ServiceWorker) {
   banner.id = 'sw-update-banner'
   banner.style.cssText = [
     'position:fixed', 'bottom:88px', 'left:50%', 'transform:translateX(-50%)',
-    'z-index:99999', 'background:#085d68', 'color:#fff',
+    'z-index:99999', 'background:#096a70', 'color:#fff',
     'padding:12px 18px', 'border-radius:16px',
     'display:flex', 'align-items:center', 'gap:12px',
     'font-family:Inter,sans-serif', 'font-size:13px', 'font-weight:600',
-    'box-shadow:0 4px 24px rgba(8,93,104,0.35)',
+    'box-shadow:0 4px 24px rgba(9,106,112,0.35)',
     'white-space:nowrap', 'max-width:calc(100vw - 32px)',
   ].join(';')
 

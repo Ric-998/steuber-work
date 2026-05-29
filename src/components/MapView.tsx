@@ -80,10 +80,10 @@ export default function MapView({ address, city, postalCode }: Props) {
         html: `<div style="
           width:32px;height:32px;
           border-radius:50% 50% 50% 0;
-          background:#085d68;
+          background:#096a70;
           transform:rotate(-45deg);
           border:3px solid #fff;
-          box-shadow:0 3px 10px rgba(8,93,104,0.5)
+          box-shadow:0 3px 10px rgba(9,106,112,0.5)
         "></div>`,
         iconSize: [32, 32],
         iconAnchor: [16, 32],
@@ -109,7 +109,7 @@ export default function MapView({ address, city, postalCode }: Props) {
   }, [fullAddress])
 
   return (
-    <div style={{ borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)', boxShadow:'0 2px 12px rgba(8,93,104,0.06)' }}>
+    <div style={{ borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)', boxShadow:'0 2px 12px rgba(9,106,112,0.06)' }}>
       {/* Map container */}
       <div style={{ position:'relative', height:200, background:'#e8f4f5' }}>
         <div ref={mapRef} style={{ width:'100%', height:'100%' }} />

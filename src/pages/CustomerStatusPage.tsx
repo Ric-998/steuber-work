@@ -22,7 +22,7 @@ interface Props {
 const STATUS_DISPLAY: Record<string, { icon: string; label: string; color: string; bg: string }> = {
   erledigt:   { icon: '✓',  label: 'Erledigt',  color: '#166534', bg: '#dcfce7' },
   offen:      { icon: '⏳', label: 'Ausstehend', color: '#92400e', bg: '#fff8e6' },
-  in_arbeit:  { icon: '⏳', label: 'In Arbeit',  color: '#085d68', bg: '#e0f4f6' },
+  in_arbeit:  { icon: '⏳', label: 'In Arbeit',  color: '#096a70', bg: '#e0f4f6' },
   problem:    { icon: '⚠',  label: 'Problem',    color: '#93000a', bg: '#ffdad6' },
   vertretung: { icon: '⏳', label: 'Ausstehend', color: '#92400e', bg: '#fff8e6' },
 }
@@ -69,7 +69,7 @@ export default function CustomerStatusPage({ token }: Props) {
 
   if (loading) return (
     <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, background:'#f8fafb', fontFamily:'Inter,system-ui,sans-serif' }}>
-      <div style={{ width:52, height:52, borderRadius:16, background:'linear-gradient(135deg,#085d68,#2f7681)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 24px rgba(8,93,104,0.22)' }}>
+      <div style={{ width:52, height:52, borderRadius:16, background:'linear-gradient(135deg,#085f69,#0c8f85)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 24px rgba(9,106,112,0.22)' }}>
         <span style={{ color:'#fff', fontSize:24, fontWeight:800, fontFamily:'Manrope,sans-serif' }}>S</span>
       </div>
       <div style={{ fontSize:14, color:'#6b7a7b' }}>Wird geladen…</div>
@@ -89,7 +89,7 @@ export default function CustomerStatusPage({ token }: Props) {
     <div style={{ minHeight:'100vh', background:'#f0f6f7', fontFamily:'Inter,system-ui,sans-serif', color:'#1a2020' }}>
 
       {/* Header bar */}
-      <div style={{ background:'linear-gradient(135deg,#085d68 0%,#2f7681 100%)', padding:'24px 20px 28px', boxShadow:'0 4px 20px rgba(8,93,104,0.18)' }}>
+      <div style={{ background:'linear-gradient(135deg,#085f69,#0c8f85)', padding:'24px 20px 28px', boxShadow:'0 4px 20px rgba(9,106,112,0.18)' }}>
         <div style={{ maxWidth:600, margin:'0 auto' }}>
           <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
             <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -120,7 +120,7 @@ export default function CustomerStatusPage({ token }: Props) {
           <div style={{ display:'flex', gap:10, marginBottom:20 }}>
             {[
               { label:'Erledigt',    count: tasks.filter(t=>t.status==='erledigt').length,  color:'#166534', bg:'#dcfce7' },
-              { label:'Ausstehend',  count: tasks.filter(t=>t.status!=='erledigt'&&t.status!=='problem').length, color:'#085d68', bg:'#e0f4f6' },
+              { label:'Ausstehend',  count: tasks.filter(t=>t.status!=='erledigt'&&t.status!=='problem').length, color:'#096a70', bg:'#e0f4f6' },
               { label:'Probleme',    count: tasks.filter(t=>t.status==='problem').length,   color:'#93000a', bg:'#ffdad6' },
             ].map(s => (
               <div key={s.label} style={{ flex:1, background:'#fff', borderRadius:16, padding:'14px 12px', boxShadow:'0 2px 10px rgba(0,0,0,0.05)', border:'1px solid #edf1f2' }}>
@@ -199,7 +199,7 @@ export default function CustomerStatusPage({ token }: Props) {
       {/* Footer */}
       <div style={{ textAlign:'center', padding:'20px 16px 36px', borderTop:'1px solid #e2e8ea', background:'#fff', color:'#9ba8a9', fontSize:12 }}>
         <div style={{ display:'inline-flex', alignItems:'center', gap:6, marginBottom:4 }}>
-          <div style={{ width:20, height:20, borderRadius:6, background:'linear-gradient(135deg,#085d68,#2f7681)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ width:20, height:20, borderRadius:6, background:'linear-gradient(135deg,#085f69,#0c8f85)', display:'flex', alignItems:'center', justifyContent:'center' }}>
             <span style={{ color:'#fff', fontSize:11, fontWeight:800, fontFamily:'Manrope,sans-serif' }}>S</span>
           </div>
           <span style={{ fontWeight:700, color:'#6b7a7b' }}>SteuberWork</span>

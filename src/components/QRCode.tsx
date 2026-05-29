@@ -12,7 +12,7 @@ export default function QRCode({ value, size = 160 }: Props) {
     // Simple QR code via API (no library needed)
     const img = new Image()
     img.crossOrigin = 'anonymous'
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&color=085d68&bgcolor=ffffff&margin=10`
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(value)}&color=096a70&bgcolor=ffffff&margin=10`
     img.onload = () => {
       const ctx = canvas.getContext('2d')
       if (ctx) {

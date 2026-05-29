@@ -83,7 +83,7 @@ const INTERVAL_ICONS: Record<string,string> = { täglich:'today', wöchentlich:'
 const ROLE_LABELS: Record<string,string> = { admin:'Admin', mitarbeiter:'Mitarbeiter', objektleiter:'Objektleiter' }
 const STATUS_META: Record<string,{label:string;icon:string;bg:string;color:string}> = {
   offen:     { label:'Offen',     icon:'radio_button_unchecked', bg:'#fff8e6', color:'#92400e' },
-  in_arbeit: { label:'In Arbeit', icon:'pending',                bg:'#e0f4f6', color:'#085d68' },
+  in_arbeit: { label:'In Arbeit', icon:'pending',                bg:'#e0f4f6', color:'#096a70' },
   erledigt:  { label:'Erledigt',  icon:'check_circle',           bg:'#dcfce7', color:'#166534' },
   problem:   { label:'Problem',   icon:'error',                  bg:'#ffdad6', color:'#93000a' },
 }
@@ -541,7 +541,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     </div>
                     <div style={s.bentoPills}>
                       <span style={s.bentoPill}><span style={s.bentoDot}/>{stats?.in_arbeit??0} In Arbeit</span>
-                      <span style={{ ...s.bentoPill, background:'rgba(255,255,255,0.1)' }}><span style={{ ...s.bentoDot, background:'#aaeefa' }}/>{stats?.gesamt_offen??0} Offen</span>
+                      <span style={{ ...s.bentoPill, background:'rgba(255,255,255,0.1)' }}><span style={{ ...s.bentoDot, background:'#a8ece8' }}/>{stats?.gesamt_offen??0} Offen</span>
                     </div>
                   </div>
                   <div style={s.bentoSide}>
@@ -865,7 +865,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 <h1 style={{ ...s.h1, fontSize:20, marginBottom:2 }}>Team</h1>
                 <p style={{ fontSize:13, color:'var(--txt-muted)', margin:0 }}>{team.filter(m=>m.is_active).length} aktiv · {team.length} gesamt</p>
               </div>
-              <button onClick={() => setShowInviteOverlay(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 12px rgba(8,93,104,0.25)', flexShrink:0 }}>
+              <button onClick={() => setShowInviteOverlay(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 12px rgba(9,106,112,0.25)', flexShrink:0 }}>
                 <span className="material-symbols-outlined" style={{ fontSize:18 }}>person_add</span>
                 Einladen
               </button>
@@ -886,11 +886,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 <div key={m.id}
                   onClick={() => setSelectedMember(m)}
                   style={{ ...s.taskCard, opacity: m.is_active ? 1 : 0.55, cursor:'pointer', transition:'box-shadow 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 16px rgba(8,93,104,0.12)')}
+                  onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 16px rgba(9,106,112,0.12)')}
                   onMouseLeave={e => (e.currentTarget.style.boxShadow=(s.taskCard as any).boxShadow||'0 1px 4px rgba(0,0,0,0.06)')}
                 >
                   {/* Avatar */}
-                  <div style={{ width:44, height:44, borderRadius:14, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: m.is_active ? '0 4px 10px rgba(8,93,104,0.25)' : 'none' }}>{ini}</div>
+                  <div style={{ width:44, height:44, borderRadius:14, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: m.is_active ? '0 4px 10px rgba(9,106,112,0.25)' : 'none' }}>{ini}</div>
                   {/* Info */}
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:4, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
@@ -1281,7 +1281,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
         {tab === 'profil' && (
           <>
             {/* Hero-Card */}
-            <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:24, padding:'32px 24px 24px', textAlign:'center', marginTop:20, marginBottom:20, boxShadow:'0 8px 32px rgba(8,93,104,0.25)', position:'relative', overflow:'hidden' }}>
+            <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:24, padding:'32px 24px 24px', textAlign:'center', marginTop:20, marginBottom:20, boxShadow:'0 8px 32px rgba(9,106,112,0.25)', position:'relative', overflow:'hidden' }}>
               <div style={{ position:'absolute', top:-30, right:-30, width:120, height:120, borderRadius:'50%', background:'rgba(255,255,255,0.06)' }} />
               <div style={{ position:'absolute', bottom:-20, left:-20, width:80, height:80, borderRadius:'50%', background:'rgba(255,255,255,0.06)' }} />
               <div style={{ width:72, height:72, borderRadius:'50%', background:'rgba(255,255,255,0.2)', border:'2.5px solid rgba(255,255,255,0.35)', color:'#fff', fontSize:26, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px', fontFamily:'var(--font-head)', position:'relative', zIndex:1 }}>{initials}</div>
@@ -2318,7 +2318,7 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
           </div>
 
           {/* Save */}
-          <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg, var(--pri) 0%, var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'var(--font-head)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:4 }}>
+          <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'var(--font-head)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginTop:4 }}>
             <span className="material-symbols-outlined icon-sm">{saving?'hourglass_empty':'save'}</span>
             {saving ? 'Wird gespeichert…' : 'Änderungen speichern'}
           </button>
@@ -2486,7 +2486,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
                   style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1.5px dashed var(--pri)', background:'var(--pri-xl)', color:'var(--pri)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
                   <span className="material-symbols-outlined" style={{ fontSize:18 }}>auto_awesome</span>
                   Aus Vorlage übernehmen
-                  <span style={{ marginLeft:'auto', fontSize:11, fontWeight:600, color:'var(--pri)', background:'rgba(8,93,104,0.1)', borderRadius:20, padding:'2px 8px' }}>{templates.length} verfügbar</span>
+                  <span style={{ marginLeft:'auto', fontSize:11, fontWeight:600, color:'var(--pri)', background:'rgba(9,106,112,0.1)', borderRadius:20, padding:'2px 8px' }}>{templates.length} verfügbar</span>
                 </button>
                 {/* Template Picker Sheet */}
                 {showTemplatePicker && (
@@ -3567,7 +3567,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
 
               {/* Ergebnisliste */}
               {custResults.length > 0 && (
-                <div style={{ border: '1.5px solid var(--pri)', borderRadius: 14, marginTop: 6, overflow: 'hidden', boxShadow: '0 8px 24px rgba(8,93,104,0.1)' }}>
+                <div style={{ border: '1.5px solid var(--pri)', borderRadius: 14, marginTop: 6, overflow: 'hidden', boxShadow: '0 8px 24px rgba(9,106,112,0.1)' }}>
                   {custResults.map((c, i) => (
                     <div key={c.id} onClick={() => { setSelectedCust(c); setCustResults([]); setCustQuery('') }}
                       style={{ padding: '12px 14px', borderBottom: i < custResults.length - 1 ? '1px solid var(--outline)' : 'none', cursor: 'pointer', background: 'var(--surf-card)', display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -4289,13 +4289,13 @@ const s: Record<string,React.CSSProperties> = {
   h1:            { fontSize:26, fontWeight:800, fontFamily:'var(--font-head)', letterSpacing:'-0.03em', marginBottom:4 },
   sub:           { fontSize:14, color:'var(--txt-muted)' },
   bento:         { display:'grid', gridTemplateColumns:'2fr 1fr', gap:12, marginBottom:14 },
-  bentoMain:     { background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:20, padding:'20px 18px', minHeight:130, display:'flex', flexDirection:'column', justifyContent:'space-between', boxShadow:'0 8px 24px rgba(8,93,104,0.2)' },
+  bentoMain:     { background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:20, padding:'20px 18px', minHeight:130, display:'flex', flexDirection:'column', justifyContent:'space-between', boxShadow:'0 8px 24px rgba(9,106,112,0.2)' },
   bentoLabel:    { fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.65)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6 },
   bentoNum:      { fontSize:17, fontWeight:800, color:'#fff', fontFamily:'var(--font-head)', lineHeight:1.2 },
   bentoPills:    { display:'flex', gap:8, flexWrap:'wrap', marginTop:12 },
   bentoPill:     { display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.18)', padding:'4px 10px', borderRadius:999, fontSize:11, color:'#fff', fontWeight:500 },
   bentoDot:      { width:7, height:7, borderRadius:'50%', background:'#fff', flexShrink:0 },
-  bentoSide:     { background:'var(--surf-card)', borderRadius:20, padding:'18px 16px', display:'flex', flexDirection:'column', justifyContent:'center', boxShadow:'0 2px 12px rgba(8,93,104,0.06)' },
+  bentoSide:     { background:'var(--surf-card)', borderRadius:20, padding:'18px 16px', display:'flex', flexDirection:'column', justifyContent:'center', boxShadow:'0 2px 12px rgba(9,106,112,0.06)' },
   bentoSideLabel:{ fontSize:11, fontWeight:600, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 },
   bentoSideNum:  { fontSize:38, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)', lineHeight:1 },
   statsRow:      { display:'flex', gap:10, marginBottom:20 },
@@ -4305,22 +4305,22 @@ const s: Record<string,React.CSSProperties> = {
   secCount:      { fontSize:12, fontWeight:600, color:'var(--txt-muted)' },
   okBanner:      { background:'var(--ok-bg)', borderRadius:16, padding:'14px 18px', display:'flex', alignItems:'center', gap:12, marginBottom:20 },
   probCard:      { background:'#fff0f0', border:'1px solid #fecaca', borderRadius:14, padding:'13px 16px', marginBottom:8, display:'flex', gap:10, alignItems:'flex-start' },
-  taskCard:      { background:'var(--surf-card)', borderRadius:16, padding:'14px', marginBottom:10, display:'flex', alignItems:'center', gap:12, boxShadow:'0 1px 8px rgba(8,93,104,0.05)' },
+  taskCard:      { background:'var(--surf-card)', borderRadius:16, padding:'14px', marginBottom:10, display:'flex', alignItems:'center', gap:12, boxShadow:'0 1px 8px rgba(9,106,112,0.05)' },
   taskIcon:      { width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
   chip:          { display:'flex', alignItems:'center', gap:4, fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999 },
-  fab:           { position:'fixed', right:24, bottom:28, width:56, height:56, borderRadius:'50%', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', border:'none', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 6px 20px rgba(8,93,104,0.35)', cursor:'pointer', zIndex:40 },
+  fab:           { position:'fixed', right:24, bottom:28, width:56, height:56, borderRadius:'50%', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', border:'none', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 6px 20px rgba(9,106,112,0.35)', cursor:'pointer', zIndex:40 },
   emptyState:    { display:'flex', flexDirection:'column', alignItems:'center', padding:'60px 20px', gap:12 },
   overlay:       { position:'absolute', inset:0, background:'var(--bg)', display:'flex', flexDirection:'column', zIndex:100, overflow:'hidden' },
   overlayHead:   { background:'var(--surf-card)', padding:'14px 18px', display:'flex', alignItems:'center', gap:12, borderBottom:'1px solid var(--outline)', flexShrink:0 },
   overlayFooter: { padding:'14px 18px 24px', borderTop:'1px solid var(--outline)', background:'var(--surf-card)', flexShrink:0 },
   backBtn:       { background:'var(--surf-low)', border:'none', width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt)', cursor:'pointer', flexShrink:0 },
   selectCard:    { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:14, border:'1.5px solid var(--outline)', cursor:'pointer', transition:'all 0.15s' },
-  formCard:      { background:'var(--surf-card)', borderRadius:20, padding:20, marginBottom:24, boxShadow:'0 2px 16px rgba(8,93,104,0.07)' },
+  formCard:      { background:'var(--surf-card)', borderRadius:20, padding:20, marginBottom:24, boxShadow:'0 2px 16px rgba(9,106,112,0.07)' },
   fieldLabel:    { display:'block', fontSize:11, fontWeight:600, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 } as React.CSSProperties,
   inputWrap:     { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' },
   input:         { flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' },
   roleOpt:       { display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 8px', borderRadius:12, border:'1.5px solid var(--outline)', cursor:'pointer', flex:1 } as React.CSSProperties,
-  btnPri:        { width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 14px rgba(8,93,104,0.25)', cursor:'pointer' } as React.CSSProperties,
+  btnPri:        { width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 14px rgba(9,106,112,0.25)', cursor:'pointer' } as React.CSSProperties,
   btnOutline:    { padding:'12px 16px', borderRadius:14, border:'1.5px solid var(--pri)', background:'transparent', color:'var(--pri)', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8, cursor:'pointer' } as React.CSSProperties,
   btnSmall:      { padding:'8px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:12, fontWeight:700, display:'flex', alignItems:'center', gap:6, cursor:'pointer', flexShrink:0 } as React.CSSProperties,
 }
@@ -4812,7 +4812,7 @@ function ContactPersonOverlay({ customerId, existing, onClose, onSaved }: {
               </div>
             </div>
           ))}
-          <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg, var(--pri) 0%, var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+          <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
             {saving ? 'Wird gespeichert…' : existing ? 'Speichern' : 'Hinzufügen'}
           </button>
         </div>
@@ -5066,7 +5066,7 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
             <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Interne Notizen …" rows={3} style={{ ...s.input, width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', resize:'vertical', lineHeight:1.6 }}/>
           </div>
 
-          <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg, var(--pri) 0%, var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
             <span className="material-symbols-outlined icon-sm">{saving?'hourglass_empty':'person_add'}</span>
             {saving?'Wird gespeichert…':'Kunden anlegen'}
           </button>
@@ -5254,7 +5254,7 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
             <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} style={{ ...s.input, width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', resize:'vertical', lineHeight:1.6 }}/>
           </div>
 
-          <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg, var(--pri) 0%, var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <button onClick={save} disabled={saving} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
             <span className="material-symbols-outlined icon-sm">{saving?'hourglass_empty':'save'}</span>
             {saving?'Wird gespeichert…':'Änderungen speichern'}
           </button>
@@ -5726,7 +5726,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
             {inviteMsg && <div style={{ background:inviteMsg.ok?'var(--ok-bg)':'var(--err-bg)', color:inviteMsg.ok?'var(--ok)':'var(--err)', borderRadius:12, padding:'12px 14px', fontSize:13, display:'flex', gap:8 }}>
               <span className="material-symbols-outlined icon-sm icon-fill">{inviteMsg.ok?'check_circle':'error'}</span>{inviteMsg.text}
             </div>}
-            <button type="submit" disabled={inviting} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:16, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(8,93,104,0.25)' }}>
+            <button type="submit" disabled={inviting} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:16, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(9,106,112,0.25)' }}>
               <span className="material-symbols-outlined icon-sm">{inviting?'hourglass_empty':'send'}</span>
               {inviting?'Wird gesendet...':'Einladungs-E-Mail senden'}
             </button>
@@ -5755,7 +5755,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
               <span className="material-symbols-outlined icon-sm icon-fill">error</span>{inviteMsg.text}
             </div>}
             {!generatedLink ? (
-              <button type="button" onClick={generateInviteLink} disabled={linkLoading} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:16, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(8,93,104,0.25)' }}>
+              <button type="button" onClick={generateInviteLink} disabled={linkLoading} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:16, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(9,106,112,0.25)' }}>
                 <span className="material-symbols-outlined icon-sm">{linkLoading?'hourglass_empty':'add_link'}</span>
                 {linkLoading?'Wird generiert...':'Einladungslink generieren'}
               </button>
@@ -5878,7 +5878,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
                     <span className="material-symbols-outlined icon-sm icon-fill">error</span>{manualErr}
                   </div>
                 )}
-                <button type="submit" disabled={manualLoading} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:16, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(8,93,104,0.25)' }}>
+                <button type="submit" disabled={manualLoading} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:16, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(9,106,112,0.25)' }}>
                   <span className="material-symbols-outlined icon-sm">{manualLoading?'hourglass_empty':'person_add'}</span>
                   {manualLoading ? 'Wird angelegt…' : 'Mitarbeiter anlegen'}
                 </button>
@@ -6108,7 +6108,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
                 Abbrechen
               </button>
               <button onClick={handleExport} disabled={exporting}
-                style={{ flex:2, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(8,93,104,0.25)', opacity: exporting ? 0.7 : 1 }}>
+                style={{ flex:2, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(9,106,112,0.25)', opacity: exporting ? 0.7 : 1 }}>
                 <span className="material-symbols-outlined icon-sm">{exporting ? 'hourglass_empty' : 'file_download'}</span>
                 {exporting ? 'Wird erstellt…' : 'XLSX exportieren'}
               </button>
@@ -6133,7 +6133,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
         )}
 
         {/* Hero */}
-        <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:20, padding:'24px 20px', display:'flex', alignItems:'center', gap:16, boxShadow:'0 8px 24px rgba(8,93,104,0.2)' }}>
+        <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:20, padding:'24px 20px', display:'flex', alignItems:'center', gap:16, boxShadow:'0 8px 24px rgba(9,106,112,0.2)' }}>
           <div style={{ width:60, height:60, borderRadius:18, background:'rgba(255,255,255,0.2)', border:'2px solid rgba(255,255,255,0.35)', color:'#fff', fontSize:22, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-head)', flexShrink:0 }}>{ini}</div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:18, fontWeight:800, color:'#fff', fontFamily:'var(--font-head)' }}>{member.full_name}</div>
@@ -6261,7 +6261,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
               {saveErr && <div style={{ background:'var(--err-bg)', color:'var(--err)', borderRadius:12, padding:'11px 14px', fontSize:13, display:'flex', gap:8, alignItems:'center' }}>
                 <span className="material-symbols-outlined" style={{ fontSize:16 }}>error</span>{saveErr}
               </div>}
-              <button onClick={handleSave} disabled={saving} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 14px rgba(8,93,104,0.25)', opacity:saving?0.7:1 }}>
+              <button onClick={handleSave} disabled={saving} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:15, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 14px rgba(9,106,112,0.25)', opacity:saving?0.7:1 }}>
                 <span className="material-symbols-outlined icon-sm">{saving?'hourglass_empty':'save'}</span>
                 {saving ? 'Wird gespeichert…' : 'Änderungen speichern'}
               </button>
@@ -6402,7 +6402,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
                 {/* KPI grid */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                   {[
-                    { icon:'beach_access', label:'Urlaub genommen', value:`${urlaubGenehmigt}`, unit:'Tage', color:'#2f7681' },
+                    { icon:'beach_access', label:'Urlaub genommen', value:`${urlaubGenehmigt}`, unit:'Tage', color:'#0c8f85' },
                     { icon:'hourglass_empty', label:'Ausstehend', value:`${urlaubPending}`, unit:'Tage', color:'#f59e0b' },
                     { icon:'sick', label:'Kranktage', value:`${kranktage}`, unit:'Tage', color:'var(--err)' },
                     { icon:'task_alt', label:'Aufgaben erledigt', value:`${maDoneCount}`, unit:'gesamt', color:'var(--ok)' },
@@ -6613,7 +6613,7 @@ function TodayTasksOverlay({ tasks, team, today, onClose, onEditTask }: {
                 <div key={t.id}
                   onClick={() => onEditTask(t)}
                   style={{ background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:12, cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', transition:'box-shadow 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 14px rgba(8,93,104,0.12)')}
+                  onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 14px rgba(9,106,112,0.12)')}
                   onMouseLeave={e => (e.currentTarget.style.boxShadow='0 1px 4px rgba(0,0,0,0.06)')}
                 >
                   <div style={{ width:8, height:8, borderRadius:'50%', background: INTERVAL_COLOR[interval]??'var(--pri)', flexShrink:0 }} />

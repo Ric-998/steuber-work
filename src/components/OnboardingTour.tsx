@@ -5,7 +5,7 @@ const TOUR_KEY = 'steuberwork_tour_done'
 const STEPS = [
   {
     icon: 'task_alt',
-    color: '#085d68',
+    color: '#096a70',
     bg: '#E6F3F4',
     title: 'Deine Aufgaben',
     desc: 'Auf dem Aufgaben-Tab siehst du sofort was heute zu tun ist – sortiert nach Objekt. Tippe auf eine Aufgabe für alle Details.',
@@ -37,7 +37,7 @@ const STEPS = [
   },
   {
     icon: 'notifications_active',
-    color: '#085d68',
+    color: '#096a70',
     bg: '#E6F3F4',
     title: 'Benachrichtigungen',
     desc: 'Aktiviere Push-Benachrichtigungen unter Profil damit du keine Aufgaben und Statusänderungen verpasst.',
@@ -77,7 +77,7 @@ export function OnboardingTour({ onClose }: Props) {
         {/* Step dots */}
         <div style={{ display:'flex', justifyContent:'center', gap:6, marginBottom:28 }}>
           {STEPS.map((_, i) => (
-            <div key={i} onClick={()=>setStep(i)} style={{ width: i===step?24:8, height:8, borderRadius:999, background:i===step?'#085d68':i<step?'#9FE1CB':'#DDE8E9', transition:'all 0.3s', cursor:'pointer' }}/>
+            <div key={i} onClick={()=>setStep(i)} style={{ width: i===step?24:8, height:8, borderRadius:999, background:i===step?'#096a70':i<step?'#9FE1CB':'#DDE8E9', transition:'all 0.3s', cursor:'pointer' }}/>
           ))}
         </div>
 
@@ -100,8 +100,8 @@ export function OnboardingTour({ onClose }: Props) {
 
           {/* Hint */}
           <div style={{ background:'#F0F8F9', borderRadius:12, padding:'10px 16px', display:'inline-flex', alignItems:'center', gap:8, marginBottom:32 }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16, color:'#085d68', flexShrink:0 }}>lightbulb</span>
-            <span style={{ fontSize:12, color:'#085d68', fontWeight:500 }}>{current.hint}</span>
+            <span className="material-symbols-outlined" style={{ fontSize:16, color:'#096a70', flexShrink:0 }}>lightbulb</span>
+            <span style={{ fontSize:12, color:'#096a70', fontWeight:500 }}>{current.hint}</span>
           </div>
         </div>
 
@@ -110,7 +110,7 @@ export function OnboardingTour({ onClose }: Props) {
           <button onClick={finish} style={{ flex:1, padding:14, borderRadius:14, border:'1.5px solid #DDE8E9', background:'transparent', color:'#6B7A7B', fontSize:14, fontWeight:600, cursor:'pointer' }}>
             Überspringen
           </button>
-          <button onClick={next} style={{ flex:2, padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085d68,#2f7681)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 14px rgba(8,93,104,0.3)', fontFamily:'Manrope,sans-serif' }}>
+          <button onClick={next} style={{ flex:2, padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 14px rgba(9,106,112,0.3)', fontFamily:'Manrope,sans-serif' }}>
             {isLast ? (
               <><span className="material-symbols-outlined" style={{ fontSize:18 }}>rocket_launch</span>Los geht's!</>
             ) : (

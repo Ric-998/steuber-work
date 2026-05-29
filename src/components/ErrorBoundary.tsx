@@ -62,7 +62,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <button
               onClick={this.sendReport}
               disabled={this.state.sending}
-              style={{ width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085d68,#2f7681)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', marginBottom:10, fontFamily:'Manrope,sans-serif' }}
+              style={{ width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', marginBottom:10, fontFamily:'Manrope,sans-serif' }}
             >
               {this.state.sending ? 'Wird gesendet...' : '📨 Fehlerbericht senden'}
             </button>
@@ -86,7 +86,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <div style={{ fontSize:15, fontWeight:700, color:'#166534' }}>Fehlerbericht gesendet!</div>
               <div style={{ fontSize:13, color:'#166534', marginTop:4, opacity:0.8 }}>Danke – der Fehler wird so schnell wie möglich behoben.</div>
             </div>
-            <button onClick={() => window.location.reload()} style={{ width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085d68,#2f7681)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+            <button onClick={() => window.location.reload()} style={{ width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,#085f69,#0c8f85)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
               App neu laden
             </button>
           </div>

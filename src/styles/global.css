@@ -1,12 +1,12 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --pri: #085d68;
-  --pri-c: #2f7681;
-  --pri-l: #aaeefa;
-  --pri-xl: #cdf7ff;
-  --sec: #4a6267;
-  --sec-c: #cae4e9;
+  --pri: #096a70;
+  --pri-c: #0c8f85;
+  --pri-l: #a8ece8;
+  --pri-xl: #d4f5f2;
+  --sec: #4a6b68;
+  --sec-c: #c2e8e4;
   --bg: #f8f9fa;
   --surf: #f8f9fa;
   --surf-low: #f3f4f5;
