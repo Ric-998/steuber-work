@@ -2719,9 +2719,7 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
       <div style={{ background:'var(--surf-card)', borderRadius:18, overflow:'hidden',
         border:'1px solid var(--outline)', marginBottom:20 }}>
         <Row icon="lightbulb" iconBg="rgba(217,119,6,0.08)" label="Feedback & Ideen"
-          sub="Fehler melden, Feature-Wünsche, Vorschläge" chevron onClick={onFeedback} />
-        <Row icon="bug_report" iconBg="rgba(186,26,26,0.08)" label="Fehler melden (alt)"
-          sub="Schnelle Fehlermeldung" chevron onClick={onBugReport} last />
+          sub="Fehler melden, Feature-Wünsche, Vorschläge" chevron onClick={onFeedback} last />
       </div>
 
       {/* ── Logout ── */}
