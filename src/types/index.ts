@@ -1,7 +1,26 @@
 export interface Role {
   id: string
-  name: 'admin' | 'mitarbeiter' | 'objektleiter'
+  name: 'admin' | 'mitarbeiter' | 'objektleiter' | 'support'
   permissions: Record<string, unknown>
+}
+
+export type FeedbackType = 'bug' | 'feature' | 'improvement' | 'other'
+export type FeedbackStatus = 'open' | 'in_progress' | 'planned' | 'done' | 'rejected'
+export type FeedbackPriority = 'low' | 'medium' | 'high' | 'critical'
+
+export interface FeedbackItem {
+  id: string
+  user_id: string | null
+  type: FeedbackType
+  title: string
+  description: string
+  status: FeedbackStatus
+  priority: FeedbackPriority
+  admin_response: string | null
+  screenshot_url: string | null
+  created_at: string
+  updated_at: string
+  users?: { full_name: string }
 }
 
 export interface UserProfile {
@@ -55,6 +74,8 @@ export interface ObjectItem {
   address_supplement?: string
   lat?: number
   lng?: number
+  objektleiter_id?: string | null
+  objektleiter?: { id: string; full_name: string } | null
   customers?: Customer
 }
 

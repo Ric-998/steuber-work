@@ -27,7 +27,7 @@ interface TeamMember {
 }
 interface Category { id:string; name:string; emoji:string }
 type ObjectType = 'einfamilienhaus'|'mehrfamilienhaus'|'firmengelaende'|'grundstueck'
-interface ObjectItem { id:string; name:string; address:string; city:string; postal_code:string; object_number?:string|null; customer_id?:string|null; is_active:boolean; object_type?:ObjectType|null; address_supplement?:string|null; notes?:string|null; access_note?:string|null; parking_note?:string|null; floor_info?:string|null; customers:{ id:string; name:string }|null }
+interface ObjectItem { id:string; name:string; address:string; city:string; postal_code:string; object_number?:string|null; customer_id?:string|null; is_active:boolean; object_type?:ObjectType|null; address_supplement?:string|null; notes?:string|null; access_note?:string|null; parking_note?:string|null; floor_info?:string|null; objektleiter_id?:string|null; customers:{ id:string; name:string }|null }
 type CustomerType = 'privatperson'|'firma'|'weg-verwaltung'|'mietverwaltung'
 interface CustomerItem {
   id: string
@@ -80,7 +80,7 @@ interface Props { userName:string; onLogout:()=>void }
 const MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
 const INTERVALS = ['täglich','wöchentlich','monatlich','quartalsweise','einmalig']
 const INTERVAL_ICONS: Record<string,string> = { täglich:'today', wöchentlich:'date_range', monatlich:'calendar_month', quartalsweise:'event_repeat', einmalig:'looks_one' }
-const ROLE_LABELS: Record<string,string> = { admin:'Admin', mitarbeiter:'Mitarbeiter', objektleiter:'Objektleiter' }
+const ROLE_LABELS: Record<string,string> = { admin:'Admin', mitarbeiter:'Mitarbeiter', objektleiter:'Objektleiter', support:'Support' }
 const STATUS_META: Record<string,{label:string;icon:string;bg:string;color:string}> = {
   offen:     { label:'Offen',     icon:'radio_button_unchecked', bg:'#fff8e6', color:'#92400e' },
   in_arbeit: { label:'In Arbeit', icon:'pending',                bg:'#e0f4f6', color:'#096a70' },
@@ -886,8 +886,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
             ) : [...team].sort((a,b)=>a.full_name.localeCompare(b.full_name,'de')).map(m => {
               const role = m.role_name || 'mitarbeiter'
               const ini = m.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
-              const roleColor: Record<string,string> = { admin:'#7c3aed', objektleiter:'#0369a1', mitarbeiter:'var(--pri)' }
-              const roleBg: Record<string,string> = { admin:'#f3e8ff', objektleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)' }
+              const roleColor: Record<string,string> = { admin:'#7c3aed', objektleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
+              const roleBg: Record<string,string> = { admin:'#f3e8ff', objektleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
               return (
                 <div key={m.id}
                   onClick={() => setSelectedMember(m)}
@@ -1802,6 +1802,10 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
   const [showEdit, setShowEdit]               = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting]               = useState(false)
+  const [olList, setOlList]                   = useState<{id:string;full_name:string}[]>([])
+  const [currentOl, setCurrentOl]             = useState<string|null>(obj.objektleiter_id ?? null)
+  const [olSaving, setOlSaving]               = useState(false)
+  const [olMsg, setOlMsg]                     = useState<string|null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -1826,10 +1830,32 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       ])
       setCustomer(custRes.data)
       setUpcomingAssigns(assignRes.data || [])
+
+      // Load all users with objektleiter role for the dropdown
+      const { data: olData } = await supabase
+        .from('users')
+        .select('id,full_name,role_id,roles(name)')
+        .eq('is_active', true)
+        .order('full_name')
+      const ols = (olData || []).filter((u: any) => u.roles?.name === 'objektleiter')
+      setOlList(ols.map((u: any) => ({ id: u.id, full_name: u.full_name })))
+
       setLoadingDetail(false)
     }
     load()
   }, [obj.id, tasks.length])
+
+  const handleOlChange = async (newId: string | null) => {
+    setOlSaving(true)
+    const { error } = await supabase.from('objects').update({ objektleiter_id: newId }).eq('id', obj.id)
+    if (!error) {
+      setCurrentOl(newId)
+      onObjectUpdated({ ...obj, objektleiter_id: newId })
+      setOlMsg('Objektleiter gespeichert')
+      setTimeout(() => setOlMsg(null), 2500)
+    }
+    setOlSaving(false)
+  }
 
   return (
     <div style={{ paddingBottom: 100 }}>
@@ -1895,6 +1921,49 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             postalCode={obj.postal_code}
           />
           </Suspense>
+        </div>
+
+        {/* ── Objektleiter-Zuweisung ── */}
+        <div style={{ background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', padding:'14px 16px', marginBottom:14 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>manage_accounts</span>
+            <span style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>Objektleiter</span>
+          </div>
+          {olList.length === 0 ? (
+            <div style={{ fontSize:13, color:'var(--txt-muted)' }}>
+              Noch keine Mitarbeiter mit Objektleiter-Rolle vorhanden.
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+              <div
+                onClick={() => handleOlChange(null)}
+                style={{ padding:'7px 14px', borderRadius:20, fontSize:13, fontWeight:600, cursor:'pointer',
+                  border: `1.5px solid ${currentOl === null ? 'var(--pri)' : 'var(--outline)'}`,
+                  background: currentOl === null ? 'var(--pri-xl)' : 'var(--surf-low)',
+                  color: currentOl === null ? 'var(--pri)' : 'var(--txt-muted)' }}
+              >
+                Keiner
+              </div>
+              {olList.map(ol => (
+                <div
+                  key={ol.id}
+                  onClick={() => !olSaving && handleOlChange(ol.id)}
+                  style={{ padding:'7px 14px', borderRadius:20, fontSize:13, fontWeight:600, cursor:olSaving?'wait':'pointer',
+                    border: `1.5px solid ${currentOl === ol.id ? 'var(--pri)' : 'var(--outline)'}`,
+                    background: currentOl === ol.id ? 'var(--pri-xl)' : 'var(--surf-low)',
+                    color: currentOl === ol.id ? 'var(--pri)' : 'var(--txt-muted)' }}
+                >
+                  {currentOl === ol.id && <span className="material-symbols-outlined" style={{ fontSize:14, verticalAlign:'middle', marginRight:4 }}>check</span>}
+                  {ol.full_name}
+                </div>
+              ))}
+            </div>
+          )}
+          {olMsg && (
+            <div style={{ marginTop:8, fontSize:12, color:'var(--ok)', display:'flex', alignItems:'center', gap:4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:14 }}>check_circle</span>{olMsg}
+            </div>
+          )}
         </div>
 
         {/* ── Leistungen ── */}
@@ -5723,7 +5792,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
             <div>
               <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rolle</label>
               <div style={{ display:'flex', gap:8 }}>
-                {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'},{val:'admin',icon:'admin_panel_settings',label:'Admin'}] as const).map(r=>(
+                {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'},{val:'admin',icon:'admin_panel_settings',label:'Admin'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
                   <div key={r.val} onClick={()=>setInviteRole(r.val)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 6px', borderRadius:12, border:`1.5px solid ${inviteRole===r.val?'var(--pri)':'var(--outline)'}`, background:inviteRole===r.val?'var(--pri-xl)':'var(--surf-low)', cursor:'pointer', transition:'all 0.15s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize:20, color:inviteRole===r.val?'var(--pri)':'var(--txt-muted)' }}>{r.icon}</span>
                     <span style={{ fontSize:11, fontWeight:700, color:inviteRole===r.val?'var(--pri)':'var(--txt-muted)', textAlign:'center' }}>{r.label}</span>
@@ -5751,7 +5820,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
             <div>
               <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rolle</label>
               <div style={{ display:'flex', gap:8 }}>
-                {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'}] as const).map(r=>(
+                {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
                   <div key={r.val} onClick={()=>setLinkRole(r.val)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 6px', borderRadius:12, border:`1.5px solid ${linkRole===r.val?'var(--pri)':'var(--outline)'}`, background:linkRole===r.val?'var(--pri-xl)':'var(--surf-low)', cursor:'pointer', transition:'all 0.15s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize:20, color:linkRole===r.val?'var(--pri)':'var(--txt-muted)' }}>{r.icon}</span>
                     <span style={{ fontSize:11, fontWeight:700, color:linkRole===r.val?'var(--pri)':'var(--txt-muted)' }}>{r.label}</span>
@@ -5873,7 +5942,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
                 <div>
                   <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rolle *</label>
                   <div style={{ display:'flex', gap:8 }}>
-                    {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'},{val:'admin',icon:'admin_panel_settings',label:'Admin'}] as const).map(r=>(
+                    {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'},{val:'admin',icon:'admin_panel_settings',label:'Admin'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
                       <div key={r.val} onClick={()=>setManualRole(r.val)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 6px', borderRadius:12, border:`1.5px solid ${manualRole===r.val?'var(--pri)':'var(--outline)'}`, background:manualRole===r.val?'var(--pri-xl)':'var(--surf-low)', cursor:'pointer', transition:'all 0.15s' }}>
                         <span className="material-symbols-outlined" style={{ fontSize:20, color:manualRole===r.val?'var(--pri)':'var(--txt-muted)' }}>{r.icon}</span>
                         <span style={{ fontSize:11, fontWeight:700, color:manualRole===r.val?'var(--pri)':'var(--txt-muted)', textAlign:'center' }}>{r.label}</span>
@@ -5985,7 +6054,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
   const [roleChanging, setRoleChanging] = useState(false)
   const [roleMsg, setRoleMsg] = useState<{ok:boolean;text:string}|null>(null)
 
-  const handleRoleChange = async (newRole: 'admin'|'mitarbeiter') => {
+  const handleRoleChange = async (newRole: 'admin'|'mitarbeiter'|'objektleiter'|'support') => {
     if (newRole === currentRole) return
     setRoleChanging(true); setRoleMsg(null)
     const { data: roleRow } = await supabase.from('roles').select('id').eq('name', newRole).single()
@@ -6001,9 +6070,9 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
 
   const ini = member.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
   const role = member.role_name ?? 'mitarbeiter'
-  const roleLabel: Record<string,string> = { admin:'Administrator', objektleiter:'Objektleiter', mitarbeiter:'Mitarbeiter' }
-  const roleColor: Record<string,string> = { admin:'#7c3aed', objektleiter:'#0369a1', mitarbeiter:'var(--pri)' }
-  const roleBg: Record<string,string>    = { admin:'#f3e8ff', objektleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)' }
+  const roleLabel: Record<string,string> = { admin:'Administrator', objektleiter:'Objektleiter', mitarbeiter:'Mitarbeiter', support:'Support' }
+  const roleColor: Record<string,string> = { admin:'#7c3aed', objektleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
+  const roleBg: Record<string,string>    = { admin:'#f3e8ff', objektleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
 
   const toggleDay = (key: string) =>
     setWorkDays(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key])
@@ -6495,18 +6564,21 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
           <div style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)' }}>Rolle</div>
           <div style={{ padding:'14px 16px', display:'flex', flexDirection:'column', gap:12 }}>
             <div style={{ display:'flex', gap:8 }}>
-              {(['mitarbeiter','admin'] as const).map(r => {
-                const isActive = currentRole === r
-                const label = r === 'admin' ? 'Administrator' : 'Mitarbeiter'
-                const icon  = r === 'admin' ? 'admin_panel_settings' : 'badge'
+              {([
+                {val:'mitarbeiter', label:'Mitarbeiter',  icon:'badge'},
+                {val:'objektleiter',label:'Objektleiter', icon:'manage_accounts'},
+                {val:'admin',       label:'Administrator',icon:'admin_panel_settings'},
+                {val:'support',     label:'Support',      icon:'support_agent'},
+              ] as const).map(r => {
+                const isActive = currentRole === r.val
                 return (
-                  <button key={r} onClick={() => handleRoleChange(r)} disabled={roleChanging}
+                  <button key={r.val} onClick={() => handleRoleChange(r.val)} disabled={roleChanging}
                     style={{ flex:1, padding:'11px 8px', borderRadius:12, border:`1.5px solid ${isActive?'var(--pri)':'var(--outline)'}`,
                       background: isActive?'var(--pri-xl)':'transparent', color: isActive?'var(--pri)':'var(--txt-muted)',
-                      fontWeight:700, fontSize:13, cursor:roleChanging?'wait':'pointer',
-                      display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.15s' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:16 }}>{icon}</span>
-                    {label}
+                      fontWeight:700, fontSize:12, cursor:roleChanging?'wait':'pointer',
+                      display:'flex', alignItems:'center', justifyContent:'center', gap:4, transition:'all 0.15s' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:16 }}>{r.icon}</span>
+                    {r.label}
                     {isActive && <span className="material-symbols-outlined" style={{ fontSize:14, marginLeft:2 }}>check</span>}
                   </button>
                 )

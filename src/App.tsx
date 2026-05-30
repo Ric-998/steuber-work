@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import TaskList from './pages/TaskList'
 import Dashboard from './pages/Dashboard'
 import RegisterPage from './pages/RegisterPage'
+import SupportDashboard from './pages/SupportDashboard'
+import ObjektleiterDashboard from './pages/ObjektleiterDashboard'
 import './styles/global.css'
 import CustomerStatusPage from './pages/CustomerStatusPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -103,6 +105,11 @@ export default function App() {
 
   const effectiveRole = devViewOverride || profile.role_name
   const isAdmin = effectiveRole === 'admin'
+  const isSupport = effectiveRole === 'support'
+
+  if (isSupport) return <SupportDashboard />
+  const isObjektleiter = effectiveRole === 'objektleiter'
+  if (isObjektleiter) return <ObjektleiterDashboard userId={profile.id} userName={profile.full_name} onLogout={handleLogout} />
 
   return (
     <div style={{ position:'relative' }}>

@@ -4,6 +4,7 @@ import { OnboardingTour, InstallGuide, useOnboarding, resetTour } from '../compo
 import { WasIstNeu } from '../components/WasIstNeu'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import BugReport from '../components/BugReport'
+import FeedbackSheet from '../components/FeedbackSheet'
 import { ChatTab, useChatUnread } from '../components/Chat'
 const MapView = lazy(() => import('../components/MapView'))
 import { registerServiceWorker, subscribeToPush, unsubscribeFromPush, isPushSubscribed, isPushSupported } from '../lib/push'
@@ -143,7 +144,22 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   const firstName = userName.split(' ')[0]
   const { show: showTour, setShow: setShowTour } = useOnboarding()
   const [showBugReport, setShowBugReport] = useState(false)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [showFeedbackNudge, setShowFeedbackNudge] = useState(false)
   const initials = userName.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()
+
+  // Feedback-Nudge: nach jeweils 10 App-Öffnungen Toast zeigen
+  useEffect(() => {
+    const KEY_COUNT = 'sw_app_opens'
+    const KEY_LAST = 'sw_nudge_last'
+    const count = parseInt(localStorage.getItem(KEY_COUNT) || '0') + 1
+    localStorage.setItem(KEY_COUNT, String(count))
+    const lastNudge = parseInt(localStorage.getItem(KEY_LAST) || '0')
+    if (count - lastNudge >= 10) {
+      localStorage.setItem(KEY_LAST, String(count))
+      setTimeout(() => setShowFeedbackNudge(true), 3000)
+    }
+  }, [])
 
   useEffect(() => {
     fetchAssignments()
@@ -853,7 +869,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
         {activeTab === 'zeit' && <ZeitTab userId={userId} myLeaves={myLeaves} vacationDaysPerYear={vacationDaysPerYear} assignments={assignments} onLeavesChanged={fetchMyLeaves} availableVertretungen={availableVertretungen} ownVertretungen={ownVertretungen} onTakeOver={takeOverVertretung} onCancelVertretung={cancelVertretung} takingOver={takingOver} cancellingVertretung={cancellingVertretung} />}
         {activeTab === 'chat' && <ChatTab currentUserName={userName} currentUserId={userId} />}
-        {activeTab === 'profile' && <ProfileTab userName={userName} initials={initials} onLogout={onLogout} userId={userId} pushEnabled={pushEnabled} pushSupported={pushSupported} onTogglePush={togglePush} onBugReport={()=>setShowBugReport(true)} />}
+        {activeTab === 'profile' && <ProfileTab userName={userName} initials={initials} onLogout={onLogout} userId={userId} pushEnabled={pushEnabled} pushSupported={pushSupported} onTogglePush={togglePush} onBugReport={()=>setShowBugReport(true)} onFeedback={()=>setShowFeedback(true)} />}
       </div>
       {/* MonthSheet */}
       <MonthSheet
@@ -1208,6 +1224,40 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
       {/* Bug Report */}
       {showBugReport && <BugReport userId={userId} onClose={()=>setShowBugReport(false)} />}
+      {showFeedback && <FeedbackSheet onClose={()=>setShowFeedback(false)} />}
+
+      {/* Feedback-Nudge Toast */}
+      {showFeedbackNudge && (
+        <div style={{
+          position:'fixed', bottom: 88, left: 12, right: 12, zIndex: 1200,
+          background: '#085d68', borderRadius: 16, padding: '14px 16px',
+          display: 'flex', alignItems: 'center', gap: 12,
+          boxShadow: '0 8px 32px rgba(8,93,104,0.35)',
+          animation: 'slideUp 0.3s ease',
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#a8ece8', flexShrink: 0 }}>lightbulb</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Hast du Ideen oder Feedback?</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>Hilf uns, die App besser zu machen</div>
+          </div>
+          <button
+            onClick={() => { setShowFeedbackNudge(false); setShowFeedback(true) }}
+            style={{ padding: '7px 14px', borderRadius: 10, border: 'none',
+              background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 13,
+              fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+          >
+            Ja →
+          </button>
+          <button
+            onClick={() => setShowFeedbackNudge(false)}
+            style={{ width: 28, height: 28, borderRadius: 14, border: 'none',
+              background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+          </button>
+        </div>
+      )}
       <PWAInstallBanner />
 
       {/* Success / Warning Toast */}
@@ -2308,9 +2358,9 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
 }
 
 
-function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSupported, onTogglePush, onBugReport }: {
+function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSupported, onTogglePush, onBugReport, onFeedback }: {
   userName:string; initials:string; onLogout:()=>void; userId:string;
-  pushEnabled:boolean; pushSupported:boolean; onTogglePush:()=>void; onBugReport:()=>void
+  pushEnabled:boolean; pushSupported:boolean; onTogglePush:()=>void; onBugReport:()=>void; onFeedback:()=>void
 }) {
   const [showGuide, setShowGuide] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
@@ -2668,8 +2718,10 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
       {/* ── Sonstiges ── */}
       <div style={{ background:'var(--surf-card)', borderRadius:18, overflow:'hidden',
         border:'1px solid var(--outline)', marginBottom:20 }}>
-        <Row icon="bug_report" iconBg="rgba(186,26,26,0.08)" label="Fehler melden"
-          sub="Problem in der App mitteilen" chevron onClick={onBugReport} last />
+        <Row icon="lightbulb" iconBg="rgba(217,119,6,0.08)" label="Feedback & Ideen"
+          sub="Fehler melden, Feature-Wünsche, Vorschläge" chevron onClick={onFeedback} />
+        <Row icon="bug_report" iconBg="rgba(186,26,26,0.08)" label="Fehler melden (alt)"
+          sub="Schnelle Fehlermeldung" chevron onClick={onBugReport} last />
       </div>
 
       {/* ── Logout ── */}
