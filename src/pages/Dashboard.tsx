@@ -3538,8 +3538,8 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
           <p style={{ ...s.sub, marginBottom: 20 }}>Die Objektnummer wird automatisch vergeben.</p>
 
           {/* PLZ + Ort nebeneinander */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <div style={{ flex: '0 0 120px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, marginBottom: 12 }}>
+            <div>
               <label style={s.fieldLabel}>PLZ *</label>
               <div style={{ ...s.inputWrap, borderColor: postal.length === 5 ? 'var(--pri)' : 'var(--outline)' }}>
                 {plzLoading
@@ -3554,9 +3554,9 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 />
               </div>
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ minWidth: 0 }}>
               <label style={s.fieldLabel}>Ort *{cityLocked && <span style={{ color: 'var(--pri)', fontWeight: 400, marginLeft: 4 }}>✓ auto</span>}</label>
-              <div style={s.inputWrap}>
+              <div style={{ ...s.inputWrap }}>
                 <span className="material-symbols-outlined icon-sm" style={{ color: 'var(--txt-muted)' }}>location_city</span>
                 <input
                   value={city}
@@ -4385,7 +4385,7 @@ const s: Record<string,React.CSSProperties> = {
   taskCard:      { background:'var(--surf-card)', borderRadius:16, padding:'14px', marginBottom:10, display:'flex', alignItems:'center', gap:12, boxShadow:'0 1px 8px rgba(9,106,112,0.05)' },
   taskIcon:      { width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
   chip:          { display:'flex', alignItems:'center', gap:4, fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999 },
-  fab:           { position:'fixed', right:24, bottom:28, width:56, height:56, borderRadius:'50%', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', border:'none', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 6px 20px rgba(9,106,112,0.35)', cursor:'pointer', zIndex:40 },
+  fab:           { position:'fixed', right:24, bottom:88, width:56, height:56, borderRadius:'50%', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', border:'none', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 6px 20px rgba(9,106,112,0.35)', cursor:'pointer', zIndex:250 },
   emptyState:    { display:'flex', flexDirection:'column', alignItems:'center', padding:'60px 20px', gap:12 },
   overlay:       { position:'absolute', inset:0, background:'var(--bg)', display:'flex', flexDirection:'column', zIndex:100, overflow:'hidden' },
   overlayHead:   { background:'var(--surf-card)', padding:'14px 18px', display:'flex', alignItems:'center', gap:12, borderBottom:'1px solid var(--outline)', flexShrink:0 },
@@ -4394,7 +4394,7 @@ const s: Record<string,React.CSSProperties> = {
   selectCard:    { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:14, border:'1.5px solid var(--outline)', cursor:'pointer', transition:'all 0.15s' },
   formCard:      { background:'var(--surf-card)', borderRadius:20, padding:20, marginBottom:24, boxShadow:'0 2px 16px rgba(9,106,112,0.07)' },
   fieldLabel:    { display:'block', fontSize:11, fontWeight:600, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 } as React.CSSProperties,
-  inputWrap:     { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' },
+  inputWrap:     { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', overflow:'hidden' },
   input:         { flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' },
   roleOpt:       { display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 8px', borderRadius:12, border:'1.5px solid var(--outline)', cursor:'pointer', flex:1 } as React.CSSProperties,
   btnPri:        { width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 14px rgba(9,106,112,0.25)', cursor:'pointer' } as React.CSSProperties,
