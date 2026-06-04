@@ -1969,7 +1969,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
   }
 
   return (
-    <div style={{ paddingBottom: 100 }}>
+    <div style={{ paddingBottom: 100, maxWidth:860, margin:'0 auto', width:'100%' }}>
       {/* Back header */}
       <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 0 12px' }}>
         <button onClick={onBack} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
@@ -2364,15 +2364,33 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
               <button onClick={() => setShowDeleteConfirm(false)} style={{ flex:1, padding:'14px', borderRadius:14, border:'1.5px solid var(--outline)', background:'var(--bg)', fontSize:14, fontWeight:700, cursor:'pointer' }}>Abbrechen</button>
               <button disabled={deleting} onClick={async () => {
                 setDeleting(true)
-                const { data: objTasks } = await supabase.from('tasks').select('id').eq('object_id', obj.id)
-                if (objTasks && objTasks.length > 0) {
-                  const taskIds = objTasks.map((t: any) => t.id)
-                  await supabase.from('task_assignments').delete().in('task_id', taskIds)
-                  await supabase.from('tasks').delete().eq('object_id', obj.id)
+                try {
+                  // 1. Tasks ermitteln
+                  const { data: objTasks } = await supabase.from('tasks').select('id').eq('object_id', obj.id)
+                  if (objTasks && objTasks.length > 0) {
+                    const taskIds = objTasks.map((t: any) => t.id)
+                    // 2. Task-Reports löschen (FK auf task_assignments)
+                    await supabase.from('task_reports').delete().in('task_id', taskIds)
+                    // 3. Task-Assignments löschen
+                    await supabase.from('task_assignments').delete().in('task_id', taskIds)
+                    // 4. Tasks löschen
+                    await supabase.from('tasks').delete().eq('object_id', obj.id)
+                  }
+                  // 5. Ansprechpartner (contact_persons mit object_id) löschen
+                  await supabase.from('contact_persons').delete().eq('object_id', obj.id)
+                  // 6. Leistungen löschen
+                  await supabase.from('object_services').delete().eq('object_id', obj.id)
+                  // 7. Objekt löschen
+                  const { error: delErr } = await supabase.from('objects').delete().eq('id', obj.id)
+                  if (delErr) throw delErr
+                  setShowDeleteConfirm(false)
+                  onObjectDeleted()
+                } catch (err: any) {
+                  console.error('Delete error:', err)
+                  alert('Fehler beim Löschen: ' + (err?.message || 'Unbekannter Fehler'))
+                } finally {
+                  setDeleting(false)
                 }
-                await supabase.from('object_services').delete().eq('object_id', obj.id)
-                await supabase.from('objects').delete().eq('id', obj.id)
-                setDeleting(false); setShowDeleteConfirm(false); onObjectDeleted()
               }} style={{ flex:1, padding:'14px', borderRadius:14, border:'none', background:'var(--err)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
                 {deleting ? 'Wird gelöscht…' : 'Endgültig löschen'}
               </button>
@@ -2466,10 +2484,15 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
     onSaved(data as unknown as ObjectItem)
   }
 
-  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+  const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' && window.innerWidth >= 768)
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:900, display:'flex', flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent:'center' }}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:900, display:'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent:'center' }}>
       <div style={{ background:'var(--bg)', borderRadius: isDesktop ? 20 : '24px 24px 0 0', maxHeight: isDesktop ? '90vh' : '92vh', width: isDesktop ? '100%' : undefined, maxWidth: isDesktop ? 680 : undefined, overflowY:'auto', paddingBottom: isDesktop ? 0 : 40 }}>
         {/* Header */}
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'20px 20px 16px', position:'sticky', top:0, background:'var(--bg)', borderBottom:'1px solid var(--outline)', zIndex:1 }}>
