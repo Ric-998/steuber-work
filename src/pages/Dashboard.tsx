@@ -4237,18 +4237,22 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   </div>
                 </div>
                 {/* Ansprechpartner – Multi-Liste */}
-                <div style={{ marginTop:8 }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                    <span style={{ display:'flex', alignItems:'center', gap:5 }}>
-                      <span className="material-symbols-outlined icon-sm">contacts</span>
-                      Ansprechpartner ({newContacts.length})
+                <div style={{ marginTop:16 }}>
+                  {/* Trennlinie + Label */}
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                    <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                    <span style={{ fontSize:11, fontWeight:800, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                      Ansprechpartner{newContacts.length > 0 ? ` (${newContacts.length})` : ''}
                     </span>
-                    {!showAddCp && (
-                      <button onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
-                        <span className="material-symbols-outlined icon-sm">add</span> Neu / Suchen
-                      </button>
-                    )}
+                    <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
                   </div>
+                  {!showAddCp && (
+                    <button onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }}
+                      style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'11px', borderRadius:12, border:'1.5px dashed var(--outline)', background:'var(--surf-low)', color:'var(--txt-muted)', fontSize:13, fontWeight:600, cursor:'pointer', marginBottom: newContacts.length > 0 ? 10 : 0 }}>
+                      <span className="material-symbols-outlined icon-sm">person_add</span>
+                      Ansprechpartner hinzufügen
+                    </button>
+                  )}
 
                   {/* Kontakt suchen */}
                   {!showAddCp && (
@@ -4544,18 +4548,22 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
               </>)}
 
               {/* Ansprechpartner – erst nach Typ-Auswahl */}
-              {newCustType && <div style={{ marginTop:8 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <span style={{ display:'flex', alignItems:'center', gap:5 }}>
-                    <span className="material-symbols-outlined icon-sm">contacts</span>
-                    Ansprechpartner ({newContacts.length})
+              {newCustType && <div style={{ marginTop:16 }}>
+                {/* Trennlinie + Label */}
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                  <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                  <span style={{ fontSize:11, fontWeight:800, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                    Ansprechpartner{newContacts.length > 0 ? ` (${newContacts.length})` : ''}
                   </span>
-                  {!showAddCp && (
-                    <button onClick={() => setShowAddCp(true)} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
-                      <span className="material-symbols-outlined icon-sm">add</span> Neu / Suchen
-                    </button>
-                  )}
+                  <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
                 </div>
+                {!showAddCp && (
+                  <button onClick={() => setShowAddCp(true)}
+                    style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'11px', borderRadius:12, border:'1.5px dashed var(--outline)', background:'var(--surf-low)', color:'var(--txt-muted)', fontSize:13, fontWeight:600, cursor:'pointer', marginBottom: newContacts.length > 0 ? 10 : 0 }}>
+                    <span className="material-symbols-outlined icon-sm">person_add</span>
+                    Ansprechpartner hinzufügen
+                  </button>
+                )}
 
                 {/* Bestehende Kontakte */}
                 {[...newContacts].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'','de')).map(cp => (
@@ -4883,18 +4891,22 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 </>)}
 
                 {/* Ansprechpartner */}
-                <div style={{ marginTop:8 }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                    <span style={{ display:'flex', alignItems:'center', gap:5 }}>
-                      <span className="material-symbols-outlined icon-sm">contacts</span>
-                      Ansprechpartner ({newContacts.length})
+                <div style={{ marginTop:16 }}>
+                  {/* Trennlinie + Label */}
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                    <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                    <span style={{ fontSize:11, fontWeight:800, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                      Ansprechpartner{newContacts.length > 0 ? ` (${newContacts.length})` : ''}
                     </span>
-                    {!showAddCp && (
-                      <button onClick={() => setShowAddCp(true)} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
-                        <span className="material-symbols-outlined icon-sm">add</span> Neu / Suchen
-                      </button>
-                    )}
+                    <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
                   </div>
+                  {!showAddCp && (
+                    <button onClick={() => setShowAddCp(true)}
+                      style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'11px', borderRadius:12, border:'1.5px dashed var(--outline)', background:'var(--surf-low)', color:'var(--txt-muted)', fontSize:13, fontWeight:600, cursor:'pointer', marginBottom: newContacts.length > 0 ? 10 : 0 }}>
+                      <span className="material-symbols-outlined icon-sm">person_add</span>
+                      Ansprechpartner hinzufügen
+                    </button>
+                  )}
 
                   {/* Bestehende Kontakte */}
                   {[...newContacts].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'','de')).map(cp => (
