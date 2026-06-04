@@ -123,6 +123,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
   const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'ansprechpartner'|'team'|'bericht'|'chat'|'profil'>('overview')
   const [showMoreSheet, setShowMoreSheet] = useState(false)
   const [objSearch, setObjSearch] = useState('')
+  const [objGroup, setObjGroup] = useState<'none'|'city'|'kunde'>('none')
   const [contactPersons, setContactPersons]   = useState<any[]>([])
   const [kundenSubTab, setKundenSubTab]       = useState<'kunden'|'ansprechpartner'>('kunden')
   const [cpSearch, setCpSearch]               = useState('')
@@ -857,56 +858,59 @@ export default function Dashboard({ userName, onLogout }: Props) {
                   <p style={{ fontSize:14, color:'var(--txt-muted)', textAlign:'center' }}>Kein Objekt gefunden</p>
                 </div>
               )
-              return <>{filtered.map(obj => {
-              const objTasks = tasks.filter(t => t.object_id === obj.id)
-              const activeTasks = objTasks.filter(t => t.is_active).length
-              const OBJ_TYPE_ICON: Record<string, string> = {
-                einfamilienhaus:  'house',
-                mehrfamilienhaus: 'apartment',
-                firmengelaende:   'business',
-                grundstueck:      'landscape',
+              // Grouping
+              const grouped: Record<string, typeof filtered> = {}
+              if (objGroup === 'city') {
+                filtered.forEach(o => { const k = o.city||'Unbekannt'; if(!grouped[k]) grouped[k]=[]; grouped[k].push(o) })
+              } else if (objGroup === 'kunde') {
+                filtered.forEach(o => { const k = o.customers?.name||'Ohne Kunde'; if(!grouped[k]) grouped[k]=[]; grouped[k].push(o) })
+              } else {
+                filtered.forEach(o => { const k = (o.address?.[0]||'#').toUpperCase(); if(!grouped[k]) grouped[k]=[]; grouped[k].push(o) })
               }
-              const typeIcon = OBJ_TYPE_ICON[obj.object_type ?? 'mehrfamilienhaus'] ?? 'apartment'
-              return (
-                <div key={obj.id} onClick={()=>setSelectedObject(obj)}
-                  style={{ ...s.taskCard, cursor:'pointer', marginBottom:10 }}>
-                  <div style={{ width:46, height:46, borderRadius:14, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                    <span className="material-symbols-outlined" style={{ color:'var(--pri)', fontSize:22 }}>{typeIcon}</span>
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:2 }}>
-                      {obj.address}, {obj.postal_code} {obj.city}
+              const groupKeys = Object.keys(grouped).sort()
+              const OBJ_TYPE_ICON: Record<string, string> = { einfamilienhaus:'house', mehrfamilienhaus:'apartment', firmengelaende:'business', grundstueck:'landscape' }
+              return (<>{groupKeys.map(groupKey => (
+                <div key={groupKey}>
+                  {objGroup !== 'none' && (
+                    <div style={{ fontSize:11, fontWeight:800, color:'var(--txt-muted)', letterSpacing:'0.08em', padding:'10px 0 5px', borderBottom:'1px solid var(--outline)', marginBottom:8, display:'flex', alignItems:'center', gap:6, textTransform:'uppercase' }}>
+                      <span>{groupKey}</span>
+                      <span style={{ fontWeight:500, fontSize:10 }}>({grouped[groupKey].length})</span>
                     </div>
-                    {obj.object_number && (
-                      <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:2 }}>
-                        {obj.object_number}
+                  )}
+                  {grouped[groupKey].map(obj => {
+                    const objTasks = tasks.filter(t => t.object_id === obj.id)
+                    const activeTasks = objTasks.filter(t => t.is_active).length
+                    const typeIcon = OBJ_TYPE_ICON[obj.object_type ?? 'mehrfamilienhaus'] ?? 'apartment'
+                    return (
+                      <div key={obj.id} onClick={()=>setSelectedObject(obj)}
+                        style={{ ...s.taskCard, cursor:'pointer', marginBottom:10 }}>
+                        <div style={{ width:46, height:46, borderRadius:14, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <span className="material-symbols-outlined" style={{ color:'var(--pri)', fontSize:22 }}>{typeIcon}</span>
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:2 }}>
+                            {obj.address}, {obj.postal_code} {obj.city}
+                          </div>
+                          {obj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:2 }}>{obj.object_number}</div>}
+                          {obj.customers?.name && (
+                            <div style={{ fontSize:11, color:'var(--pri)', marginTop:2, fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
+                              <span className="material-symbols-outlined icon-sm">business</span>{obj.customers.name}
+                            </div>
+                          )}
+                          <div style={{ display:'flex', gap:6, marginTop:6 }}>
+                            {activeTasks > 0 && <span style={{ ...s.chip, background:'var(--pri-xl)', color:'var(--pri)', fontSize:10 }}><span className="material-symbols-outlined icon-sm">task_alt</span>{activeTasks} Aufgabe{activeTasks !== 1 ? 'n' : ''}</span>}
+                            {!obj.is_active && <span style={{ ...s.chip, background:'var(--surf-high)', color:'var(--txt-muted)', fontSize:10 }}>Inaktiv</span>}
+                          </div>
+                        </div>
+                        <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:20, flexShrink:0 }}>chevron_right</span>
                       </div>
-                    )}
-                    {obj.customers?.name && (
-                      <div style={{ fontSize:11, color:'var(--pri)', marginTop:2, fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
-                        <span className="material-symbols-outlined icon-sm">business</span>
-                        {obj.customers.name}
-                      </div>
-                    )}
-                    <div style={{ display:'flex', gap:6, marginTop:6 }}>
-                      {activeTasks > 0 && (
-                        <span style={{ ...s.chip, background:'var(--pri-xl)', color:'var(--pri)', fontSize:10 }}>
-                          <span className="material-symbols-outlined icon-sm">task_alt</span>
-                          {activeTasks} Aufgabe{activeTasks !== 1 ? 'n' : ''}
-                        </span>
-                      )}
-                      {!obj.is_active && (
-                        <span style={{ ...s.chip, background:'var(--surf-high)', color:'var(--txt-muted)', fontSize:10 }}>Inaktiv</span>
-                      )}
-                    </div>
-                  </div>
-                  <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:20, flexShrink:0 }}>chevron_right</span>
+                    )
+                  })}
                 </div>
-              )
-            })}
+              ))}
               <div style={{ height:80 }}/>
             </>
-          })()}
+          )})()}
           </>
         )}
 
@@ -947,7 +951,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             customer={selectedCustomer}
             objects={objects.filter(o => o.customer_id === selectedCustomer.id)}
             onBack={() => setSelectedCustomer(null)}
-            onUpdated={c => { setCustomers(prev => prev.map(x => x.id===c.id?c:x)); setSelectedCustomer(c) }}
+            onUpdated={c => { setCustomers(prev => prev.map(x => x.id===c.id?c:x)); setSelectedCustomer(c); showToast('✔ Kunde gespeichert', 'ok') }}
             onDeleted={() => { setCustomers(prev => prev.filter(x => x.id!==selectedCustomer.id)); setSelectedCustomer(null) }}
             onObjectClick={obj => { setTab('objekte'); setSelectedObject(obj) }}
           />
@@ -1665,6 +1669,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {showTodayOverlay && (
         <TodayTasksOverlay
           tasks={tasks}
+          assignments={dailyReport?.assignments ?? []}
           team={team}
           today={localToday()}
           onClose={() => setShowTodayOverlay(false)}
@@ -1826,7 +1831,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
           objects={objects}
           team={team.filter(m=>m.is_active && m.role_name!=='admin')}
           onClose={()=>setEditTask(null)}
-          onSaved={()=>{ setEditTask(null); loadAll() }}
+          onSaved={()=>{ setEditTask(null); loadAll(); showToast('✔ Aufgabe gespeichert', 'ok') }}
           isDesktop={isDesktop}
         />
       )}
@@ -1835,7 +1840,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {showObjCreate && (
         <CreateObjectOverlay
           onClose={()=>setShowObjCreate(false)}
-          onSaved={()=>{ setShowObjCreate(false); loadAll() }}
+          onSaved={()=>{ setShowObjCreate(false); loadAll(); showToast('✔ Objekt gespeichert', 'ok') }}
           team={team.filter(m=>m.is_active)}
           isDesktop={isDesktop}
         />
@@ -5479,8 +5484,22 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
           {(customer.street || customer.postal_code) && (
             <Row icon="home" label="Adresse">{customer.street}{customer.postal_code ? `, ${customer.postal_code} ${customer.city}` : ''}</Row>
           )}
-          {customer.phone && <Row icon="phone" label="Telefon"><a href={`tel:${customer.phone}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.phone}</a></Row>}
-          {customer.email && <Row icon="mail" label="E-Mail"><a href={`mailto:${customer.email}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.email}</a></Row>}
+          {(customer.phone || customer.email) && (
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {customer.phone && (
+                <a href={`tel:${customer.phone}`} style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:12, background:'var(--ok-bg)', color:'#2e7d32', textDecoration:'none', fontSize:13, fontWeight:700 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18 }}>phone</span>
+                  {customer.phone}
+                </a>
+              )}
+              {customer.email && (
+                <a href={`mailto:${customer.email}`} style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:12, background:'#e3f2fd', color:'#1565c0', textDecoration:'none', fontSize:13, fontWeight:700 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18 }}>mail</span>
+                  {customer.email}
+                </a>
+              )}
+            </div>
+          )}
           {customer.notes && <Row icon="notes" label="Notizen"><span style={{ color:'var(--txt-sec)', lineHeight:1.5 }}>{customer.notes}</span></Row>}
           {/* WEG-spezifisch: Hausverwaltung + c/o */}
           {customer.customer_type === 'weg-verwaltung' && customer.hausverwaltung && (
@@ -5528,9 +5547,17 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:700 }}>{cp.name}</div>
                 {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{cp.role}</div>}
-                <div style={{ display:'flex', gap:10, marginTop:4, flexWrap:'wrap' }}>
-                  {cp.phone && <a href={`tel:${cp.phone}`} style={{ fontSize:12, color:'var(--pri)', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined icon-sm">phone</span>{cp.phone}</a>}
-                  {cp.email && <a href={`mailto:${cp.email}`} style={{ fontSize:12, color:'var(--pri)', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined icon-sm">mail</span>{cp.email}</a>}
+                <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+                  {cp.phone && (
+                    <a href={`tel:${cp.phone}`} style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 11px', borderRadius:10, background:'var(--ok-bg)', color:'#2e7d32', textDecoration:'none', fontSize:12, fontWeight:700 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:15 }}>phone</span>{cp.phone}
+                    </a>
+                  )}
+                  {cp.email && (
+                    <a href={`mailto:${cp.email}`} style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 11px', borderRadius:10, background:'#e3f2fd', color:'#1565c0', textDecoration:'none', fontSize:12, fontWeight:700 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:15 }}>mail</span>{cp.email}
+                    </a>
+                  )}
                 </div>
               </div>
               <button onClick={() => setEditContact(cp)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex', padding:4 }}>
@@ -7447,17 +7474,35 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
 }
 
 // ─── TodayTasksOverlay ────────────────────────────────────────────────────────
-function TodayTasksOverlay({ tasks, team, today, onClose, onEditTask }: {
-  tasks: TaskItem[]; team: TeamMember[]; today: string
+function TodayTasksOverlay({ tasks, assignments, team, today, onClose, onEditTask }: {
+  tasks: TaskItem[]; assignments: any[]; team: TeamMember[]; today: string
   onClose: () => void; onEditTask: (t: TaskItem) => void
 }) {
+  // Use real assignments if available, fall back to task-based view
+  const hasAssignments = assignments.length > 0
+  const todayAssignments = assignments.filter((a: any) => a.due_date === today || !a.due_date)
+
+  // For task-based fallback
   const todayTasks = tasks.filter(t => t.is_active && (t.due_date ?? '') <= today && (!t.end_date || t.end_date >= today))
-  const byObject = todayTasks.reduce<Record<string, { label: string; items: TaskItem[] }>>((acc, t) => {
-    const key = (t as any).objects?.name || (t as any).objects?.address || 'Ohne Objekt'
+
+  const STATUS_META: Record<string, {label:string;bg:string;color:string;icon:string}> = {
+    offen:     { label:'Offen',     bg:'var(--surf-high)', color:'var(--txt-muted)', icon:'radio_button_unchecked' },
+    in_arbeit: { label:'In Arbeit', bg:'#fff3cd',          color:'#b45309',          icon:'pending' },
+    erledigt:  { label:'Erledigt',  bg:'var(--ok-bg)',     color:'var(--ok)',         icon:'check_circle' },
+    problem:   { label:'Problem',   bg:'#ffdad6',          color:'var(--err-dot)',    icon:'error' },
+  }
+
+  // Group assignments by object
+  const byObject = (hasAssignments ? todayAssignments : todayTasks).reduce<Record<string, { label: string; items: any[] }>>((acc, item) => {
+    const key = item.tasks?.objects?.name || item.tasks?.objects?.address
+      || (item as any).objects?.name || (item as any).objects?.address || 'Ohne Objekt'
     if (!acc[key]) acc[key] = { label: key, items: [] }
-    acc[key].items.push(t)
+    acc[key].items.push(item)
     return acc
   }, {})
+
+  const totalItems = hasAssignments ? todayAssignments.length : todayTasks.length
+  const doneCount = hasAssignments ? todayAssignments.filter((a:any) => a.status === 'erledigt').length : 0
 
   const INTERVAL_COLOR: Record<string,string> = { täglich:'var(--pri)', wöchentlich:'#0369a1', monatlich:'#7c3aed', quartalsweise:'#0f766e', einmalig:'#92400e' }
   const INTERVAL_BG: Record<string,string>    = { täglich:'var(--pri-xl)', wöchentlich:'#e0f2fe', monatlich:'#f3e8ff', quartalsweise:'#ccfbf1', einmalig:'#fff8e6' }
@@ -7475,40 +7520,50 @@ function TodayTasksOverlay({ tasks, team, today, onClose, onEditTask }: {
             {new Date(today).toLocaleDateString('de-DE', { weekday:'long', day:'numeric', month:'long' })}
           </div>
         </div>
-        <div style={{ fontSize:13, fontWeight:700, color:'#92400e', background:'#fff8e6', borderRadius:20, padding:'5px 12px' }}>{todayTasks.length} Aufgaben</div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          {hasAssignments && doneCount > 0 && <span style={{ fontSize:13, fontWeight:700, color:'var(--ok)', background:'var(--ok-bg)', borderRadius:20, padding:'5px 12px' }}>{doneCount} ✓</span>}
+          <div style={{ fontSize:13, fontWeight:700, color:'#92400e', background:'#fff8e6', borderRadius:20, padding:'5px 12px' }}>{totalItems} Aufgaben</div>
+        </div>
       </div>
 
       {/* Body */}
       <div style={{ height:0, flex:1, overflowY:'auto', padding:20 }}>
-        {todayTasks.length === 0 ? (
+        {totalItems === 0 ? (
           <div style={{ textAlign:'center', padding:'60px 20px' }}>
             <span className="material-symbols-outlined" style={{ fontSize:48, color:'var(--ok)', display:'block', marginBottom:12 }}>task_alt</span>
-            <div style={{ fontSize:16, fontWeight:700, color:'var(--ok)' }}>Alle erledigt – freier Tag!</div>
+            <div style={{ fontSize:16, fontWeight:700, color:'var(--ok)' }}>Keine Aufgaben für heute</div>
           </div>
         ) : Object.values(byObject).map(({ label, items }) => (
           <div key={label} style={{ marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
               <span className="material-symbols-outlined" style={{ fontSize:14 }}>apartment</span>{label}
             </div>
-            {items.map(t => {
-              const assignee = team.find(m => m.id === t.default_assignee_id)
-              const interval = t.interval ?? 'einmalig'
+            {items.map((item: any) => {
+              const isAssignment = hasAssignments
+              const title = isAssignment ? (item.tasks?.title ?? '–') : item.title
+              const interval = isAssignment ? (item.tasks?.interval ?? 'einmalig') : (item.interval ?? 'einmalig')
+              const assignee = team.find(m => m.id === (isAssignment ? item.user_id : item.default_assignee_id))
+              const status = isAssignment ? item.status : null
+              const st = status ? STATUS_META[status] : null
+              const task = isAssignment ? null : item as TaskItem
               return (
-                <div key={t.id}
-                  onClick={() => onEditTask(t)}
-                  style={{ background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:12, cursor:'pointer', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', transition:'box-shadow 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 14px rgba(9,106,112,0.12)')}
-                  onMouseLeave={e => (e.currentTarget.style.boxShadow='0 1px 4px rgba(0,0,0,0.06)')}
+                <div key={item.id}
+                  onClick={() => { if (task) onEditTask(task) }}
+                  style={{ background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, display:'flex', alignItems:'center', gap:12, cursor: task ? 'pointer' : 'default', boxShadow:'0 1px 4px rgba(0,0,0,0.06)', opacity: status === 'erledigt' ? 0.7 : 1 }}
                 >
-                  <div style={{ width:8, height:8, borderRadius:'50%', background: INTERVAL_COLOR[interval]??'var(--pri)', flexShrink:0 }} />
+                  {st ? (
+                    <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:st.color, flexShrink:0 }}>{st.icon}</span>
+                  ) : (
+                    <div style={{ width:8, height:8, borderRadius:'50%', background:'var(--pri)', flexShrink:0 }} />
+                  )}
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.title}</div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{title}</div>
                     <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, flexWrap:'wrap' }}>
-                      <span style={{ fontSize:11, fontWeight:700, color: INTERVAL_COLOR[interval], background: INTERVAL_BG[interval], borderRadius:20, padding:'2px 7px' }}>{interval}</span>
+                      {st && <span style={{ fontSize:11, fontWeight:700, color:st.color, background:st.bg, borderRadius:20, padding:'2px 7px' }}>{st.label}</span>}
                       {assignee && <span style={{ fontSize:11, color:'var(--txt-muted)' }}>→ {assignee.full_name}</span>}
                     </div>
                   </div>
-                  <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>edit</span>
+                  {task && <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>edit</span>}
                 </div>
               )
             })}
