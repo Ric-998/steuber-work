@@ -538,7 +538,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {!isDesktop && showMoreSheet && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:190, display:'flex', alignItems:'flex-end' }}
           onClick={() => setShowMoreSheet(false)}>
-          <div style={{ background:'var(--bg)', borderRadius:'20px 20px 0 0', width:'100%', paddingBottom:'env(safe-area-inset-bottom, 16px)' }}
+          <div style={{ background:'var(--bg)', borderRadius:'20px 20px 0 0', width:'100%', paddingBottom:'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 4px' }}>
               <div style={{ width:36, height:4, borderRadius:2, background:'var(--surf-high)' }}/>
