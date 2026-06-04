@@ -1593,10 +1593,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {showBugReport && <BugReport userId={currentUserId} onClose={()=>setShowBugReport(false)} />}
       <PWAInstallBanner />
 
-    {/* FAB – only on Aufträge tab */}
-      {tab === 'objekte' && !selectedObject && (
-        <button style={s.fab} onClick={()=>setShowCreate('')}>
-          <span className="material-symbols-outlined">add</span>
+    {/* FAB – Neue Aufgabe, nur Mobile, auf relevanten Tabs */}
+      {!isDesktop && !selectedObject && ['objekte','overview','kunden','ansprechpartner'].includes(tab) && (
+        <button style={{ ...s.fab, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, width:'auto', borderRadius:28, padding:'0 18px', height:52 }} onClick={()=>setShowCreate('')}>
+          <span className="material-symbols-outlined" style={{ fontSize:20 }}>add_task</span>
+          <span style={{ fontSize:9, fontWeight:800, letterSpacing:'0.04em', lineHeight:1 }}>AUFGABE</span>
         </button>
       )}
 
@@ -1858,6 +1859,18 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
   const [olSaving, setOlSaving]               = useState(false)
   const [olMsg, setOlMsg]                     = useState<string|null>(null)
 
+  const [objContacts, setObjContacts] = useState<any[]>([])
+  const [showAddObjCp, setShowAddObjCp] = useState(false)
+  const [objCpSearchQ, setObjCpSearchQ] = useState('')
+  const [objCpSearchRes, setObjCpSearchRes] = useState<any[]>([])
+  const [objCpSearching, setObjCpSearching] = useState(false)
+  const [newObjCpFn, setNewObjCpFn] = useState('')
+  const [newObjCpLn, setNewObjCpLn] = useState('')
+  const [newObjCpRole, setNewObjCpRole] = useState('')
+  const [newObjCpPhone, setNewObjCpPhone] = useState('')
+  const [newObjCpEmail, setNewObjCpEmail] = useState('')
+  const [objCpSaving, setObjCpSaving] = useState(false)
+
   useEffect(() => {
     const load = async () => {
       setLoadingDetail(true)
@@ -1891,6 +1904,13 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       const ols = (olData || []).filter((u: any) => u.roles?.name === 'objektleiter')
       setOlList(ols.map((u: any) => ({ id: u.id, full_name: u.full_name })))
 
+      // Contacts für dieses Objekt laden
+      supabase.from('contact_persons')
+        .select('id,name,first_name,last_name,role,phone,email')
+        .eq('object_id', obj.id)
+        .order('last_name')
+        .then(({ data }) => { if (data) setObjContacts(data) })
+
       setLoadingDetail(false)
     }
     load()
@@ -1906,6 +1926,46 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       setTimeout(() => setOlMsg(null), 2500)
     }
     setOlSaving(false)
+  }
+
+  const searchObjCp = async (q: string) => {
+    setObjCpSearchQ(q)
+    if (q.trim().length < 2) { setObjCpSearchRes([]); return }
+    setObjCpSearching(true)
+    const term = q.trim()
+    const [{ data: cpData }, { data: custData }] = await Promise.all([
+      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email').or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`).limit(5),
+      supabase.from('customers').select('id,name,first_name,last_name,email,phone').eq('customer_type','privatperson').or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`).limit(5),
+    ])
+    const results = [
+      ...(cpData||[]).map((r:any)=>({ _id:r.id, first_name:r.first_name||'', last_name:r.last_name||r.name||'', role:r.role||'', phone:r.phone||'', email:r.email||'' })),
+      ...(custData||[]).map((r:any)=>({ _id:'cust-'+r.id, first_name:r.first_name||'', last_name:r.last_name||r.name||'', role:'', phone:r.phone||'', email:r.email||'' })),
+    ]
+    setObjCpSearchRes(results.slice(0, 8))
+    setObjCpSearching(false)
+  }
+
+  const addObjCp = async (cp: {first_name:string;last_name:string;role:string;phone:string;email:string}) => {
+    if (!cp.last_name.trim() && !cp.first_name.trim()) return
+    setObjCpSaving(true)
+    const { data } = await supabase.from('contact_persons').insert({
+      object_id: obj.id,
+      customer_id: obj.customer_id,
+      name: `${cp.first_name} ${cp.last_name}`.trim(),
+      first_name: cp.first_name.trim() || null,
+      last_name: cp.last_name.trim() || null,
+      role: cp.role.trim() || null,
+      phone: cp.phone.trim() || null,
+      email: cp.email.trim() || null,
+    }).select('id,name,first_name,last_name,role,phone,email').single()
+    if (data) setObjContacts(prev => [...prev, data].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')))
+    setNewObjCpFn(''); setNewObjCpLn(''); setNewObjCpRole(''); setNewObjCpPhone(''); setNewObjCpEmail('')
+    setShowAddObjCp(false); setObjCpSaving(false)
+  }
+
+  const removeObjCp = async (id: string) => {
+    await supabase.from('contact_persons').delete().eq('id', id)
+    setObjContacts(prev => prev.filter(c => c.id !== id))
   }
 
   return (
@@ -1962,6 +2022,104 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             </div>
           </div>
         )}
+
+        {/* ── Ansprechpartner ── */}
+        <div style={{ background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', padding:'14px 16px', marginBottom:14 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: objContacts.length > 0 || showAddObjCp ? 12 : 0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>contacts</span>
+              <span style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>Ansprechpartner ({objContacts.length})</span>
+            </div>
+            {!showAddObjCp && (
+              <button onClick={() => setShowAddObjCp(true)} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'5px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+                <span className="material-symbols-outlined icon-sm">add</span> Hinzufügen
+              </button>
+            )}
+          </div>
+
+          {objContacts.map(cp => {
+            const dn = [cp.first_name, cp.last_name].filter(Boolean).join(' ') || cp.name || '–'
+            const ini = ((cp.first_name?.[0]||'')+(cp.last_name?.[0]||'')).toUpperCase() || '?'
+            return (
+              <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:10, background:'var(--surf-low)', marginBottom:6, border:'1px solid var(--outline)' }}>
+                <div style={{ width:32, height:32, borderRadius:10, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>{ini}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{dn}</div>
+                  {cp.role && <div style={{ fontSize:11, color:'var(--txt-sec)' }}>{cp.role}</div>}
+                  <div style={{ display:'flex', gap:10, marginTop:2 }}>
+                    {cp.phone && <a href={'tel:'+cp.phone} style={{ fontSize:11, color:'var(--pri)', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined" style={{ fontSize:13 }}>phone</span>{cp.phone}</a>}
+                    {cp.email && <a href={'mailto:'+cp.email} style={{ fontSize:11, color:'var(--pri)', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined" style={{ fontSize:13 }}>mail</span>{cp.email}</a>}
+                  </div>
+                </div>
+                <button onClick={() => removeObjCp(cp.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--err-dot)', padding:4, display:'flex', flexShrink:0 }}>
+                  <span className="material-symbols-outlined icon-sm">delete</span>
+                </button>
+              </div>
+            )
+          })}
+
+          {showAddObjCp && (
+            <div style={{ background:'var(--surf-low)', borderRadius:12, padding:12, border:'1.5px solid var(--pri)', marginTop: objContacts.length > 0 ? 8 : 0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-card)', marginBottom:8 }}>
+                <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
+                <input value={objCpSearchQ} onChange={e=>searchObjCp(e.target.value)} placeholder="Ansprechpartner suchen …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:13, color:'var(--txt)' }}/>
+                {objCpSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+                {objCpSearchQ && <button onClick={()=>{setObjCpSearchQ('');setObjCpSearchRes([])}} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
+              </div>
+              {objCpSearchRes.length > 0 && (
+                <div style={{ background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--outline)', marginBottom:8, overflow:'hidden' }}>
+                  {objCpSearchRes.map((cp:any) => (
+                    <div key={cp._id} onClick={()=>{ addObjCp({first_name:cp.first_name,last_name:cp.last_name,role:cp.role,phone:cp.phone,email:cp.email}); setObjCpSearchQ(''); setObjCpSearchRes([]) }}
+                      style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', borderBottom:'1px solid var(--outline)', cursor:'pointer' }}>
+                      <div style={{ width:28, height:28, borderRadius:8, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11 }}>
+                        {(cp.first_name?.[0]||cp.last_name?.[0]||'?').toUpperCase()}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:700 }}>{cp.first_name} {cp.last_name}</div>
+                        {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{cp.role}</div>}
+                      </div>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>add_circle</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize:11, fontWeight:700, color:'var(--pri)', marginBottom:8 }}>Neuer Ansprechpartner</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                <div><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Vorname</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
+                    <input value={newObjCpFn} onChange={e=>setNewObjCpFn(e.target.value)} placeholder="Max" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
+                  </div>
+                </div>
+                <div><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Nachname *</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
+                    <input value={newObjCpLn} onChange={e=>setNewObjCpLn(e.target.value)} placeholder="Mustermann" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginBottom:8 }}><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Funktion</label>
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
+                  <input value={newObjCpRole} onChange={e=>setNewObjCpRole(e.target.value)} placeholder="Hausmeister" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
+                </div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                <div><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Telefon</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
+                    <input value={newObjCpPhone} onChange={e=>setNewObjCpPhone(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
+                  </div>
+                </div>
+                <div><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>E-Mail</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
+                    <input value={newObjCpEmail} onChange={e=>setNewObjCpEmail(e.target.value)} placeholder="max@beispiel.de" inputMode="email" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button onClick={()=>{setShowAddObjCp(false);setNewObjCpFn('');setNewObjCpLn('');setNewObjCpRole('');setNewObjCpPhone('');setNewObjCpEmail('');setObjCpSearchQ('');setObjCpSearchRes([])}} style={{ flex:1, padding:'9px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:13, fontWeight:600, cursor:'pointer' }}>Abbrechen</button>
+                <button disabled={(!newObjCpFn.trim() && !newObjCpLn.trim()) || objCpSaving} onClick={()=>addObjCp({first_name:newObjCpFn,last_name:newObjCpLn,role:newObjCpRole,phone:newObjCpPhone,email:newObjCpEmail})} style={{ flex:1, padding:'9px', borderRadius:10, border:'none', background:(newObjCpFn.trim()||newObjCpLn.trim())&&!objCpSaving?'var(--pri)':'var(--outline)', color:'#fff', fontSize:13, fontWeight:700, cursor:(newObjCpFn.trim()||newObjCpLn.trim())&&!objCpSaving?'pointer':'not-allowed' }}>Hinzufügen</button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ── Karte ── */}
         <div style={{ marginBottom:14 }}>
@@ -2308,9 +2466,11 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
     onSaved(data as unknown as ObjectItem)
   }
 
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
+
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:900, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}>
-      <div style={{ background:'var(--bg)', borderRadius:'24px 24px 0 0', maxHeight:'92vh', overflowY:'auto', paddingBottom:40 }}>
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:900, display:'flex', flexDirection: isDesktop ? 'row' : 'column', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent:'center' }}>
+      <div style={{ background:'var(--bg)', borderRadius: isDesktop ? 20 : '24px 24px 0 0', maxHeight: isDesktop ? '90vh' : '92vh', width: isDesktop ? '100%' : undefined, maxWidth: isDesktop ? 680 : undefined, overflowY:'auto', paddingBottom: isDesktop ? 0 : 40 }}>
         {/* Header */}
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'20px 20px 16px', position:'sticky', top:0, background:'var(--bg)', borderBottom:'1px solid var(--outline)', zIndex:1 }}>
           <button onClick={onClose} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
@@ -2592,9 +2752,6 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
               </div>
             )}
 
-            <button onClick={()=>setShowNewObj(true)} style={{ ...s.btnOutline, width:'100%', marginBottom:20 }}>
-              <span className="material-symbols-outlined icon-sm">add_home</span> Neues Objekt anlegen
-            </button>
           </>
         )}
 
