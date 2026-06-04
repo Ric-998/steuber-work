@@ -6,7 +6,16 @@ import { ChatTab, useChatUnread } from '../components/Chat'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import { WasIstNeu } from '../components/WasIstNeu'
 import QRCode from '../components/QRCode'
-const MapView = lazy(() => import('../components/MapView'))
+const MapView = lazy(() =>
+  import('../components/MapView').catch(() => ({
+    default: () => (
+      <div style={{ height:160, borderRadius:16, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', gap:8, color:'var(--txt-muted)', fontSize:13 }}>
+        <span className="material-symbols-outlined" style={{ fontSize:20 }}>map</span>
+        Karte nicht verfügbar
+      </div>
+    )
+  }))
+)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Stats { heute_faellig:number; in_arbeit:number; gesamt_offen:number; diese_woche_done:number; probleme:number; probleme_heute:number }
