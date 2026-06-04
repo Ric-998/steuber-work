@@ -111,6 +111,10 @@ const MOTIVATIONS = [
 export default function Dashboard({ userName, onLogout }: Props) {
   const [motivation] = useState(() => MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)])
   const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'team'|'bericht'|'chat'|'profil'>('overview')
+  const [objSearch, setObjSearch] = useState('')
+  const [contactPersons, setContactPersons]   = useState<any[]>([])
+  const [kundenSubTab, setKundenSubTab]       = useState<'kunden'|'ansprechpartner'>('kunden')
+  const [cpSearch, setCpSearch]               = useState('')
   const [selectedObject, setSelectedObject] = useState<ObjectItem|null>(null)
   const [selectedProblem, setSelectedProblem] = useState<Problem|null>(null)
   const [showProblemsSheet, setShowProblemsSheet] = useState(false)
@@ -234,16 +238,17 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
   const loadAll = async () => {
     setLoading(true)
-    const [stRes, prRes, tmRes, tkRes, obRes, catRes, custRes, lvRes, bkRes] = await Promise.all([
+    const [stRes, prRes, tmRes, tkRes, obRes, catRes, custRes, lvRes, bkRes, cpRes] = await Promise.all([
       supabase.rpc('get_dashboard_stats'),
       supabase.rpc('get_dashboard_problems'),
       supabase.from('users').select('id,full_name,phone,email,is_active,role_id,street,postal_code,city,created_at,employed_since,work_days,work_hours_per_week,work_hours_type,hourly_wage,admin_setup_done,is_onboarded,vacation_days_per_year').order('full_name'),
       supabase.from('tasks').select('id,title,description,interval,is_active,due_date,end_date,category_id,object_id,contract_id,default_assignee_id,categories(name,emoji),objects(name,address,city),contracts(id,type,start_date,end_date,object_id,customer_id),users!tasks_default_assignee_id_fkey(full_name)').order('created_at',{ascending:false}),
       supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)').order('address'),
       supabase.from('categories').select('*').order('name'),
-      supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,contract_type,hausverwaltung_id,co_contact_id,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name'),
+      supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name'),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
       supabase.from('vacation_blackouts').select('*').order('from_date',{ascending:true}),
+      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,customers(id,name,customer_type)').order('last_name').order('name'),
     ])
     if (stRes.data) setStats(stRes.data)
     if (prRes.data) setProblems((prRes.data || []) as unknown as Problem[])
@@ -254,6 +259,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     if (custRes?.data) setCustomers(custRes.data as unknown as CustomerItem[])
     if (lvRes?.data) setLeaveRequests(lvRes.data as unknown as LeaveRequest[])
     if (bkRes?.data) setBlackouts(bkRes.data)
+    if (cpRes?.data) setContactPersons(cpRes.data)
 
     // Tauschbörse: assignments with status=vertretung
     const todayStr = new Date().toISOString().split('T')[0]
@@ -751,7 +757,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
         {/* ── OBJEKTE – Liste ── */}
         {tab === 'objekte' && !selectedObject && (
           <>
-            <section style={{ padding:'20px 0 16px', display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+            <section style={{ padding:'20px 0 12px', display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
               <div>
                 <h1 style={s.h1}>Objekte</h1>
                 <p style={s.sub}>{objects.length} Objekte · {tasks.filter(t=>t.is_active).length} aktive Aufgaben</p>
@@ -761,13 +767,45 @@ export default function Dashboard({ userName, onLogout }: Props) {
               </button>
             </section>
 
-            {loading ? <Loader/> : objects.length === 0 ? (
-              <div style={s.emptyState}>
-                <span className="material-symbols-outlined" style={{ fontSize:48, color:'var(--txt-muted)', opacity:0.3 }}>apartment</span>
-                <h3 style={{ fontSize:16, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt-muted)' }}>Noch keine Objekte</h3>
-                <p style={{ fontSize:13, color:'var(--txt-muted)', textAlign:'center', opacity:0.7, maxWidth:220 }}>Lege dein erstes Objekt über den Button an</p>
-              </div>
-            ) : objects.map(obj => {
+            {/* Suche */}
+            <div style={{ ...s.inputWrap, marginBottom:14 }}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
+              <input
+                value={objSearch}
+                onChange={e => setObjSearch(e.target.value)}
+                placeholder="Adresse, Ort, PLZ, Kunde, Objektnr. …"
+                style={{ ...s.input, fontSize:14 }}
+              />
+              {objSearch && (
+                <button onClick={()=>setObjSearch('')} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}>
+                  <span className="material-symbols-outlined icon-sm">close</span>
+                </button>
+              )}
+            </div>
+
+            {loading ? <Loader/> : (() => {
+              const q = objSearch.trim().toLowerCase()
+              const filtered = q ? objects.filter(o => {
+                const haystack = [
+                  o.address, o.city, o.postal_code, o.object_number,
+                  o.customers?.name, o.notes, o.access_note, o.floor_info
+                ].filter(Boolean).join(' ').toLowerCase()
+                return q.split(' ').filter(Boolean).every(word => haystack.includes(word))
+              }) : objects
+              if (objects.length === 0) return (
+                <div style={s.emptyState}>
+                  <span className="material-symbols-outlined" style={{ fontSize:48, color:'var(--txt-muted)', opacity:0.3 }}>apartment</span>
+                  <h3 style={{ fontSize:16, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt-muted)' }}>Noch keine Objekte</h3>
+                  <p style={{ fontSize:13, color:'var(--txt-muted)', textAlign:'center', opacity:0.7, maxWidth:220 }}>Lege dein erstes Objekt anlegen</p>
+                </div>
+              )
+              if (filtered.length === 0) return (
+                <div style={s.emptyState}>
+                  <span className="material-symbols-outlined" style={{ fontSize:40, color:'var(--txt-muted)', opacity:0.3 }}>search_off</span>
+                  <p style={{ fontSize:14, color:'var(--txt-muted)', textAlign:'center' }}>Kein Objekt gefunden</p>
+                </div>
+              )
+              return <>{filtered.map(obj => {
               const objTasks = tasks.filter(t => t.object_id === obj.id)
               const activeTasks = objTasks.filter(t => t.is_active).length
               const OBJ_TYPE_ICON: Record<string, string> = {
@@ -814,7 +852,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 </div>
               )
             })}
-            <div style={{ height:80 }}/>
+              <div style={{ height:80 }}/>
+            </>
+          })()}
           </>
         )}
 
@@ -843,12 +883,30 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
         {/* ── KUNDEN ── */}
         {tab === 'kunden' && !selectedCustomer && (
-          <KundenList
-            customers={customers}
-            objects={objects}
-            loading={loading}
-            onSelect={c => setSelectedCustomer(c)}
-          />
+          <>
+            {/* Sub-Navigation: Kunden | Ansprechpartner */}
+            <div style={{ display:'flex', gap:8, paddingTop:16, paddingBottom:4, position:'sticky', top:0, background:'var(--bg)', zIndex:10 }}>
+              {(['kunden','ansprechpartner'] as const).map(st => (
+                <button key={st} onClick={() => setKundenSubTab(st)} style={{ flex:1, padding:'9px', borderRadius:12, border:'none', background: kundenSubTab===st ? 'var(--pri)' : 'var(--surf-low)', color: kundenSubTab===st ? '#fff' : 'var(--txt-sec)', fontSize:13, fontWeight:700, cursor:'pointer', transition:'all 0.15s' }}>
+                  {st === 'kunden' ? `Kunden (${customers.length})` : `Ansprechpartner (${contactPersons.length})`}
+                </button>
+              ))}
+            </div>
+            {kundenSubTab === 'kunden' ? (
+              <KundenList
+                customers={customers}
+                objects={objects}
+                loading={loading}
+                onSelect={c => setSelectedCustomer(c)}
+              />
+            ) : (
+              <AnsprechpartnerList
+                contacts={contactPersons}
+                search={cpSearch}
+                onSearchChange={setCpSearch}
+              />
+            )}
+          </>
         )}
         {tab === 'kunden' && selectedCustomer && (
           <KundeDetail
@@ -3155,6 +3213,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   // Neukunde-Felder
   const [newCustType, setNewCustType]         = useState<'privatperson'|'firma'|'weg-verwaltung'|'mietverwaltung'|''>('')
   const [newCustName, setNewCustName]         = useState('')
+  const [wegObjId, setWegObjId]               = useState('')
   // Privatperson-Felder
   const [newAnrede, setNewAnrede]             = useState<'herr'|'frau'|'eheleute'|''>('')
   const [newVorname, setNewVorname]           = useState('')
@@ -3170,10 +3229,14 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   const [newPhone, setNewPhone]               = useState('')
   const [newEmail, setNewEmail]               = useState('')
   // Firma / Verwaltung: erster Ansprechpartner
-  const [newCpName, setNewCpName]             = useState('')
-  const [newCpRole, setNewCpRole]             = useState('')
-  const [newCpPhone, setNewCpPhone]           = useState('')
-  const [newCpEmail, setNewCpEmail]           = useState('')
+  // Multi-Kontakte für Firma
+  const [newContacts, setNewContacts]         = useState<{id:string;first_name:string;last_name:string;role:string;phone:string;email:string}[]>([])
+  const [showAddCp, setShowAddCp]             = useState(false)
+  const [cpFn, setCpFn]                       = useState('')
+  const [cpLn, setCpLn]                       = useState('')
+  const [cpRl, setCpRl]                       = useState('')
+  const [cpPh, setCpPh]                       = useState('')
+  const [cpEm, setCpEm]                       = useState('')
   // WEG: Hausverwaltung suchen/anlegen
   const [hvQuery, setHvQuery]                 = useState('')
   const [hvResults, setHvResults]             = useState<CustomerItem[]>([])
@@ -3347,10 +3410,8 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
         custEmail = newEmail.trim() || null
         if (newAnrede === 'eheleute') {
           firstName2 = newVorname2.trim() || null
-          lastName2  = newNachname2.trim() || null
-          builtName = lastName === lastName2
-            ? `${newVorname.trim()} und ${newVorname2.trim()} ${newNachname.trim()}`
-            : `${newVorname.trim()} ${newNachname.trim()} & ${newVorname2.trim()} ${newNachname2.trim()}`
+          lastName2  = null  // gemeinsamer Nachname ist newNachname
+          builtName  = `${newVorname.trim()} + ${newVorname2.trim()} ${newNachname.trim()}`
         } else {
           builtName = `${newVorname.trim()} ${newNachname.trim()}`
         }
@@ -3389,12 +3450,23 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
         city: newCity.trim() || null,
         phone: custPhone,
         email: custEmail,
+        hausverwaltung_objekt_id: (newCustType === 'weg-verwaltung' && wegObjId.trim()) ? wegObjId.trim() : null,
       }).select('id').single()
       if (e || !cust) { setError(e?.message || 'Kunde konnte nicht angelegt werden'); setSaving(false); return }
       customerId = cust.id
       // Firma: erster Ansprechpartner
-      if (newCustType === 'firma' && newCpName.trim()) {
-        await supabase.from('contact_persons').insert({ customer_id: cust.id, name: newCpName.trim(), role: newCpRole.trim() || null, phone: newCpPhone.trim() || null, email: newCpEmail.trim() || null })
+      if (newCustType === 'firma' && newContacts.length > 0) {
+        for (const cp of newContacts) {
+          await supabase.from('contact_persons').insert({
+            customer_id: cust.id,
+            name: `${cp.first_name} ${cp.last_name}`.trim(),
+            first_name: cp.first_name || null,
+            last_name: cp.last_name || null,
+            role: cp.role || null,
+            phone: cp.phone || null,
+            email: cp.email || null,
+          })
+        }
       }
 
       // Mietverwaltung: Verwaltung verknüpfen/anlegen
@@ -3499,7 +3571,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
     && newAnrede !== ''
     && newVorname.trim() !== ''
     && newNachname.trim() !== ''
-    && (newAnrede !== 'eheleute' || (newVorname2.trim() !== '' && newNachname2.trim() !== ''))
+    && (newAnrede !== 'eheleute' || newVorname2.trim() !== '')
   const mvEigValid = mvEigTyp !== '' && (
     (mvEigTyp === 'firma' && mvEigFirma.trim() !== '') ||
     (mvEigTyp !== 'firma' && mvEigVorname.trim() !== '' && mvEigNachname.trim() !== '')
@@ -3738,7 +3810,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     { v:'weg-verwaltung',label:'WEG-Verwaltung', icon:'apartment',   desc:'Wohnungseigentümergem.' },
                     { v:'mietverwaltung',label:'Mietverwaltung', icon:'home_work',   desc:'Hausverwaltung, Mieter' },
                   ] as const).map(t => (
-                    <div key={t.v} onClick={() => setNewCustType(t.v)}
+                    <div key={t.v} onClick={() => { setNewCustType(t.v); if (t.v === 'weg-verwaltung') { const parts = [street.trim(), [postal.trim(), city.trim()].filter(Boolean).join(' ')].filter(Boolean); setNewCustName('WEG ' + parts.join(', ')) } }}
                       style={{ padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', cursor:'pointer', display:'flex', flexDirection:'column', gap:6, transition:'all 0.15s' }}
                       onMouseEnter={e=>{(e.currentTarget as HTMLDivElement).style.borderColor='var(--pri)';(e.currentTarget as HTMLDivElement).style.background='var(--pri-xl)'}}
                       onMouseLeave={e=>{(e.currentTarget as HTMLDivElement).style.borderColor='var(--outline)';(e.currentTarget as HTMLDivElement).style.background='var(--surf-low)'}}>
@@ -3766,40 +3838,46 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   </div>
                 </div>
 
-                {/* Person 1 */}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
-                  <div>
-                    <label style={s.fieldLabel}>Vorname *</label>
-                    <div style={s.inputWrap}>
-                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
-                      <input value={newVorname} onChange={e => setNewVorname(e.target.value)} placeholder="Max" style={s.input}/>
+                {/* Person 1 + optional Person 2 (Eheleute) */}
+                {newAnrede === 'eheleute' ? (<>
+                  {/* Zwei Vornamen nebeneinander */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                    <div>
+                      <label style={s.fieldLabel}>Vorname 1 *</label>
+                      <div style={s.inputWrap}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
+                        <input value={newVorname} onChange={e => setNewVorname(e.target.value)} placeholder="Max" style={s.input}/>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={s.fieldLabel}>Vorname 2 *</label>
+                      <div style={s.inputWrap}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
+                        <input value={newVorname2} onChange={e => setNewVorname2(e.target.value)} placeholder="Maria" style={s.input}/>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label style={s.fieldLabel}>Nachname *</label>
+                  {/* Gemeinsamer Nachname – volle Breite */}
+                  <div style={{ marginBottom:10 }}>
+                    <label style={s.fieldLabel}>Gemeinsamer Nachname *</label>
                     <div style={s.inputWrap}>
                       <input value={newNachname} onChange={e => setNewNachname(e.target.value)} placeholder="Mustermann" style={s.input}/>
                     </div>
                   </div>
-                </div>
-
-                {/* Person 2 (Eheleute) */}
-                {newAnrede === 'eheleute' && (
-                  <div style={{ background:'var(--surf-low)', borderRadius:10, padding:'10px 12px', marginBottom:10, border:'1px dashed var(--outline)' }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8 }}>2. Person</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                      <div>
-                        <label style={s.fieldLabel}>Vorname *</label>
-                        <div style={s.inputWrap}>
-                          <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
-                          <input value={newVorname2} onChange={e => setNewVorname2(e.target.value)} placeholder="Maria" style={s.input}/>
-                        </div>
+                </>) : (
+                  /* Herr / Frau: Vorname + Nachname nebeneinander */
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                    <div>
+                      <label style={s.fieldLabel}>Vorname *</label>
+                      <div style={s.inputWrap}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
+                        <input value={newVorname} onChange={e => setNewVorname(e.target.value)} placeholder="Max" style={s.input}/>
                       </div>
-                      <div>
-                        <label style={s.fieldLabel}>Nachname *</label>
-                        <div style={s.inputWrap}>
-                          <input value={newNachname2} onChange={e => setNewNachname2(e.target.value)} placeholder="Mustermann" style={s.input}/>
-                        </div>
+                    </div>
+                    <div>
+                      <label style={s.fieldLabel}>Nachname *</label>
+                      <div style={s.inputWrap}>
+                        <input value={newNachname} onChange={e => setNewNachname(e.target.value)} placeholder="Mustermann" style={s.input}/>
                       </div>
                     </div>
                   </div>
@@ -3878,63 +3956,106 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     </div>
                   </div>
                 </div>
-                {/* Erster Ansprechpartner */}
-                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px', marginTop:4, border:'1px solid var(--outline)' }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:10, display:'flex', alignItems:'center', gap:5 }}>
-                    <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner hinterlegen
+                {/* Ansprechpartner – Multi-Liste */}
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      <span className="material-symbols-outlined icon-sm">contacts</span>
+                      Ansprechpartner ({newContacts.length})
+                    </span>
+                    {!showAddCp && (
+                      <button onClick={() => setShowAddCp(true)} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+                        <span className="material-symbols-outlined icon-sm">add</span> Hinzufügen
+                      </button>
+                    )}
                   </div>
-                  {[
-                    { label:'Name', val:newCpName, set:setNewCpName, ph:'Max Mustermann' },
-                    { label:'Funktion / Rolle', val:newCpRole, set:setNewCpRole, ph:'Geschäftsführer' },
-                    { label:'Telefon', val:newCpPhone, set:setNewCpPhone, ph:'+49 561 …' },
-                    { label:'E-Mail', val:newCpEmail, set:setNewCpEmail, ph:'max@firma.de' },
-                  ].map(f => (
-                    <div key={f.label} style={{ marginBottom:8 }}>
-                      <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
-                      <div style={s.inputWrap}><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+
+                  {/* bestehende Kontakte als Chips */}
+                  {[...newContacts].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'','de')).map(cp => (
+                    <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:10, background:'var(--surf-low)', borderRadius:10, padding:'8px 10px', marginBottom:6, border:'1px solid var(--outline)' }}>
+                      <div style={{ width:32, height:32, borderRadius:10, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, fontFamily:'var(--font-head)', flexShrink:0 }}>
+                        {(cp.first_name?.[0]||'')}{(cp.last_name?.[0]||'')}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{cp.first_name} {cp.last_name}</div>
+                        {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{cp.role}</div>}
+                        {(cp.phone||cp.email) && <div style={{ fontSize:11, color:'var(--txt-sec)' }}>{[cp.phone,cp.email].filter(Boolean).join(' · ')}</div>}
+                      </div>
+                      <button onClick={() => setNewContacts(prev => prev.filter(x => x.id !== cp.id))} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--err-dot)', padding:4, display:'flex' }}>
+                        <span className="material-symbols-outlined icon-sm">delete</span>
+                      </button>
                     </div>
                   ))}
+
+                  {/* Inline-Formular für neuen Kontakt */}
+                  {showAddCp && (
+                    <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px', border:'1.5px solid var(--pri)', marginBottom:8 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'var(--pri)', marginBottom:10 }}>Neuer Ansprechpartner</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>Vorname</label>
+                          <div style={s.inputWrap}><input value={cpFn} onChange={e=>setCpFn(e.target.value)} placeholder="Max" style={s.input} autoFocus/></div>
+                        </div>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>Nachname *</label>
+                          <div style={s.inputWrap}><input value={cpLn} onChange={e=>setCpLn(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
+                        </div>
+                      </div>
+                      <div style={{ marginBottom:8 }}>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>Funktion / Rolle</label>
+                        <div style={s.inputWrap}><input value={cpRl} onChange={e=>setCpRl(e.target.value)} placeholder="Geschäftsführer" style={s.input}/></div>
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>Telefon</label>
+                          <div style={s.inputWrap}><input value={cpPh} onChange={e=>setCpPh(e.target.value)} placeholder="+49 561 …" style={s.input} inputMode="tel"/></div>
+                        </div>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>E-Mail</label>
+                          <div style={s.inputWrap}><input value={cpEm} onChange={e=>setCpEm(e.target.value)} placeholder="max@firma.de" style={s.input} inputMode="email"/></div>
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={() => { setShowAddCp(false); setCpFn(''); setCpLn(''); setCpRl(''); setCpPh(''); setCpEm('') }} style={{ flex:1, padding:'9px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:13, fontWeight:600, cursor:'pointer' }}>Abbrechen</button>
+                        <button disabled={!cpLn.trim()} onClick={() => {
+                          if (!cpLn.trim()) return
+                          setNewContacts(prev => [...prev, { id: crypto.randomUUID(), first_name: cpFn.trim(), last_name: cpLn.trim(), role: cpRl.trim(), phone: cpPh.trim(), email: cpEm.trim() }])
+                          setShowAddCp(false); setCpFn(''); setCpLn(''); setCpRl(''); setCpPh(''); setCpEm('')
+                        }} style={{ flex:1, padding:'9px', borderRadius:10, border:'none', background: cpLn.trim() ? 'var(--pri)' : 'var(--outline)', color:'#fff', fontSize:13, fontWeight:700, cursor: cpLn.trim() ? 'pointer' : 'not-allowed' }}>
+                          Hinzufügen
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>)}
 
               {/* ── WEG-Verwaltung ────────────────────────────────── */}
               {newCustType === 'weg-verwaltung' && (<>
-                {/* Name + Adresse */}
+                {/* WEG-Name (auto-befüllt aus Schritt 1) */}
                 <div style={{ marginBottom: 10 }}>
                   <label style={s.fieldLabel}>WEG-Name *</label>
-                  <div style={s.inputWrap}>
-                    <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>apartment</span>
+                  <div style={{ ...s.inputWrap, background: newCustName.startsWith('WEG ') ? 'var(--ok-bg)' : undefined }}>
+                    <span className="material-symbols-outlined icon-sm" style={{ color: newCustName.startsWith('WEG ') ? 'var(--ok)' : 'var(--txt-muted)' }}>apartment</span>
                     <input value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="WEG Musterstraße 10" style={s.input}/>
+                    {newCustName.startsWith('WEG ') && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>}
                   </div>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Automatisch aus Objektadresse befüllt – bei Bedarf anpassen.</div>
                 </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label style={s.fieldLabel}>Straße + Hausnummer</label>
+
+                {/* Objekt-ID der Hausverwaltung */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={s.fieldLabel}>Objekt-ID der Hausverwaltung (optional)</label>
                   <div style={s.inputWrap}>
-                    <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>location_on</span>
-                    <input value={newStreet} onChange={e => setNewStreet(e.target.value)} placeholder="Musterstraße 10" style={s.input}/>
-                  </div>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:16 }}>
-                  <div>
-                    <label style={s.fieldLabel}>PLZ</label>
-                    <div style={s.inputWrap}>
-                      <input value={newPostal} onChange={e => lookupNewCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
-                      {newPlzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={s.fieldLabel}>Ort</label>
-                    <div style={{ ...s.inputWrap, background: newCityLocked ? 'var(--ok-bg)' : undefined }}>
-                      <input value={newCity} onChange={e => { setNewCity(e.target.value); setNewCityLocked(false) }} placeholder="Melsungen" style={s.input}/>
-                      {newCityLocked && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>}
-                    </div>
+                    <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>tag</span>
+                    <input value={wegObjId} onChange={e => setWegObjId(e.target.value)} placeholder="z.B. 4711 oder OBJ-2024-001" style={s.input}/>
                   </div>
                 </div>
 
                 {/* Divider */}
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
                   <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
-                  <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Hausverwaltung</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>C/O Hausverwaltung</span>
                   <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
                 </div>
 
@@ -4056,11 +4177,6 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 {/* c/o Ansprechpartner (aus HV-Kontakten) */}
                 {(selectedHv || hvCreateMode) && (
                   <>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, marginTop:4 }}>
-                      <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
-                      <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>c/o Ansprechpartner</span>
-                      <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
-                    </div>
                     {selectedHv && hvContacts.length > 0 ? (
                       <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:10 }}>
                         {hvContacts.map(cp => (
@@ -7128,5 +7244,132 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
         )}
       </div>
     </PageOverlay>
+  )
+}
+
+// ─── AnsprechpartnerList ──────────────────────────────────────────────────────
+function AnsprechpartnerList({ contacts, search, onSearchChange }: {
+  contacts: any[]
+  search: string
+  onSearchChange: (v: string) => void
+}) {
+  const [showExport, setShowExport] = useState(false)
+
+  // Filter
+  const q = search.trim().toLowerCase()
+  const filtered = q ? contacts.filter(cp => {
+    const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, cp.customers?.name].filter(Boolean).join(' ').toLowerCase()
+    return q.split(' ').filter(Boolean).every((w: string) => hay.includes(w))
+  }) : contacts
+
+  // Sort alphabetically by last_name, then first_name
+  const sorted = [...filtered].sort((a, b) => {
+    const ln = (a.last_name || a.name || '').localeCompare(b.last_name || b.name || '', 'de')
+    if (ln !== 0) return ln
+    return (a.first_name || '').localeCompare(b.first_name || '', 'de')
+  })
+
+  // Group by first letter of last_name (or name)
+  const grouped: Record<string, any[]> = {}
+  sorted.forEach(cp => {
+    const letter = (cp.last_name || cp.name || '#')[0]?.toUpperCase() || '#'
+    if (!grouped[letter]) grouped[letter] = []
+    grouped[letter].push(cp)
+  })
+  const letters = Object.keys(grouped).sort()
+
+  // XLSX Export
+  const exportXlsx = async () => {
+    const XLSX = await import('xlsx')
+    const rows = sorted.map(cp => ({
+      'Vorname': cp.first_name || '',
+      'Nachname': cp.last_name || cp.name || '',
+      'Funktion/Rolle': cp.role || '',
+      'Telefon': cp.phone || '',
+      'E-Mail': cp.email || '',
+      'Kunde/Firma': cp.customers?.name || '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Ansprechpartner')
+    XLSX.writeFile(wb, `ansprechpartner_${new Date().toISOString().slice(0,10)}.xlsx`)
+    setShowExport(false)
+  }
+
+  return (
+    <>
+      {/* Header */}
+      <div style={{ paddingTop:8, paddingBottom:12 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+          <p style={{ fontSize:13, color:'var(--txt-muted)', margin:0 }}>{sorted.length} Personen</p>
+          <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+            <span className="material-symbols-outlined icon-sm">download</span> Export
+          </button>
+        </div>
+
+        {/* Suche */}
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', overflow:'hidden', marginBottom:4 }}>
+          <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
+          <input value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Name, Funktion, Telefon, Firma …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
+          {search && <button onClick={() => onSearchChange('')} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
+        </div>
+      </div>
+
+      {/* Liste */}
+      {sorted.length === 0 ? (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'60px 20px', gap:12 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:48, color:'var(--txt-muted)', opacity:0.3 }}>{search ? 'search_off' : 'contacts'}</span>
+          <p style={{ fontSize:14, color:'var(--txt-muted)', textAlign:'center' }}>{search ? 'Keine Treffer' : 'Noch keine Ansprechpartner'}</p>
+        </div>
+      ) : (
+        <>
+          {letters.map(letter => (
+            <div key={letter}>
+              <div style={{ fontSize:11, fontWeight:800, color:'var(--txt-muted)', paddingTop:16, paddingBottom:6, letterSpacing:'0.08em', textTransform:'uppercase', borderBottom:'1px solid var(--outline)', marginBottom:8 }}>{letter}</div>
+              {grouped[letter].map((cp: any) => {
+                const initials = ((cp.first_name?.[0]||'') + (cp.last_name?.[0]||cp.name?.[0]||'')).toUpperCase() || '?'
+                const displayName = cp.first_name || cp.last_name
+                  ? [cp.first_name, cp.last_name].filter(Boolean).join(' ')
+                  : cp.name || '–'
+                return (
+                  <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
+                    <div style={{ width:40, height:40, borderRadius:12, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, fontFamily:'var(--font-head)', flexShrink:0 }}>
+                      {initials}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:2 }}>{displayName}</div>
+                      {cp.role && <div style={{ fontSize:12, color:'var(--txt-sec)', marginBottom:2 }}>{cp.role}</div>}
+                      <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+                        {cp.phone && <span style={{ fontSize:11, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined icon-sm">phone</span>{cp.phone}</span>}
+                        {cp.email && <span style={{ fontSize:11, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined icon-sm">mail</span>{cp.email}</span>}
+                      </div>
+                      {cp.customers?.name && (
+                        <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600, marginTop:4, display:'flex', alignItems:'center', gap:4 }}>
+                          <span className="material-symbols-outlined icon-sm">business</span>{cp.customers.name}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+          <div style={{ height:80 }}/>
+        </>
+      )}
+
+      {/* Export-Modal */}
+      {showExport && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'flex-end' }} onClick={() => setShowExport(false)}>
+          <div style={{ background:'var(--bg)', borderRadius:'20px 20px 0 0', width:'100%', padding:'20px 20px 32px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', marginBottom:4 }}>Ansprechpartner exportieren</div>
+            <div style={{ fontSize:13, color:'var(--txt-muted)', marginBottom:20 }}>{sorted.length} Einträge · XLSX für Excel</div>
+            <button onClick={exportXlsx} style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+              <span className="material-symbols-outlined">download</span> Als XLSX herunterladen
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
