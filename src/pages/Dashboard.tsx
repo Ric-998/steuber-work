@@ -3458,6 +3458,8 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   const [mvVerwNewCpName, setMvVerwNewCpName]   = useState('')
   const [mvVerwNewCpPhone, setMvVerwNewCpPhone] = useState('')
   const [mvVerwNewCpEmail, setMvVerwNewCpEmail] = useState('')
+  const [mvVerwNameSuggestions, setMvVerwNameSuggestions] = useState<CustomerItem[]>([])
+  const [mvVerwNameSearching, setMvVerwNameSearching]     = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -3523,6 +3525,26 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       .limit(6)
     setMvVerwResults(data || [])
     setMvVerwSearching(false)
+  }
+
+  const searchMvVerwName = async (val: string) => {
+    setMvVerwNewName(val)
+    if (val.trim().length < 2) { setMvVerwNameSuggestions([]); return }
+    setMvVerwNameSearching(true)
+    const { data } = await supabase.from('customers')
+      .select('id,name,customer_type,street,postal_code,city')
+      .or("customer_type.eq.firma,customer_type.eq.mietverwaltung")
+      .ilike('name', '%' + val.trim() + '%')
+      .limit(5)
+    setMvVerwNameSuggestions((data || []) as unknown as CustomerItem[])
+    setMvVerwNameSearching(false)
+  }
+
+  const pickMvVerwSuggestion = (v: CustomerItem) => {
+    setSelectedMvVerw(v)
+    setMvVerwCreateMode(false)
+    setMvVerwNewName('')
+    setMvVerwNameSuggestions([])
   }
 
   const searchHvName = async (val: string) => {
@@ -3654,7 +3676,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       if (e || !cust) { setError(e?.message || 'Kunde konnte nicht angelegt werden'); setSaving(false); return }
       customerId = cust.id
       // Firma: erster Ansprechpartner
-      if (newCustType === 'firma' && newContacts.length > 0) {
+      if (['firma', 'weg-verwaltung', 'mietverwaltung'].includes(newCustType) && newContacts.length > 0) {
         for (const cp of newContacts) {
           await supabase.from('contact_persons').insert({
             customer_id: cust.id,
@@ -4065,7 +4087,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     { v:'weg-verwaltung',label:'WEG-Verwaltung', icon:'apartment',   desc:'Wohnungseigentümergem.' },
                     { v:'mietverwaltung',label:'Mietverwaltung', icon:'home_work',   desc:'Hausverwaltung, Mieter' },
                   ] as const).map(t => (
-                    <div key={t.v} onClick={() => { setNewCustType(t.v); if (t.v === 'weg-verwaltung') { const parts = [street.trim(), [postal.trim(), city.trim()].filter(Boolean).join(' ')].filter(Boolean); setNewCustName('WEG ' + parts.join(', ')) } }}
+                    <div key={t.v} onClick={() => { setNewCustType(t.v); setNewContacts([]); if (t.v === 'weg-verwaltung') { const parts = [street.trim(), [postal.trim(), city.trim()].filter(Boolean).join(' ')].filter(Boolean); setNewCustName('WEG ' + parts.join(', ')) } }}
                       style={{ padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', cursor:'pointer', display:'flex', flexDirection:'column', gap:6, transition:'all 0.15s' }}
                       onMouseEnter={e=>{(e.currentTarget as HTMLDivElement).style.borderColor='var(--pri)';(e.currentTarget as HTMLDivElement).style.background='var(--pri-xl)'}}
                       onMouseLeave={e=>{(e.currentTarget as HTMLDivElement).style.borderColor='var(--outline)';(e.currentTarget as HTMLDivElement).style.background='var(--surf-low)'}}>
@@ -4481,20 +4503,6 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                         </div>
                       </div>
                     </div>
-                    <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, marginTop:4, display:'flex', alignItems:'center', gap:5 }}>
-                      <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner
-                    </div>
-                    {[
-                      { label:'Name', val:hvNewCpName, set:setHvNewCpName, ph:'Max Mustermann' },
-                      { label:'Funktion', val:hvNewCpRole, set:setHvNewCpRole, ph:'Verwalter' },
-                      { label:'Telefon', val:hvNewCpPhone, set:setHvNewCpPhone, ph:'+49 561 …' },
-                      { label:'E-Mail', val:hvNewCpEmail, set:setHvNewCpEmail, ph:'verwaltung@beispiel.de' },
-                    ].map(f => (
-                      <div key={f.label} style={{ marginBottom:6 }}>
-                        <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
-                        <div style={s.inputWrap}><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
-                      </div>
-                    ))}
                   </div>
                 )}
 
@@ -4531,6 +4539,111 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   </>
                 )}
               </>)}
+
+              {/* Ansprechpartner */}
+              <div style={{ marginTop:8 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+                    <span className="material-symbols-outlined icon-sm">contacts</span>
+                    Ansprechpartner ({newContacts.length})
+                  </span>
+                  {!showAddCp && (
+                    <button onClick={() => setShowAddCp(true)} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+                      <span className="material-symbols-outlined icon-sm">add</span> Neu / Suchen
+                    </button>
+                  )}
+                </div>
+
+                {/* Bestehende Kontakte */}
+                {[...newContacts].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'','de')).map(cp => (
+                  <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:10, background:'var(--surf-low)', borderRadius:10, padding:'8px 10px', marginBottom:6, border:'1px solid var(--outline)' }}>
+                    <div style={{ width:32, height:32, borderRadius:10, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, fontFamily:'var(--font-head)', flexShrink:0 }}>
+                      {(cp.first_name?.[0]||'')}{(cp.last_name?.[0]||'')}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{cp.first_name} {cp.last_name}</div>
+                      {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{cp.role}</div>}
+                      {(cp.phone||cp.email) && <div style={{ fontSize:11, color:'var(--txt-sec)' }}>{[cp.phone,cp.email].filter(Boolean).join(' · ')}</div>}
+                    </div>
+                    <button onClick={() => setNewContacts(prev => prev.filter(x => x.id !== cp.id))} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--err-dot)', padding:4, display:'flex' }}>
+                      <span className="material-symbols-outlined icon-sm">delete</span>
+                    </button>
+                  </div>
+                ))}
+
+                {/* Suche + Inline-Formular */}
+                {showAddCp && (
+                  <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px', border:'1.5px solid var(--pri)', marginBottom:8 }}>
+                    {/* Suche */}
+                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-card)', marginBottom:8 }}>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
+                      <input value={cpSearchQ} onChange={e => searchCp(e.target.value)} placeholder="Ansprechpartner suchen …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:13, color:'var(--txt)' }}/>
+                      {cpSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+                      {cpSearchQ && <button onClick={() => { setCpSearchQ(''); setCpSearchRes([]) }} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
+                    </div>
+                    {cpSearchRes.length > 0 && (
+                      <div style={{ background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--outline)', marginBottom:8, overflow:'hidden' }}>
+                        {cpSearchRes.map((cp: any) => (
+                          <div key={cp.id} onClick={() => pickExistingCp(cp)} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderBottom:'1px solid var(--outline)', cursor:'pointer', background:'var(--surf-low)' }}>
+                            <div style={{ width:28, height:28, borderRadius:8, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>
+                              {(cp.first_name?.[0]||cp.last_name?.[0]||'?').toUpperCase()}
+                            </div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:13, fontWeight:700 }}>{cp.first_name} {cp.last_name}</div>
+                              {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{cp.role}</div>}
+                            </div>
+                            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>add_circle</span>
+                          </div>
+                        ))}
+                        {cpSearchQ.length >= 2 && <div onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }} style={{ padding:'9px 12px', fontSize:12, fontWeight:700, color:'var(--pri)', cursor:'pointer', display:'flex', alignItems:'center', gap:6, background:'var(--surf-card)' }}>
+                          <span className="material-symbols-outlined icon-sm">add</span> Neu anlegen
+                        </div>}
+                      </div>
+                    )}
+                    {cpSearchQ.length >= 2 && cpSearchRes.length === 0 && !cpSearching && (
+                      <div onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }} style={{ padding:'9px 12px', fontSize:12, fontWeight:700, color:'var(--pri)', cursor:'pointer', display:'flex', alignItems:'center', gap:6, background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--outline)', marginBottom:8 }}>
+                        <span className="material-symbols-outlined icon-sm">add</span> Neu anlegen: {cpSearchQ}
+                      </div>
+                    )}
+                    {/* Formular */}
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--pri)', marginBottom:10 }}>Neuer Ansprechpartner</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                      <div>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>Vorname</label>
+                        <div style={s.inputWrap}><input value={cpFn} onChange={e=>setCpFn(e.target.value)} placeholder="Max" style={s.input}/></div>
+                      </div>
+                      <div>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>Nachname *</label>
+                        <div style={s.inputWrap}><input value={cpLn} onChange={e=>setCpLn(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
+                      </div>
+                    </div>
+                    <div style={{ marginBottom:8 }}>
+                      <label style={{ ...s.fieldLabel, fontSize:10 }}>Funktion / Rolle</label>
+                      <div style={s.inputWrap}><input value={cpRl} onChange={e=>setCpRl(e.target.value)} placeholder="Verwalter" style={s.input}/></div>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                      <div>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>Telefon</label>
+                        <div style={s.inputWrap}><input value={cpPh} onChange={e=>setCpPh(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={s.input}/></div>
+                      </div>
+                      <div>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>E-Mail</label>
+                        <div style={s.inputWrap}><input value={cpEm} onChange={e=>setCpEm(e.target.value)} placeholder="max@firma.de" inputMode="email" style={s.input}/></div>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button onClick={() => { setShowAddCp(false); setCpFn(''); setCpLn(''); setCpRl(''); setCpPh(''); setCpEm('') }} style={{ flex:1, padding:'9px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:13, fontWeight:600, cursor:'pointer' }}>Abbrechen</button>
+                      <button disabled={!cpLn.trim()} onClick={() => {
+                        if (!cpLn.trim()) return
+                        setNewContacts(prev => [...prev, { id: crypto.randomUUID(), first_name: cpFn.trim(), last_name: cpLn.trim(), role: cpRl.trim(), phone: cpPh.trim(), email: cpEm.trim() }])
+                        setShowAddCp(false); setCpFn(''); setCpLn(''); setCpRl(''); setCpPh(''); setCpEm('')
+                      }} style={{ flex:1, padding:'9px', borderRadius:10, border:'none', background: cpLn.trim() ? 'var(--pri)' : 'var(--outline)', color:'#fff', fontSize:13, fontWeight:700, cursor: cpLn.trim() ? 'pointer' : 'not-allowed' }}>
+                        Hinzufügen
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* ── Mietverwaltung ────────────────────────────────────────── */}
               {newCustType === 'mietverwaltung' && (<>
@@ -4717,15 +4830,35 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                           <span className="material-symbols-outlined icon-sm">close</span>
                         </button>
                       </div>
-                      {[
-                        { label:'Name *', val:mvVerwNewName, set:setMvVerwNewName, ph:'Muster Verwaltungs GmbH' },
-                        { label:'Straße + Hausnummer', val:mvVerwNewStreet, set:setMvVerwNewStreet, ph:'Beispielweg 5' },
-                      ].map(f => (
-                        <div key={f.label} style={{ marginBottom:8 }}>
-                          <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
-                          <div style={s.inputWrap}><input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+                      <div style={{ marginBottom:8, position:'relative' }}>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>Name *</label>
+                        <div style={s.inputWrap}>
+                          <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>home_work</span>
+                          <input value={mvVerwNewName} onChange={e => searchMvVerwName(e.target.value)} placeholder="Muster Verwaltungs GmbH" style={s.input}/>
+                          {mvVerwNameSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                         </div>
-                      ))}
+                        {mvVerwNameSuggestions.length > 0 && (
+                          <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:50, background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--pri)', boxShadow:'0 8px 24px rgba(9,106,112,0.15)', marginTop:2, overflow:'hidden' }}>
+                            <div style={{ padding:'6px 12px 4px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Bereits vorhanden – auswählen?</div>
+                            {mvVerwNameSuggestions.map(v => (
+                              <div key={v.id} onClick={() => pickMvVerwSuggestion(v)}
+                                style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderTop:'1px solid var(--outline)', cursor:'pointer', background:'var(--surf-low)' }}>
+                                <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>home_work</span>
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{v.name}</div>
+                                  {(v as any).street && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{(v as any).street}{(v as any).city ? ', '+(v as any).city : ''}</div>}
+                                </div>
+                                <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 6px', flexShrink:0 }}>Auswählen</span>
+                              </div>
+                            ))}
+                            <div style={{ padding:'6px 12px 8px', fontSize:11, color:'var(--txt-muted)', fontStyle:'italic' }}>Oder weiter neu anlegen ↓</div>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ marginBottom:8 }}>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>Straße + Hausnummer</label>
+                        <div style={s.inputWrap}><input value={mvVerwNewStreet} onChange={e=>setMvVerwNewStreet(e.target.value)} placeholder="Beispielweg 5" style={s.input}/></div>
+                      </div>
                       <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:8 }}>
                         <div>
                           <label style={{ ...s.fieldLabel, fontSize:10 }}>PLZ</label>
@@ -4742,22 +4875,114 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                           </div>
                         </div>
                       </div>
-                      <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
-                        <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner
-                      </div>
-                      {[
-                        { label:'Name', val:mvVerwNewCpName, set:setMvVerwNewCpName, ph:'Max Mustermann' },
-                        { label:'Telefon', val:mvVerwNewCpPhone, set:setMvVerwNewCpPhone, ph:'+49 561 …' },
-                        { label:'E-Mail', val:mvVerwNewCpEmail, set:setMvVerwNewCpEmail, ph:'verwaltung@beispiel.de' },
-                      ].map(f => (
-                        <div key={f.label} style={{ marginBottom:6 }}>
-                          <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
-                          <div style={s.inputWrap}><input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
-                        </div>
-                      ))}
                     </div>
                   )}
                 </>)}
+
+                {/* Ansprechpartner */}
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      <span className="material-symbols-outlined icon-sm">contacts</span>
+                      Ansprechpartner ({newContacts.length})
+                    </span>
+                    {!showAddCp && (
+                      <button onClick={() => setShowAddCp(true)} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+                        <span className="material-symbols-outlined icon-sm">add</span> Neu / Suchen
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Bestehende Kontakte */}
+                  {[...newContacts].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'','de')).map(cp => (
+                    <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:10, background:'var(--surf-low)', borderRadius:10, padding:'8px 10px', marginBottom:6, border:'1px solid var(--outline)' }}>
+                      <div style={{ width:32, height:32, borderRadius:10, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, fontFamily:'var(--font-head)', flexShrink:0 }}>
+                        {(cp.first_name?.[0]||'')}{(cp.last_name?.[0]||'')}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{cp.first_name} {cp.last_name}</div>
+                        {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{cp.role}</div>}
+                        {(cp.phone||cp.email) && <div style={{ fontSize:11, color:'var(--txt-sec)' }}>{[cp.phone,cp.email].filter(Boolean).join(' · ')}</div>}
+                      </div>
+                      <button onClick={() => setNewContacts(prev => prev.filter(x => x.id !== cp.id))} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--err-dot)', padding:4, display:'flex' }}>
+                        <span className="material-symbols-outlined icon-sm">delete</span>
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Suche + Inline-Formular */}
+                  {showAddCp && (
+                    <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px', border:'1.5px solid var(--pri)', marginBottom:8 }}>
+                      {/* Suche */}
+                      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-card)', marginBottom:8 }}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
+                        <input value={cpSearchQ} onChange={e => searchCp(e.target.value)} placeholder="Ansprechpartner suchen …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:13, color:'var(--txt)' }}/>
+                        {cpSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+                        {cpSearchQ && <button onClick={() => { setCpSearchQ(''); setCpSearchRes([]) }} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
+                      </div>
+                      {cpSearchRes.length > 0 && (
+                        <div style={{ background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--outline)', marginBottom:8, overflow:'hidden' }}>
+                          {cpSearchRes.map((cp: any) => (
+                            <div key={cp.id} onClick={() => pickExistingCp(cp)} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderBottom:'1px solid var(--outline)', cursor:'pointer', background:'var(--surf-low)' }}>
+                              <div style={{ width:28, height:28, borderRadius:8, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>
+                                {(cp.first_name?.[0]||cp.last_name?.[0]||'?').toUpperCase()}
+                              </div>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontSize:13, fontWeight:700 }}>{cp.first_name} {cp.last_name}</div>
+                                {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{cp.role}</div>}
+                              </div>
+                              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>add_circle</span>
+                            </div>
+                          ))}
+                          {cpSearchQ.length >= 2 && <div onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }} style={{ padding:'9px 12px', fontSize:12, fontWeight:700, color:'var(--pri)', cursor:'pointer', display:'flex', alignItems:'center', gap:6, background:'var(--surf-card)' }}>
+                            <span className="material-symbols-outlined icon-sm">add</span> Neu anlegen
+                          </div>}
+                        </div>
+                      )}
+                      {cpSearchQ.length >= 2 && cpSearchRes.length === 0 && !cpSearching && (
+                        <div onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }} style={{ padding:'9px 12px', fontSize:12, fontWeight:700, color:'var(--pri)', cursor:'pointer', display:'flex', alignItems:'center', gap:6, background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--outline)', marginBottom:8 }}>
+                          <span className="material-symbols-outlined icon-sm">add</span> Neu anlegen: {cpSearchQ}
+                        </div>
+                      )}
+                      {/* Formular */}
+                      <div style={{ fontSize:11, fontWeight:700, color:'var(--pri)', marginBottom:10 }}>Neuer Ansprechpartner</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>Vorname</label>
+                          <div style={s.inputWrap}><input value={cpFn} onChange={e=>setCpFn(e.target.value)} placeholder="Max" style={s.input}/></div>
+                        </div>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>Nachname *</label>
+                          <div style={s.inputWrap}><input value={cpLn} onChange={e=>setCpLn(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
+                        </div>
+                      </div>
+                      <div style={{ marginBottom:8 }}>
+                        <label style={{ ...s.fieldLabel, fontSize:10 }}>Funktion / Rolle</label>
+                        <div style={s.inputWrap}><input value={cpRl} onChange={e=>setCpRl(e.target.value)} placeholder="Verwalter" style={s.input}/></div>
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>Telefon</label>
+                          <div style={s.inputWrap}><input value={cpPh} onChange={e=>setCpPh(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={s.input}/></div>
+                        </div>
+                        <div>
+                          <label style={{ ...s.fieldLabel, fontSize:10 }}>E-Mail</label>
+                          <div style={s.inputWrap}><input value={cpEm} onChange={e=>setCpEm(e.target.value)} placeholder="max@firma.de" inputMode="email" style={s.input}/></div>
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={() => { setShowAddCp(false); setCpFn(''); setCpLn(''); setCpRl(''); setCpPh(''); setCpEm('') }} style={{ flex:1, padding:'9px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:13, fontWeight:600, cursor:'pointer' }}>Abbrechen</button>
+                        <button disabled={!cpLn.trim()} onClick={() => {
+                          if (!cpLn.trim()) return
+                          setNewContacts(prev => [...prev, { id: crypto.randomUUID(), first_name: cpFn.trim(), last_name: cpLn.trim(), role: cpRl.trim(), phone: cpPh.trim(), email: cpEm.trim() }])
+                          setShowAddCp(false); setCpFn(''); setCpLn(''); setCpRl(''); setCpPh(''); setCpEm('')
+                        }} style={{ flex:1, padding:'9px', borderRadius:10, border:'none', background: cpLn.trim() ? 'var(--pri)' : 'var(--outline)', color:'#fff', fontSize:13, fontWeight:700, cursor: cpLn.trim() ? 'pointer' : 'not-allowed' }}>
+                          Hinzufügen
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </>)}
             </div>
           )}
