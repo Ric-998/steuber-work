@@ -110,7 +110,7 @@ const MOTIVATIONS = [
 
 export default function Dashboard({ userName, onLogout }: Props) {
   const [motivation] = useState(() => MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)])
-  const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'team'|'bericht'|'chat'|'profil'>('overview')
+  const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'ansprechpartner'|'team'|'bericht'|'chat'|'profil'>('overview')
   const [objSearch, setObjSearch] = useState('')
   const [contactPersons, setContactPersons]   = useState<any[]>([])
   const [kundenSubTab, setKundenSubTab]       = useState<'kunden'|'ansprechpartner'>('kunden')
@@ -422,6 +422,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     { id:'overview', icon:'dashboard',  label:'Übersicht',    badge: reportNewCount },
     { id:'objekte',  icon:'apartment',  label:'Objekte',      badge: 0 },
     { id:'kunden',   icon:'contacts',   label:'Kunden',       badge: 0 },
+    { id:'ansprechpartner', icon:'person_search', label:'Ansprechpartner', badge: 0 },
     { id:'bericht',  icon:'summarize',  label:'Tagesbericht', badge: pendingCount + reportNewCount },
     { id:'chat',     icon:'chat_bubble',label:'Nachrichten',  badge: chatUnread },
     { id:'team',     icon:'group',      label:'Team',         badge: teamBadge },
@@ -499,8 +500,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
           {([
             { id:'overview',   icon:'dashboard',     label:'Übersicht', badge: reportNewCount },
             { id:'objekte',    icon:'apartment',      label:'Objekte',   badge: 0 },
-            { id:'team',       icon:'group',          label:'Team',      badge: teamBadge },
-            { id:'chat',       icon:'chat_bubble',    label:'Chat',      badge: chatUnread },
+            { id:'kunden',     icon:'contacts',       label:'Kunden',    badge: 0 },
+            { id:'ansprechpartner', icon:'person_search', label:'Kontakte', badge: 0 },
             { id:'profil',     icon:'person',         label:'Profil',    badge: 0 },
           ] as const).map(t=>(
             <div key={t.id} onClick={()=>{ setTab(t.id); if(t.id==='overview'){ const now=Date.now(); setReportSeen(now); localStorage.setItem('sw_report_seen',String(now)) } }} style={{ ...s.tabItem, color:tab===t.id?'var(--pri)':'var(--txt-muted)', fontWeight:tab===t.id?700:500, position:'relative' }}>
@@ -883,30 +884,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
         {/* ── KUNDEN ── */}
         {tab === 'kunden' && !selectedCustomer && (
-          <>
-            {/* Sub-Navigation: Kunden | Ansprechpartner */}
-            <div style={{ display:'flex', gap:8, paddingTop:16, paddingBottom:4, position:'sticky', top:0, background:'var(--bg)', zIndex:10 }}>
-              {(['kunden','ansprechpartner'] as const).map(st => (
-                <button key={st} onClick={() => setKundenSubTab(st)} style={{ flex:1, padding:'9px', borderRadius:12, border:'none', background: kundenSubTab===st ? 'var(--pri)' : 'var(--surf-low)', color: kundenSubTab===st ? '#fff' : 'var(--txt-sec)', fontSize:13, fontWeight:700, cursor:'pointer', transition:'all 0.15s' }}>
-                  {st === 'kunden' ? `Kunden (${customers.length})` : `Ansprechpartner (${contactPersons.length})`}
-                </button>
-              ))}
-            </div>
-            {kundenSubTab === 'kunden' ? (
-              <KundenList
-                customers={customers}
-                objects={objects}
-                loading={loading}
-                onSelect={c => setSelectedCustomer(c)}
-              />
-            ) : (
-              <AnsprechpartnerList
-                contacts={contactPersons}
-                search={cpSearch}
-                onSearchChange={setCpSearch}
-              />
-            )}
-          </>
+          <KundenList
+            customers={customers}
+            objects={objects}
+            loading={loading}
+            onSelect={c => setSelectedCustomer(c)}
+          />
         )}
         {tab === 'kunden' && selectedCustomer && (
           <KundeDetail
@@ -919,6 +902,16 @@ export default function Dashboard({ userName, onLogout }: Props) {
           />
         )}
 
+
+        {/* ── ANSPRECHPARTNER ── */}
+        {tab === 'ansprechpartner' && (
+          <AnsprechpartnerList
+            contacts={contactPersons}
+            customers={customers}
+            search={cpSearch}
+            onSearchChange={setCpSearch}
+          />
+        )}
 
         {/* ── TEAM ── */}
         {tab === 'team' && (
@@ -3232,6 +3225,9 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   // Multi-Kontakte für Firma
   const [newContacts, setNewContacts]         = useState<{id:string;first_name:string;last_name:string;role:string;phone:string;email:string}[]>([])
   const [showAddCp, setShowAddCp]             = useState(false)
+  const [cpSearchQ, setCpSearchQ]             = useState('')
+  const [cpSearchRes, setCpSearchRes]         = useState<any[]>([])
+  const [cpSearching, setCpSearching]         = useState(false)
   const [cpFn, setCpFn]                       = useState('')
   const [cpLn, setCpLn]                       = useState('')
   const [cpRl, setCpRl]                       = useState('')
@@ -3567,6 +3563,33 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   }
 
   const canStep2 = street.trim() !== '' && postal.trim().length === 5 && city.trim() !== ''
+
+  const searchCp = async (q: string) => {
+    setCpSearchQ(q)
+    if (q.trim().length < 2) { setCpSearchRes([]); return }
+    setCpSearching(true)
+    const { data } = await supabase.from('contact_persons')
+      .select('id,name,first_name,last_name,role,phone,email,customers(name)')
+      .or(`name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
+      .limit(5)
+    setCpSearchRes(data || [])
+    setCpSearching(false)
+  }
+
+  const pickExistingCp = (cp: any) => {
+    const alreadyAdded = newContacts.some(c => c.first_name === (cp.first_name||'') && c.last_name === (cp.last_name||cp.name||''))
+    if (alreadyAdded) return
+    setNewContacts(prev => [...prev, {
+      id: crypto.randomUUID(),
+      first_name: cp.first_name || '',
+      last_name: cp.last_name || cp.name || '',
+      role: cp.role || '',
+      phone: cp.phone || '',
+      email: cp.email || '',
+    }])
+    setCpSearchQ('')
+    setCpSearchRes([])
+  }
   const privatpersonValid = newCustType === 'privatperson'
     && newAnrede !== ''
     && newVorname.trim() !== ''
@@ -3964,11 +3987,47 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                       Ansprechpartner ({newContacts.length})
                     </span>
                     {!showAddCp && (
-                      <button onClick={() => setShowAddCp(true)} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
-                        <span className="material-symbols-outlined icon-sm">add</span> Hinzufügen
+                      <button onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+                        <span className="material-symbols-outlined icon-sm">add</span> Neu / Suchen
                       </button>
                     )}
                   </div>
+
+                  {/* Kontakt suchen */}
+                  {!showAddCp && (
+                    <div style={{ marginBottom:8 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 12px', borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-low)', marginBottom:4 }}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
+                        <input value={cpSearchQ} onChange={e => searchCp(e.target.value)} placeholder="Bestehenden Ansprechpartner suchen …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:13, color:'var(--txt)' }}/>
+                        {cpSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+                        {cpSearchQ && <button onClick={() => { setCpSearchQ(''); setCpSearchRes([]) }} style={{ background:'none', border:'none', cursor:'pointer', padding:0, color:'var(--txt-muted)', display:'flex' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
+                      </div>
+                      {cpSearchRes.length > 0 && (
+                        <div style={{ background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--outline)', overflow:'hidden' }}>
+                          {cpSearchRes.map((cp: any) => (
+                            <div key={cp.id} onClick={() => pickExistingCp(cp)} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderBottom:'1px solid var(--outline)', cursor:'pointer', background:'var(--surf-low)' }}>
+                              <div style={{ width:28, height:28, borderRadius:8, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>
+                                {(cp.first_name?.[0]||cp.name?.[0]||'?').toUpperCase()}
+                              </div>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{cp.first_name || ''} {cp.last_name || cp.name || ''}</div>
+                                {(cp.role || cp.customers?.name) && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{[cp.role, cp.customers?.name].filter(Boolean).join(' · ')}</div>}
+                              </div>
+                              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>add_circle</span>
+                            </div>
+                          ))}
+                          {cpSearchQ.length >= 2 && <div onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }} style={{ padding:'9px 12px', fontSize:12, fontWeight:700, color:'var(--pri)', cursor:'pointer', display:'flex', alignItems:'center', gap:6, background:'var(--surf-card)' }}>
+                            <span className="material-symbols-outlined icon-sm">add</span> Neu anlegen
+                          </div>}
+                        </div>
+                      )}
+                      {cpSearchQ.length >= 2 && cpSearchRes.length === 0 && !cpSearching && (
+                        <div onClick={() => { setShowAddCp(true); setCpSearchQ(''); setCpSearchRes([]) }} style={{ padding:'9px 12px', fontSize:12, fontWeight:700, color:'var(--pri)', cursor:'pointer', display:'flex', alignItems:'center', gap:6, background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--outline)' }}>
+                          <span className="material-symbols-outlined icon-sm">add</span> Neu anlegen: {cpSearchQ}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* bestehende Kontakte als Chips */}
                   {[...newContacts].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'','de')).map(cp => (
@@ -7248,19 +7307,37 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
 }
 
 // ─── AnsprechpartnerList ──────────────────────────────────────────────────────
-function AnsprechpartnerList({ contacts, search, onSearchChange }: {
+function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
   contacts: any[]
+  customers: any[]
   search: string
   onSearchChange: (v: string) => void
 }) {
   const [showExport, setShowExport] = useState(false)
 
+  // Merge: contact_persons + privatperson customers (they ARE persons)
+  const privatpersonen = (customers || [])
+    .filter((c: any) => c.customer_type === 'privatperson' && (c.first_name || c.last_name || c.name))
+    .map((c: any) => ({
+      id: 'cust-' + c.id,
+      _isCust: true,
+      first_name: c.first_name || '',
+      last_name: c.last_name || (c.name || ''),
+      name: c.name || [c.first_name, c.last_name].filter(Boolean).join(' '),
+      role: 'Privatperson',
+      phone: c.phone || null,
+      email: c.email || null,
+      customer_id: c.id,
+      customers: { id: c.id, name: c.name, customer_type: 'privatperson' },
+    }))
+  const allContacts = [...contacts, ...privatpersonen]
+
   // Filter
   const q = search.trim().toLowerCase()
-  const filtered = q ? contacts.filter(cp => {
+  const filtered = q ? allContacts.filter(cp => {
     const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, cp.customers?.name].filter(Boolean).join(' ').toLowerCase()
     return q.split(' ').filter(Boolean).every((w: string) => hay.includes(w))
-  }) : contacts
+  }) : allContacts
 
   // Sort alphabetically by last_name, then first_name
   const sorted = [...filtered].sort((a, b) => {
