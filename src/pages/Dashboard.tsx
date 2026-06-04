@@ -446,7 +446,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {isDesktop && (
         <aside style={{ width:220, flexShrink:0, background:'var(--surf-card)', borderRight:'1px solid var(--outline)', display:'flex', flexDirection:'column', height:'100dvh', overflowY:'auto' }}>
           {/* Logo */}
-          <div style={{ padding:'24px 20px 20px', borderBottom:'1px solid var(--outline)' }}>
+          <div onClick={() => { setTab('overview'); setSelectedObject(null); setSelectedCustomer(null) }}
+            style={{ padding:'24px 20px 20px', borderBottom:'1px solid var(--outline)', cursor:'pointer' }}>
             <div style={{ fontFamily:'Manrope,sans-serif', fontWeight:800, fontSize:22, color:'var(--pri)', letterSpacing:'-0.3px', lineHeight:1.1, textTransform:'uppercase' }}>STEUBER</div>
             <div style={{ fontFamily:'Manrope,sans-serif', fontWeight:300, fontSize:22, color:'var(--pri-c)', letterSpacing:'5px', lineHeight:1.1, textTransform:'uppercase' }}>WORK</div>
           </div>
@@ -494,7 +495,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
         <header style={s.topBar}>
           <div style={s.topBarInner}>
             {/* Logo links */}
-            <div style={s.topLogo}>
+            <div style={{ ...s.topLogo, cursor:'pointer' }}
+              onClick={() => { setTab('overview'); setSelectedObject(null); setSelectedCustomer(null) }}>
               <span style={s.topLogoBold}>STEUBER</span>
               <span style={s.topLogoLight}>WORK</span>
             </div>
@@ -1604,7 +1606,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       <PWAInstallBanner />
 
     {/* FAB – Neue Aufgabe, nur Mobile, auf relevanten Tabs */}
-      {!isDesktop && !selectedObject && ['objekte','overview','kunden','ansprechpartner'].includes(tab) && (
+      {!isDesktop && !selectedObject && ['objekte','overview'].includes(tab) && (
         <button style={{ ...s.fab, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:2, width:'auto', borderRadius:28, padding:'0 18px', height:52 }} onClick={()=>setShowCreate('')}>
           <span className="material-symbols-outlined" style={{ fontSize:20 }}>add_task</span>
           <span style={{ fontSize:9, fontWeight:800, letterSpacing:'0.04em', lineHeight:1 }}>AUFGABE</span>
@@ -2379,12 +2381,17 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
                   const { data: objTasks } = await supabase.from('tasks').select('id').eq('object_id', obj.id)
                   if (objTasks && objTasks.length > 0) {
                     const taskIds = objTasks.map((t: any) => t.id)
-                    // 2. Task-Reports löschen (FK auf task_assignments)
-                    await supabase.from('task_reports').delete().in('task_id', taskIds)
-                    // 3. Task-Assignments löschen
-                    await supabase.from('task_assignments').delete().in('task_id', taskIds)
-                    // 4. Tasks löschen
-                    await supabase.from('tasks').delete().eq('object_id', obj.id)
+                    // 2. Assignments ermitteln
+                    const { data: objAssigns } = await supabase.from('task_assignments').select('id').in('task_id', taskIds)
+                    if (objAssigns && objAssigns.length > 0) {
+                      const assignIds = objAssigns.map((a: any) => a.id)
+                      // 3. Task-Reports löschen (FK auf assignment_id)
+                      await supabase.from('task_reports').delete().in('assignment_id', assignIds)
+                      // 4. Task-Assignments löschen
+                      await supabase.from('task_assignments').delete().in('id', assignIds)
+                    }
+                    // 5. Tasks löschen
+                    await supabase.from('tasks').delete().in('id', taskIds)
                   }
                   // 5. Ansprechpartner (contact_persons mit object_id) löschen
                   await supabase.from('contact_persons').delete().eq('object_id', obj.id)
@@ -7502,9 +7509,24 @@ function AdminKontoSection({ userName }: { userName: string }) {
 
   // Get current user email
   const [email, setEmail] = useState('')
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [emailMsg, setEmailMsg] = useState<{text:string;ok:boolean}|null>(null)
+  const [emailSaving, setEmailSaving] = useState(false)
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => { if (data.user?.email) setEmail(data.user.email) })
   }, [])
+
+  const handleEmailSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newEmail.trim() || !newEmail.includes('@')) { setEmailMsg({ text:'Bitte eine gültige E-Mail eingeben.', ok:false }); return }
+    if (newEmail.trim() === email) { setEmailMsg({ text:'Das ist bereits deine aktuelle E-Mail.', ok:false }); return }
+    setEmailSaving(true); setEmailMsg(null)
+    const { error } = await supabase.auth.updateUser({ email: newEmail.trim() })
+    if (error) { setEmailMsg({ text: error.message || 'Fehler beim Ändern.', ok:false }) }
+    else { setEmailMsg({ text:'Bestätigungs-E-Mail wurde gesendet. Bitte beide Adressen bestätigen.', ok:true }); setNewEmail('') }
+    setEmailSaving(false)
+  }
 
   const inputRow = (icon: string, placeholder: string, value: string, setValue: (v:string)=>void, show: boolean, setShow: (v:boolean)=>void) => (
     <div style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
@@ -7524,14 +7546,46 @@ function AdminKontoSection({ userName }: { userName: string }) {
       <div style={{ padding:'12px 16px', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)' }}>Konto</div>
 
       {/* E-Mail Row */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderBottom:'1px solid var(--outline)' }}>
-        <div style={{ width:34, height:34, borderRadius:10, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-          <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>mail</span>
+      <div style={{ borderBottom:'1px solid var(--outline)' }}>
+        <div onClick={() => { setShowEmailForm(f => !f); setEmailMsg(null); setNewEmail('') }}
+          style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 16px', cursor:'pointer' }}>
+          <div style={{ width:34, height:34, borderRadius:10, background: showEmailForm ? 'var(--pri-xl)' : 'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18, color: showEmailForm ? 'var(--pri)' : 'var(--txt-muted)' }}>mail</span>
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:14, fontWeight:600, color: showEmailForm ? 'var(--pri)' : 'var(--txt)' }}>E-Mail</div>
+            <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>{email || '…'}</div>
+          </div>
+          <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', transition:'transform 0.2s', transform: showEmailForm ? 'rotate(90deg)' : 'none' }}>chevron_right</span>
         </div>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>E-Mail</div>
-          <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>{email || '…'}</div>
-        </div>
+        {showEmailForm && (
+          <form onSubmit={handleEmailSave} style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10, borderTop:'1px solid var(--outline)' }}>
+            <div style={{ height:4 }}/>
+            <div style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>mail</span>
+              <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
+                placeholder="Neue E-Mail-Adresse" required
+                style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', fontFamily:'var(--font-body)' }}/>
+            </div>
+            {emailMsg && (
+              <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, background: emailMsg.ok ? 'var(--ok-bg)' : 'var(--err-bg)', color: emailMsg.ok ? 'var(--ok)' : 'var(--err)', fontSize:13 }}>
+                <span className="material-symbols-outlined icon-sm icon-fill">{emailMsg.ok ? 'check_circle' : 'error'}</span>
+                {emailMsg.text}
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8 }}>
+              <button type="button" onClick={() => { setShowEmailForm(false); setEmailMsg(null) }}
+                style={{ padding:'11px 16px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                Abbrechen
+              </button>
+              <button type="submit" disabled={emailSaving}
+                style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                <span className="material-symbols-outlined icon-sm">{emailSaving ? 'hourglass_empty' : 'mail'}</span>
+                {emailSaving ? 'Wird gesendet…' : 'Bestätigung senden'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Passwort Row */}
