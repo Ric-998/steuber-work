@@ -4543,8 +4543,8 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 )}
               </>)}
 
-              {/* Ansprechpartner */}
-              <div style={{ marginTop:8 }}>
+              {/* Ansprechpartner – erst nach Typ-Auswahl */}
+              {newCustType && <div style={{ marginTop:8 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                   <span style={{ display:'flex', alignItems:'center', gap:5 }}>
                     <span className="material-symbols-outlined icon-sm">contacts</span>
@@ -4646,7 +4646,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     </div>
                   </div>
                 )}
-              </div>
+              </div>}
 
               {/* ── Mietverwaltung ────────────────────────────────────────── */}
               {newCustType === 'mietverwaltung' && (<>
