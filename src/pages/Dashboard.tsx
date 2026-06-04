@@ -7408,23 +7408,38 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
                 const displayName = cp.first_name || cp.last_name
                   ? [cp.first_name, cp.last_name].filter(Boolean).join(' ')
                   : cp.name || '–'
+                const isPrivat = cp._isCust === true
+                const hasRole = cp.role && cp.role !== 'Privatperson'
                 return (
-                  <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
-                    <div style={{ width:40, height:40, borderRadius:12, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, fontFamily:'var(--font-head)', flexShrink:0 }}>
+                  <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, boxShadow:'0 1px 6px rgba(9,106,112,0.06)', borderLeft: isPrivat ? '3px solid var(--pri-xl)' : '3px solid transparent' }}>
+                    {/* Avatar */}
+                    <div style={{ width:44, height:44, borderRadius:14, background: isPrivat ? 'var(--pri-xl)' : 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: isPrivat ? 'var(--pri)' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: isPrivat ? 'none' : '0 4px 10px rgba(9,106,112,0.2)' }}>
                       {initials}
                     </div>
+                    {/* Content */}
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:2 }}>{displayName}</div>
-                      {cp.role && <div style={{ fontSize:12, color:'var(--txt-sec)', marginBottom:2 }}>{cp.role}</div>}
-                      <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-                        {cp.phone && <span style={{ fontSize:11, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined icon-sm">phone</span>{cp.phone}</span>}
-                        {cp.email && <span style={{ fontSize:11, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined icon-sm">mail</span>{cp.email}</span>}
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom: hasRole || cp.phone || cp.email ? 3 : 0 }}>
+                        <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{displayName}</div>
+                        {isPrivat && <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 6px', flexShrink:0 }}>Privat</span>}
                       </div>
-                      {cp.customers?.name && (
-                        <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600, marginTop:4, display:'flex', alignItems:'center', gap:4 }}>
-                          <span className="material-symbols-outlined icon-sm">business</span>{cp.customers.name}
+                      {hasRole && (
+                        <div style={{ fontSize:12, color:'var(--txt-sec)', fontWeight:600, marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:13 }}>work</span>
+                          {cp.role}
                         </div>
                       )}
+                      <div style={{ display:'flex', gap:14, flexWrap:'wrap' }}>
+                        {cp.phone && (
+                          <a href={'tel:' + cp.phone} style={{ fontSize:12, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--pri)' }}>phone</span>{cp.phone}
+                          </a>
+                        )}
+                        {cp.email && (
+                          <a href={'mailto:' + cp.email} style={{ fontSize:12, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--pri)' }}>mail</span>{cp.email}
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )
