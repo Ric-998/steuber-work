@@ -56,6 +56,7 @@ interface CustomerItem {
   // WEG-Verwaltung: Verknüpfung zur Hausverwaltung + c/o-Ansprechpartner
   hausverwaltung_id?: string|null
   co_contact_id?: string|null
+  is_hausverwaltung?: boolean
   hausverwaltung?: { id:string; name:string; customer_type:CustomerType } | null
   co_contact?: { id:string; name:string; role?:string|null; phone?:string|null; email?:string|null } | null
 }
@@ -245,7 +246,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.from('tasks').select('id,title,description,interval,is_active,due_date,end_date,category_id,object_id,contract_id,default_assignee_id,categories(name,emoji),objects(name,address,city),contracts(id,type,start_date,end_date,object_id,customer_id),users!tasks_default_assignee_id_fkey(full_name)').order('created_at',{ascending:false}),
       supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)').order('address'),
       supabase.from('categories').select('*').order('name'),
-      supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name'),
+      supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name'),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
       supabase.from('vacation_blackouts').select('*').order('from_date',{ascending:true}),
       supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,customers(id,name,customer_type)').order('last_name').order('name'),
@@ -3700,6 +3701,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
             street: mvVerwNewStreet.trim() || null,
             postal_code: mvVerwNewPostal.trim() || null,
             city: mvVerwNewCity.trim() || null,
+            is_hausverwaltung: true,
           }).select('id').single()
           if (verwData) {
             verwId = verwData.id
@@ -3731,6 +3733,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
             street: hvNewStreet.trim() || null,
             postal_code: hvNewPostal.trim() || null,
             city: hvNewCity.trim() || null,
+            is_hausverwaltung: true,
           }).select('id').single()
 
           if (hvData) {
@@ -5088,6 +5091,7 @@ function KundenList({ customers, objects, loading, onSelect }: {
   onSelect: (c: CustomerItem) => void
 }) {
   const [search, setSearch] = useState('')
+  const [filterChip, setFilterChip] = useState<'alle'|'privatperson'|'firma'|'verwaltung'|'hausverwaltung'>('alle')
   const [showExport, setShowExport] = useState(false)
 
   const exportFields = [
@@ -5180,8 +5184,22 @@ function KundenList({ customers, objects, loading, onSelect }: {
   }
 
   const filtered = customers.filter(c => {
-    const q = search.toLowerCase()
-    return !q || c.name.toLowerCase().includes(q) || (c.contact_person||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || (c.phone||'').includes(q)
+    // Chip filter
+    if (filterChip === 'privatperson' && c.customer_type !== 'privatperson') return false
+    if (filterChip === 'firma' && c.customer_type !== 'firma') return false
+    if (filterChip === 'verwaltung' && c.customer_type !== 'weg-verwaltung' && c.customer_type !== 'mietverwaltung') return false
+    if (filterChip === 'hausverwaltung' && !c.is_hausverwaltung) return false
+    // Text search
+    const q = search.trim().toLowerCase()
+    if (!q) return true
+    const contactName = [c.contact_first_name, c.contact_last_name].filter(Boolean).join(' ')
+    const hay = [
+      c.name, c.contact_person, contactName,
+      c.email, c.phone, c.city, c.postal_code,
+      c.street_name, c.lexware_id,
+      c.hausverwaltung?.name,
+    ].filter(Boolean).join(' ').toLowerCase()
+    return q.split(' ').filter(Boolean).every(word => hay.includes(word))
   })
 
   // Group alphabetically
@@ -5252,10 +5270,30 @@ function KundenList({ customers, objects, loading, onSelect }: {
           </div>
         )}
         {/* Search */}
-        <div style={{ ...s.inputWrap, marginBottom:0 }}>
+        <div style={{ ...s.inputWrap, marginBottom:10 }}>
           <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, E-Mail, Telefon …" style={s.input} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, Firma, Stadt, Hausverwaltung …" style={s.input} />
           {search && <button onClick={() => setSearch('')} style={{ background:'none', border:'none', cursor:'pointer', display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
+        </div>
+        {/* Filter Chips */}
+        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, scrollbarWidth:'none' }}>
+          {([
+            { id:'alle',          label:'Alle',          count: customers.length },
+            { id:'privatperson',  label:'Privatperson',  count: customers.filter(c=>c.customer_type==='privatperson').length },
+            { id:'firma',         label:'Firma',         count: customers.filter(c=>c.customer_type==='firma').length },
+            { id:'verwaltung',    label:'Verwaltung',    count: customers.filter(c=>c.customer_type==='weg-verwaltung'||c.customer_type==='mietverwaltung').length },
+            { id:'hausverwaltung',label:'Hausverwaltung',count: customers.filter(c=>c.is_hausverwaltung).length },
+          ] as const).map(chip => (
+            <button key={chip.id} onClick={() => setFilterChip(chip.id)}
+              style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:999, border:'1.5px solid', flexShrink:0, fontSize:12, fontWeight:700, cursor:'pointer', transition:'all 0.15s',
+                borderColor: filterChip===chip.id ? 'var(--pri)' : 'var(--outline)',
+                background:  filterChip===chip.id ? 'var(--pri-xl)' : 'var(--surf-card)',
+                color:       filterChip===chip.id ? 'var(--pri)' : 'var(--txt-muted)',
+              }}>
+              {chip.label}
+              {chip.count > 0 && <span style={{ fontSize:10, fontWeight:800, background: filterChip===chip.id ? 'var(--pri)' : 'var(--surf-high)', color: filterChip===chip.id ? '#fff' : 'var(--txt-muted)', borderRadius:999, padding:'1px 5px' }}>{chip.count}</span>}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -5274,18 +5312,35 @@ function KundenList({ customers, objects, loading, onSelect }: {
                 const objCount = objects.filter(o => o.customer_id === c.id).length
                 return (
                   <div key={c.id} onClick={() => onSelect(c)}
-                    style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:'1px solid var(--outline)', cursor:'pointer' }}>
-                    <div style={{ width:40, height:40, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>{CUST_ICON[c.customer_type]}</span>
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 0', borderBottom:'1px solid var(--outline)', cursor:'pointer' }}>
+                    <div style={{ width:40, height:40, borderRadius:12, background: c.is_hausverwaltung ? 'var(--pri)' : 'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <span className="material-symbols-outlined icon-sm" style={{ color: c.is_hausverwaltung ? '#fff' : 'var(--pri)' }}>{c.is_hausverwaltung ? 'domain' : CUST_ICON[c.customer_type]}</span>
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)' }}>{c.name}</div>
-                      <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>
-                        {CUST_LABEL[c.customer_type]}
-                        {c.customer_type==='weg-verwaltung' && c.hausverwaltung && ` · ${c.hausverwaltung.name}`}
-                        {(c.customer_type==='firma'||c.customer_type==='mietverwaltung') && c.contact_person && ` · ${c.contact_person}`}
-                        {objCount > 0 && <span style={{ marginLeft:8, color:'var(--pri)', fontWeight:600 }}>{objCount} Objekt{objCount!==1?'e':''}</span>}
+                      {/* Name + Typ-Badge */}
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
+                        <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.name}</div>
+                        {c.is_hausverwaltung && <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 6px', flexShrink:0 }}>HV</span>}
                       </div>
+                      {/* Kundentyp */}
+                      <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom: (c.hausverwaltung || c.contact_first_name || c.contact_last_name || c.contact_person) ? 2 : 0, display:'flex', alignItems:'center', gap:6 }}>
+                        <span>{CUST_LABEL[c.customer_type]}</span>
+                        {objCount > 0 && <span style={{ color:'var(--pri)', fontWeight:600 }}>{objCount} Objekt{objCount!==1?'e':''}</span>}
+                      </div>
+                      {/* Hausverwaltung (separate Zeile) */}
+                      {(c.customer_type==='weg-verwaltung'||c.customer_type==='mietverwaltung') && c.hausverwaltung && (
+                        <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600, display:'flex', alignItems:'center', gap:3, marginBottom:1 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:12 }}>domain</span>
+                          {c.hausverwaltung.name}
+                        </div>
+                      )}
+                      {/* Ansprechpartner (separate Zeile) */}
+                      {(c.customer_type==='firma'||c.customer_type==='mietverwaltung') && (c.contact_first_name||c.contact_last_name||c.contact_person) && (
+                        <div style={{ fontSize:11, color:'var(--txt-sec)', display:'flex', alignItems:'center', gap:3 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:12 }}>person</span>
+                          {[c.contact_first_name, c.contact_last_name].filter(Boolean).join(' ') || c.contact_person}
+                        </div>
+                      )}
                     </div>
                     <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:18 }}>chevron_right</span>
                   </div>
@@ -5839,6 +5894,7 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
   const [email, setEmail]           = useState(customer.email||'')
   const [notes, setNotes]           = useState(customer.notes||'')
   const [contractType, setContractType] = useState<'jahresvertrag'|'einmalig'|''>(customer.contract_type||'')
+  const [isHausverwaltung, setIsHausverwaltung] = useState(customer.is_hausverwaltung ?? false)
   const [saving, setSaving]         = useState(false)
   const [error, setError]           = useState('')
 
@@ -5880,6 +5936,7 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
       email: email.trim()||null,
       notes: notes.trim()||null,
       contract_type: contractType||null,
+      is_hausverwaltung: isHausverwaltung,
     }).eq('id', customer.id).select('*').single()
     if (e || !data) { setError(e?.message||'Fehler'); setSaving(false); return }
     onSaved(data as CustomerItem)
@@ -5909,6 +5966,21 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
               </div>
             ))}
           </div>
+
+          {/* Hausverwaltung Toggle – nur für Firmen */}
+          {custType === 'firma' && (
+            <div onClick={() => setIsHausverwaltung(v => !v)}
+              style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:12, border:`1.5px solid ${isHausverwaltung ? 'var(--pri)' : 'var(--outline)'}`, background: isHausverwaltung ? 'var(--pri-xl)' : 'var(--surf-card)', cursor:'pointer', marginBottom:14 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:20, color: isHausverwaltung ? 'var(--pri)' : 'var(--txt-muted)' }}>domain</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:700, color: isHausverwaltung ? 'var(--pri)' : 'var(--txt)' }}>Ist eine Hausverwaltung</div>
+                <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>Erscheint im Filter „Hausverwaltung"</div>
+              </div>
+              <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${isHausverwaltung ? 'var(--pri)' : 'var(--outline)'}`, background: isHausverwaltung ? 'var(--pri)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                {isHausverwaltung && <span className="material-symbols-outlined" style={{ fontSize:14, color:'#fff' }}>check</span>}
+              </div>
+            </div>
+          )}
 
           {/* Name fields – split by type */}
           {custType === 'firma' ? (
