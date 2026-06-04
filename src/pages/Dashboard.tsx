@@ -121,6 +121,7 @@ const MOTIVATIONS = [
 export default function Dashboard({ userName, onLogout }: Props) {
   const [motivation] = useState(() => MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)])
   const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'ansprechpartner'|'team'|'bericht'|'chat'|'profil'>('overview')
+  const [showMoreSheet, setShowMoreSheet] = useState(false)
   const [objSearch, setObjSearch] = useState('')
   const [contactPersons, setContactPersons]   = useState<any[]>([])
   const [kundenSubTab, setKundenSubTab]       = useState<'kunden'|'ansprechpartner'>('kunden')
@@ -510,20 +511,58 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {!isDesktop && (
         <div style={s.tabBar}>
           {([
-            { id:'overview',   icon:'dashboard',     label:'Übersicht', badge: reportNewCount },
-            { id:'objekte',    icon:'apartment',      label:'Objekte',   badge: 0 },
-            { id:'kunden',     icon:'contacts',       label:'Kunden',    badge: 0 },
-            { id:'ansprechpartner', icon:'person_search', label:'Kontakte', badge: 0 },
-            { id:'profil',     icon:'person',         label:'Profil',    badge: 0 },
+            { id:'overview', icon:'dashboard',  label:'Übersicht', badge: reportNewCount },
+            { id:'objekte',  icon:'apartment',  label:'Objekte',   badge: 0 },
+            { id:'kunden',   icon:'contacts',   label:'Kunden',    badge: 0 },
+            { id:'team',     icon:'group',      label:'Team',      badge: newMaCount },
           ] as const).map(t=>(
-            <div key={t.id} onClick={()=>{ setTab(t.id); if(t.id==='overview'){ const now=Date.now(); setReportSeen(now); localStorage.setItem('sw_report_seen',String(now)) } }} style={{ ...s.tabItem, color:tab===t.id?'var(--pri)':'var(--txt-muted)', fontWeight:tab===t.id?700:500, position:'relative' }}>
-              <div style={{ width:44, height:30, borderRadius:99, background:tab===t.id?'var(--pri-xl)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.15s', position:'relative' }}>
-                <span className={`material-symbols-outlined${tab===t.id?' icon-fill':''}`} style={{ fontSize:22 }}>{t.icon}</span>
+            <div key={t.id} onClick={()=>{ setShowMoreSheet(false); setTab(t.id); if(t.id==='overview'){ const now=Date.now(); setReportSeen(now); localStorage.setItem('sw_report_seen',String(now)) } }} style={{ ...s.tabItem, color:tab===t.id&&!showMoreSheet?'var(--pri)':'var(--txt-muted)', fontWeight:tab===t.id&&!showMoreSheet?700:500, position:'relative' }}>
+              <div style={{ width:44, height:30, borderRadius:99, background:tab===t.id&&!showMoreSheet?'var(--pri-xl)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.15s', position:'relative' }}>
+                <span className={`material-symbols-outlined${tab===t.id&&!showMoreSheet?' icon-fill':''}`} style={{ fontSize:22 }}>{t.icon}</span>
                 {t.badge > 0 && <span style={{ position:'absolute', top:2, right:4, minWidth:16, height:16, borderRadius:999, background:'#e53935', color:'#fff', fontSize:9, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 3px' }}>{t.badge}</span>}
               </div>
               {t.label}
             </div>
           ))}
+          {/* Mehr-Tab */}
+          <div onClick={() => setShowMoreSheet(v => !v)} style={{ ...s.tabItem, color:showMoreSheet?'var(--pri)':'var(--txt-muted)', fontWeight:showMoreSheet?700:500, position:'relative' }}>
+            <div style={{ width:44, height:30, borderRadius:99, background:showMoreSheet?'var(--pri-xl)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.15s' }}>
+              <span className={`material-symbols-outlined${showMoreSheet?' icon-fill':''}`} style={{ fontSize:22 }}>more_horiz</span>
+            </div>
+            Mehr
+          </div>
+        </div>
+      )}
+
+      {/* Mehr-Sheet */}
+      {!isDesktop && showMoreSheet && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:190, display:'flex', alignItems:'flex-end' }}
+          onClick={() => setShowMoreSheet(false)}>
+          <div style={{ background:'var(--bg)', borderRadius:'20px 20px 0 0', width:'100%', paddingBottom:'env(safe-area-inset-bottom, 16px)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 4px' }}>
+              <div style={{ width:36, height:4, borderRadius:2, background:'var(--surf-high)' }}/>
+            </div>
+            <div style={{ padding:'8px 16px 16px', display:'flex', flexDirection:'column', gap:6 }}>
+              {([
+                { id:'ansprechpartner', icon:'person_search', label:'Kontakte',   desc:'Ansprechpartner & Personen' },
+                { id:'bericht',         icon:'bar_chart',     label:'Tagesbericht', desc:'Auswertung & Protokoll' },
+                { id:'profil',          icon:'person',        label:'Profil',     desc:'Einstellungen & Konto' },
+              ] as const).map(item => (
+                <div key={item.id} onClick={() => { setTab(item.id); setShowMoreSheet(false); if(item.id==='bericht'){ const now=Date.now(); setReportSeen(now); localStorage.setItem('sw_report_seen',String(now)) } }}
+                  style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', borderRadius:14, background: tab===item.id ? 'var(--pri-xl)' : 'var(--surf-card)', border:`1.5px solid ${tab===item.id ? 'var(--pri)' : 'var(--outline)'}`, cursor:'pointer' }}>
+                  <div style={{ width:40, height:40, borderRadius:12, background: tab===item.id ? 'var(--pri)' : 'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:20, color: tab===item.id ? '#fff' : 'var(--txt-muted)' }}>{item.icon}</span>
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:700, color: tab===item.id ? 'var(--pri)' : 'var(--txt)' }}>{item.label}</div>
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{item.desc}</div>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>chevron_right</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -8098,9 +8137,9 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
           : cp.name || '–'
         const initials = ((cp.first_name?.[0]||'') + (cp.last_name?.[0]||cp.name?.[0]||'')).toUpperCase() || '?'
         return (
-          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1100, display:'flex', alignItems:'flex-end' }}
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1100, display:'flex', alignItems: window.innerWidth >= 768 ? 'center' : 'flex-end', justifyContent: window.innerWidth >= 768 ? 'center' : 'stretch' }}
             onClick={() => setSelectedContact(null)}>
-            <div style={{ background:'var(--bg)', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'85vh', overflowY:'auto', paddingBottom:'env(safe-area-inset-bottom, 20px)' }}
+            <div style={{ background:'var(--bg)', borderRadius: window.innerWidth >= 768 ? 20 : '24px 24px 0 0', width: window.innerWidth >= 768 ? 400 : '100%', maxHeight:'85vh', overflowY:'auto', paddingBottom: window.innerWidth >= 768 ? 0 : 'env(safe-area-inset-bottom, 20px)', boxShadow: window.innerWidth >= 768 ? '0 8px 40px rgba(0,0,0,0.2)' : 'none' }}
               onClick={e => e.stopPropagation()}>
               {/* Handle */}
               <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 0' }}>
