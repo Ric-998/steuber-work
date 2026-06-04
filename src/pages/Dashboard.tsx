@@ -3240,6 +3240,8 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   const [selectedHv, setSelectedHv]           = useState<CustomerItem|null>(null)
   const [hvCreateMode, setHvCreateMode]       = useState(false)
   const [hvNewName, setHvNewName]             = useState('')
+  const [hvNameSuggestions, setHvNameSuggestions] = useState<CustomerItem[]>([])
+  const [hvNameSearching, setHvNameSearching] = useState(false)
   const [hvNewStreet, setHvNewStreet]         = useState('')
   const [hvNewPostal, setHvNewPostal]         = useState('')
   const [hvNewCity, setHvNewCity]             = useState('')
@@ -3341,6 +3343,27 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       .limit(6)
     setMvVerwResults(data || [])
     setMvVerwSearching(false)
+  }
+
+  const searchHvName = async (val: string) => {
+    setHvNewName(val)
+    if (val.trim().length < 2) { setHvNameSuggestions([]); return }
+    setHvNameSearching(true)
+    const { data } = await supabase.from('customers')
+      .select('id,name,customer_type,street,postal_code,city')
+      .or("customer_type.eq.firma,customer_type.eq.weg-verwaltung")
+      .ilike('name', '%' + val.trim() + '%')
+      .limit(5)
+    setHvNameSuggestions((data || []) as unknown as CustomerItem[])
+    setHvNameSearching(false)
+  }
+
+  const pickHvSuggestion = (hv: CustomerItem) => {
+    // Switch to selecting this existing HV
+    selectHv(hv)
+    setHvCreateMode(false)
+    setHvNewName('')
+    setHvNameSuggestions([])
   }
 
   const searchHv = async (q: string) => {
@@ -3510,7 +3533,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
 
           if (hvData) {
             hvId = hvData.id
-            // Ansprechpartner der HV anlegen
+            // Ansprechpartner anlegen
             if (hvNewCpName.trim()) {
               const { data: cpData } = await supabase.from('contact_persons').insert({
                 customer_id: hvData.id,
@@ -3568,11 +3591,40 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
     setCpSearchQ(q)
     if (q.trim().length < 2) { setCpSearchRes([]); return }
     setCpSearching(true)
-    const { data } = await supabase.from('contact_persons')
-      .select('id,name,first_name,last_name,role,phone,email,customers(name)')
-      .or(`name.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
-      .limit(5)
-    setCpSearchRes(data || [])
+    const term = q.trim()
+    // Search contact_persons table
+    const { data: cpData } = await supabase.from('contact_persons')
+      .select('id,name,first_name,last_name,role,phone,email')
+      .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`)
+      .limit(8)
+    // Also search privatperson customers (they ARE contacts)
+    const { data: custData } = await supabase.from('customers')
+      .select('id,name,first_name,last_name,email,phone')
+      .eq('customer_type', 'privatperson')
+      .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`)
+      .limit(8)
+    // Merge and deduplicate by name
+    const fromCp = (cpData || []).map((r: any) => ({
+      id: r.id,
+      first_name: r.first_name || '',
+      last_name: r.last_name || r.name || '',
+      role: r.role || '',
+      phone: r.phone || '',
+      email: r.email || '',
+      _source: 'cp',
+    }))
+    const fromCust = (custData || []).map((r: any) => ({
+      id: 'cust-' + r.id,
+      first_name: r.first_name || '',
+      last_name: r.last_name || r.name || '',
+      role: 'Privatperson',
+      phone: r.phone || '',
+      email: r.email || '',
+      _source: 'cust',
+    }))
+    // Combine, put contact_persons first, then privatpersons
+    const combined = [...fromCp, ...fromCust].slice(0, 8)
+    setCpSearchRes(combined)
     setCpSearching(false)
   }
 
@@ -3998,7 +4050,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     <div style={{ marginBottom:8 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 12px', borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-low)', marginBottom:4 }}>
                         <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
-                        <input value={cpSearchQ} onChange={e => searchCp(e.target.value)} placeholder="Bestehenden Ansprechpartner suchen …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:13, color:'var(--txt)' }}/>
+                        <input value={cpSearchQ} onChange={e => searchCp(e.target.value)} placeholder="Ansprechpartner suchen …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:13, color:'var(--txt)' }}/>
                         {cpSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                         {cpSearchQ && <button onClick={() => { setCpSearchQ(''); setCpSearchRes([]) }} style={{ background:'none', border:'none', cursor:'pointer', padding:0, color:'var(--txt-muted)', display:'flex' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
                       </div>
@@ -4191,15 +4243,48 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                         <span className="material-symbols-outlined icon-sm">close</span>
                       </button>
                     </div>
-                    {[
-                      { label:'Name *', val:hvNewName, set:setHvNewName, ph:'Muster Hausverwaltung GmbH' },
-                      { label:'Straße + Hausnummer', val:hvNewStreet, set:setHvNewStreet, ph:'Beispielweg 5' },
-                    ].map(f => (
-                      <div key={f.label} style={{ marginBottom:8 }}>
-                        <label style={{ ...s.fieldLabel, fontSize:10 }}>{f.label}</label>
-                        <div style={s.inputWrap}><input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+                    {/* Name mit Live-Suche */}
+                    <div style={{ marginBottom:8, position:'relative' }}>
+                      <label style={{ ...s.fieldLabel, fontSize:10 }}>Name *</label>
+                      <div style={s.inputWrap}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>domain</span>
+                        <input
+                          value={hvNewName}
+                          onChange={e => searchHvName(e.target.value)}
+                          placeholder="Muster Hausverwaltung GmbH"
+                          style={s.input}
+                          autoFocus
+                        />
+                        {hvNameSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                       </div>
-                    ))}
+                      {/* Suggestions dropdown */}
+                      {hvNameSuggestions.length > 0 && (
+                        <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:50, background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--pri)', boxShadow:'0 8px 24px rgba(9,106,112,0.15)', marginTop:2, overflow:'hidden' }}>
+                          <div style={{ padding:'6px 12px 4px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Bereits vorhanden – auswählen?</div>
+                          {hvNameSuggestions.map(hv => (
+                            <div key={hv.id} onClick={() => pickHvSuggestion(hv)}
+                              style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderTop:'1px solid var(--outline)', cursor:'pointer', background:'var(--surf-low)' }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--pri-xl)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--surf-low)'}>
+                              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>domain</span>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{hv.name}</div>
+                                {(hv as any).street && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{(hv as any).street}{(hv as any).city ? ', ' + (hv as any).city : ''}</div>}
+                              </div>
+                              <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 6px', flexShrink:0 }}>Auswählen</span>
+                            </div>
+                          ))}
+                          <div style={{ padding:'6px 12px 8px', fontSize:11, color:'var(--txt-muted)', fontStyle:'italic' }}>
+                            Oder weiter unten als neue HV anlegen ↓
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Straße */}
+                    <div style={{ marginBottom:8 }}>
+                      <label style={{ ...s.fieldLabel, fontSize:10 }}>Straße + Hausnummer</label>
+                      <div style={s.inputWrap}><input value={hvNewStreet} onChange={e => setHvNewStreet(e.target.value)} placeholder="Beispielweg 5" style={s.input}/></div>
+                    </div>
                     <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:8 }}>
                       <div>
                         <label style={{ ...s.fieldLabel, fontSize:10 }}>PLZ</label>
@@ -4217,7 +4302,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                       </div>
                     </div>
                     <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, marginTop:4, display:'flex', alignItems:'center', gap:5 }}>
-                      <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner HV (optional)
+                      <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner
                     </div>
                     {[
                       { label:'Name', val:hvNewCpName, set:setHvNewCpName, ph:'Max Mustermann' },
@@ -4478,7 +4563,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                         </div>
                       </div>
                       <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-sec)', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
-                        <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner (optional)
+                        <span className="material-symbols-outlined icon-sm">person</span> Ansprechpartner
                       </div>
                       {[
                         { label:'Name', val:mvVerwNewCpName, set:setMvVerwNewCpName, ph:'Max Mustermann' },
@@ -4904,7 +4989,7 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
       </div>
       {loadingContacts ? <Loader/> : contacts.length === 0 ? (
         <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'14px', textAlign:'center', color:'var(--txt-muted)', fontSize:13, marginBottom:16 }}>
-          Noch keine Ansprechpartner hinterlegt
+          Noch keine Ansprechpartner
         </div>
       ) : (
         <div style={{ marginBottom:16 }}>
