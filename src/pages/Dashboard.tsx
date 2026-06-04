@@ -566,7 +566,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     </div>
                     <div style={s.bentoPills}>
                       <span style={s.bentoPill}><span style={s.bentoDot}/>{stats?.in_arbeit??0} In Arbeit</span>
-                      <span style={{ ...s.bentoPill, background:'rgba(255,255,255,0.1)' }}><span style={{ ...s.bentoDot, background:'#a8ece8' }}/>{stats?.gesamt_offen??0} Offen</span>
+                      <span style={{ ...s.bentoPill, background:'rgba(255,255,255,0.1)' }}><span style={{ ...s.bentoDot, background:'#a8ece8' }}/>{(dailyReport?.assignments??[]).filter((a:any)=>a.status==='offen').length} Offen</span>
                     </div>
                   </div>
                   <div style={s.bentoSide}>
@@ -7951,6 +7951,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
   onSearchChange: (v: string) => void
 }) {
   const [showExport, setShowExport] = useState(false)
+  const [selectedContact, setSelectedContact] = useState<any>(null)
 
   // Merge: contact_persons + privatperson customers (they ARE persons)
   const privatpersonen = (customers || [])
@@ -8048,7 +8049,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
                 const isPrivat = cp._isCust === true
                 const hasRole = cp.role && cp.role !== 'Privatperson'
                 return (
-                  <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, boxShadow:'0 1px 6px rgba(9,106,112,0.06)', borderLeft: isPrivat ? '3px solid var(--pri-xl)' : '3px solid transparent' }}>
+                  <div key={cp.id} onClick={() => setSelectedContact(cp)} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, boxShadow:'0 1px 6px rgba(9,106,112,0.06)', borderLeft: isPrivat ? '3px solid var(--pri-xl)' : '3px solid transparent', cursor:'pointer' }}>
                     {/* Avatar */}
                     <div style={{ width:44, height:44, borderRadius:14, background: isPrivat ? 'var(--pri-xl)' : 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: isPrivat ? 'var(--pri)' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: isPrivat ? 'none' : '0 4px 10px rgba(9,106,112,0.2)' }}>
                       {initials}
@@ -8078,6 +8079,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
                         )}
                       </div>
                     </div>
+                    <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
                   </div>
                 )
               })}
@@ -8086,6 +8088,96 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
           <div style={{ height:80 }}/>
         </>
       )}
+
+      {/* Kontaktkarte */}
+      {selectedContact && (() => {
+        const cp = selectedContact
+        const isPrivat = cp._isCust === true
+        const displayName = cp.first_name || cp.last_name
+          ? [cp.first_name, cp.last_name].filter(Boolean).join(' ')
+          : cp.name || '–'
+        const initials = ((cp.first_name?.[0]||'') + (cp.last_name?.[0]||cp.name?.[0]||'')).toUpperCase() || '?'
+        return (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1100, display:'flex', alignItems:'flex-end' }}
+            onClick={() => setSelectedContact(null)}>
+            <div style={{ background:'var(--bg)', borderRadius:'24px 24px 0 0', width:'100%', maxHeight:'85vh', overflowY:'auto', paddingBottom:'env(safe-area-inset-bottom, 20px)' }}
+              onClick={e => e.stopPropagation()}>
+              {/* Handle */}
+              <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 0' }}>
+                <div style={{ width:36, height:4, borderRadius:2, background:'var(--surf-high)' }}/>
+              </div>
+              {/* Avatar + Name */}
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 20px 16px', gap:10 }}>
+                <div style={{ width:72, height:72, borderRadius:22, background: isPrivat ? 'var(--pri-xl)' : 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: isPrivat ? 'var(--pri)' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:24, fontFamily:'var(--font-head)', boxShadow: isPrivat ? 'none' : '0 6px 20px rgba(9,106,112,0.3)' }}>
+                  {initials}
+                </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ fontSize:20, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:4 }}>{displayName}</div>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                    {cp.role && cp.role !== 'Privatperson' && (
+                      <span style={{ fontSize:12, color:'var(--txt-sec)', fontWeight:600 }}>{cp.role}</span>
+                    )}
+                    {isPrivat && <span style={{ fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 8px' }}>Privatperson</span>}
+                  </div>
+                </div>
+              </div>
+              {/* Infos */}
+              <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+                {/* Kontaktdaten */}
+                {(cp.phone || cp.email) && (
+                  <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
+                    {cp.phone && (
+                      <a href={'tel:' + cp.phone}
+                        style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', textDecoration:'none', borderBottom: cp.email ? '1px solid var(--outline)' : 'none' }}>
+                        <div style={{ width:38, height:38, borderRadius:12, background:'#e8f5e9', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:20, color:'#2e7d32' }}>phone</span>
+                        </div>
+                        <div>
+                          <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Telefon</div>
+                          <div style={{ fontSize:15, fontWeight:700, color:'var(--pri)', marginTop:1 }}>{cp.phone}</div>
+                        </div>
+                      </a>
+                    )}
+                    {cp.email && (
+                      <a href={'mailto:' + cp.email}
+                        style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', textDecoration:'none' }}>
+                        <div style={{ width:38, height:38, borderRadius:12, background:'#e3f2fd', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:20, color:'#1565c0' }}>mail</span>
+                        </div>
+                        <div>
+                          <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>E-Mail</div>
+                          <div style={{ fontSize:15, fontWeight:700, color:'var(--pri)', marginTop:1 }}>{cp.email}</div>
+                        </div>
+                      </a>
+                    )}
+                  </div>
+                )}
+                {/* Verknüpfter Kunde */}
+                {cp.customers?.name && (
+                  <div style={{ background:'var(--surf-card)', borderRadius:16, border:'1px solid var(--outline)', padding:'14px 16px', display:'flex', alignItems:'center', gap:14 }}>
+                    <div style={{ width:38, height:38, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--pri)' }}>
+                        {cp.customers.customer_type === 'privatperson' ? 'person' : cp.customers.customer_type === 'firma' ? 'business' : 'apartment'}
+                      </span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Kunde</div>
+                      <div style={{ fontSize:15, fontWeight:700, color:'var(--txt)', marginTop:1 }}>{cp.customers.name}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Schließen */}
+              <div style={{ padding:'0 16px 8px' }}>
+                <button onClick={() => setSelectedContact(null)}
+                  style={{ width:'100%', padding:'13px', borderRadius:14, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                  Schließen
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Export-Modal */}
       {showExport && (
