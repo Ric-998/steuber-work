@@ -12,19 +12,30 @@ function urlBase64ToUint8Array(base64String: string) {
 export async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return null
   try {
-    const hadController = !!navigator.serviceWorker.controller
     const reg = await navigator.serviceWorker.register('/sw.js')
 
-    // Stündlich auf Updates prüfen (für lang laufende PWA-Sessions)
-    setInterval(() => reg.update(), 60 * 60 * 1000)
+    // Vite-Hash-basierter Update-Check:
+    // index.html mit cache bypass abrufen, Bundle-Hash extrahieren und vergleichen.
+    // Ändert sich der Hash → neue Version deployed → Banner anzeigen.
+    let knownHash: string | null = null
 
-    // Wenn ein neuer SW die Kontrolle übernimmt:
-    // - Erststart (kein vorheriger Controller) → still, kein Banner nötig
-    // - Update (vorheriger Controller war aktiv) → Banner anzeigen
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!hadController) return
-      window.dispatchEvent(new CustomEvent('swupdated'))
-    })
+    const checkForAppUpdate = async () => {
+      try {
+        const res = await fetch('/index.html', { cache: 'no-store' })
+        const html = await res.text()
+        const match = html.match(/src="\/assets\/index-([^"]+)\.js"/)
+        const hash = match?.[1] ?? null
+        if (!hash) return
+        if (knownHash === null) { knownHash = hash; return }
+        if (hash !== knownHash) {
+          window.dispatchEvent(new CustomEvent('swupdated'))
+        }
+      } catch { /* offline – ignore */ }
+    }
+
+    // Sofort + alle 5 Minuten prüfen
+    checkForAppUpdate()
+    setInterval(checkForAppUpdate, 5 * 60 * 1000)
 
     return reg
   } catch(e) {
