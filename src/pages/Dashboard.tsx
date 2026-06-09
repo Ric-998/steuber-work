@@ -816,9 +816,16 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 <h1 style={s.h1}>Objekte</h1>
                 <p style={s.sub}>{objects.length} Objekte · {tasks.filter(t=>t.is_active).length} aktive Aufgaben</p>
               </div>
-              <button style={s.btnSmall} onClick={()=>setShowObjCreate(true)}>
-                <span className="material-symbols-outlined icon-sm">add_home</span> Neu
-              </button>
+              <div style={{ display:'flex', gap:8 }}>
+                {isDesktop && (
+                  <button style={{ ...s.btnSmall, background:'var(--pri)', border:'none', color:'#fff' }} onClick={()=>setShowCreate('')}>
+                    <span className="material-symbols-outlined icon-sm">add_task</span> Aufgabe
+                  </button>
+                )}
+                <button style={s.btnSmall} onClick={()=>setShowObjCreate(true)}>
+                  <span className="material-symbols-outlined icon-sm">add_home</span> Objekt
+                </button>
+              </div>
             </section>
 
             {/* Suche */}
@@ -2750,7 +2757,7 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
             <input value={street} onChange={e => setStreet(e.target.value)} placeholder="Bahnhofstraße 14" style={s.input} />
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:10, alignItems:'start' }}>
             <div>
               <label style={s.fieldLabel}>PLZ *</label>
               <div style={s.inputWrap}>
@@ -4092,10 +4099,14 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i <= effStep ? 'var(--pri)' : 'var(--outline)', transition:'background 0.2s' }} />
               ))}
               {newCustType && (
-                <div style={{ display:'flex', alignItems:'center', gap:4, background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:20, padding:'3px 9px 3px 5px', marginLeft:4 }}>
+                <button
+                  onClick={() => { setNewCustType(''); setNewAnrede(''); setNewVorname(''); setNewNachname(''); setNewVorname2(''); setNewNachname2(''); setNewContacts([]); setCpFn(''); setCpLn('') }}
+                  title="Typ ändern"
+                  style={{ display:'flex', alignItems:'center', gap:4, background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:20, padding:'3px 9px 3px 5px', marginLeft:4, cursor:'pointer' }}>
                   <span className="material-symbols-outlined" style={{ fontSize:13, color:'var(--pri)' }}>{ti[newCustType]||'person'}</span>
                   <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)' }}>{tl[newCustType]||newCustType}</span>
-                </div>
+                  <span className="material-symbols-outlined" style={{ fontSize:11, color:'var(--pri)', marginLeft:1 }}>edit</span>
+                </button>
               )}
             </div>
           </div>
@@ -4110,7 +4121,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
           <p style={{ ...s.sub, marginBottom: 20 }}>Die Objektnummer wird automatisch vergeben.</p>
 
           {/* PLZ + Ort nebeneinander */}
-          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 8, marginBottom: 12, alignItems:'start' }}>
             <div>
               <label style={s.fieldLabel}>PLZ *</label>
               <div style={{ ...s.inputWrap, borderColor: postal.length === 5 ? 'var(--pri)' : 'var(--outline)' }}>
@@ -4127,8 +4138,8 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
               </div>
             </div>
             <div style={{ minWidth: 0 }}>
-              <label style={s.fieldLabel}>Ort *{cityLocked && <span style={{ color: 'var(--pri)', fontWeight: 400, marginLeft: 4 }}>✓ auto</span>}</label>
-              <div style={{ ...s.inputWrap }}>
+              <label style={s.fieldLabel}>Ort *</label>
+              <div style={{ ...s.inputWrap, background: cityLocked ? 'var(--ok-bg)' : undefined }}>
                 <span className="material-symbols-outlined icon-sm" style={{ color: 'var(--txt-muted)' }}>location_city</span>
                 <input
                   value={city}
@@ -4136,6 +4147,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   placeholder="Melsungen"
                   style={s.input}
                 />
+                {cityLocked && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)', flexShrink:0 }}>check_circle</span>}
               </div>
             </div>
           </div>
@@ -4288,23 +4300,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>Neuen Kunden anlegen</div>
-                  {newCustType && (() => {
-                    const tl: Record<string,string> = { privatperson:'Privatperson', firma:'Firma', 'weg-verwaltung':'WEG-Verwaltung', mietverwaltung:'Mietverwaltung' }
-                    const ti: Record<string,string> = { privatperson:'person', firma:'business', 'weg-verwaltung':'apartment', mietverwaltung:'home_work' }
-                    return (
-                      <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:4, background:'var(--pri-xl)', borderRadius:20, padding:'3px 10px 3px 6px', border:'1px solid var(--pri)' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize:13, color:'var(--pri)' }}>{ti[newCustType]||'person'}</span>
-                          <span style={{ fontSize:11, fontWeight:700, color:'var(--pri)' }}>{tl[newCustType]||newCustType}</span>
-                        </div>
-                        <button onClick={() => { setNewCustType(''); setNewAnrede(''); setNewVorname(''); setNewNachname(''); setNewVorname2(''); setNewNachname2(''); setNewContacts([]); setCpFn(''); setCpLn('') }}
-                          style={{ background:'none', border:'none', color:'var(--txt-muted)', fontSize:11, cursor:'pointer', padding:0, display:'flex', alignItems:'center', gap:3 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize:13 }}>edit</span>
-                          Typ ändern
-                        </button>
-                      </div>
-                    )
-                  })()}
+
                 </div>
                 <button onClick={() => { setCreateMode(false); setNewCustType(''); setCustQuery(''); setCustResults([]) }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--txt-muted)' }}>
@@ -4352,11 +4348,10 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 {/* Person 1 + optional Person 2 (Eheleute) */}
                 {newAnrede === 'eheleute' ? (<>
                   {/* Zwei Vornamen nebeneinander */}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8, alignItems:'start' }}>
                     <div>
                       <label style={s.fieldLabel}>Vorname 1 *</label>
                       <div style={s.inputWrap}>
-                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
                         <input value={newVorname} onChange={e => setNewVorname(e.target.value)} placeholder="Max" style={s.input}/>
                       </div>
                     </div>
@@ -4377,11 +4372,10 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   </div>
                 </>) : (
                   /* Herr / Frau: Vorname + Nachname nebeneinander */
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10, alignItems:'start' }}>
                     <div>
                       <label style={s.fieldLabel}>Vorname *</label>
                       <div style={s.inputWrap}>
-                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
                         <input value={newVorname} onChange={e => setNewVorname(e.target.value)} placeholder="Max" style={s.input}/>
                       </div>
                     </div>
@@ -4892,7 +4886,7 @@ const s: Record<string,React.CSSProperties> = {
   backBtn:       { background:'var(--surf-low)', border:'none', width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt)', cursor:'pointer', flexShrink:0 },
   selectCard:    { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:14, border:'1.5px solid var(--outline)', cursor:'pointer', transition:'all 0.15s' },
   formCard:      { background:'var(--surf-card)', borderRadius:20, padding:20, marginBottom:24, boxShadow:'0 2px 16px rgba(9,106,112,0.07)' },
-  fieldLabel:    { display:'block', fontSize:11, fontWeight:600, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 } as React.CSSProperties,
+  fieldLabel:    { display:'flex', alignItems:'center', gap:6, fontSize:11, fontWeight:600, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6, minHeight:16 } as React.CSSProperties,
   inputWrap:     { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', overflow:'hidden' },
   input:         { flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' },
   roleOpt:       { display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 8px', borderRadius:12, border:'1.5px solid var(--outline)', cursor:'pointer', flex:1 } as React.CSSProperties,
@@ -5623,7 +5617,7 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
               <label style={s.fieldLabel}>Adresszusatz</label>
               <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>layers</span><input value={addrSup} onChange={e=>setAddrSup(e.target.value)} placeholder="c/o, Gebäude B, …" style={s.input}/></div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14, alignItems:'start' }}>
               <div>
                 <label style={s.fieldLabel}>PLZ</label>
                 <div style={s.inputWrap}>
@@ -5698,7 +5692,7 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
                 <div style={s.inputWrap}><input value={streetNumber} onChange={e=>setStreetNumber(e.target.value)} placeholder="1" style={s.input}/></div>
               </div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14, alignItems:'start' }}>
               <div>
                 <label style={s.fieldLabel}>PLZ</label>
                 <div style={s.inputWrap}>
@@ -5898,7 +5892,7 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
             <label style={s.fieldLabel}>Adresszusatz</label>
             <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>layers</span><input value={addrSup} onChange={e=>setAddrSup(e.target.value)} placeholder="c/o, Gebäude B, …" style={s.input}/></div>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14, alignItems:'start' }}>
             <div>
               <label style={s.fieldLabel}>PLZ</label>
               <div style={s.inputWrap}>
