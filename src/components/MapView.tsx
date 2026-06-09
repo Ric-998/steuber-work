@@ -8,6 +8,7 @@ interface Props {
 
 export default function MapView({ address, city, postalCode }: Props) {
   const [showDialog, setShowDialog] = useState(false)
+  const [showMap, setShowMap] = useState(false)
 
   const fullAddress = [address, postalCode, city].filter(Boolean).join(', ')
   const encodedAddress = encodeURIComponent(fullAddress)
@@ -24,33 +25,51 @@ export default function MapView({ address, city, postalCode }: Props) {
     setShowDialog(false)
   }
 
+  const handleRoute = () => {
+    if (isIOS) setShowDialog(true)
+    else openGoogleMaps()
+  }
+
   return (
     <>
-      <div style={{ borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)', boxShadow:'0 2px 12px rgba(9,106,112,0.06)' }}>
-        {/* Karten-Vorschau via Google Maps iframe */}
-        <div style={{ position:'relative', height:180 }}>
-          <iframe
-            title="Kartenvorschau"
-            src={`https://maps.google.com/maps?q=${encodedAddress}&output=embed&hl=de&z=15`}
-            style={{ width:'100%', height:'100%', border:'none', display:'block' }}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
+      <div style={{ background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', overflow:'hidden' }}>
+        {/* Adresszeile */}
+        <div style={{ padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ width:36, height:36, borderRadius:10, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>location_on</span>
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{address}</div>
+            <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{postalCode} {city}</div>
+          </div>
+          <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+            <button
+              onClick={() => setShowMap(v => !v)}
+              style={{ display:'flex', alignItems:'center', gap:4, padding:'7px 10px', borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-low)', color:'var(--txt-sec)', fontSize:11, fontWeight:600, cursor:'pointer' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:14 }}>map</span>
+              {showMap ? 'Schließen' : 'Karte'}
+            </button>
+            <button
+              onClick={handleRoute}
+              style={{ display:'flex', alignItems:'center', gap:4, padding:'7px 12px', borderRadius:10, border:'none', background:'var(--pri)', color:'#fff', fontSize:11, fontWeight:700, cursor:'pointer' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:14 }}>directions</span>
+              Route
+            </button>
+          </div>
         </div>
 
-        {/* Adresszeile + Route-Button */}
-        <div style={{ background:'var(--surf-card)', padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-          <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{address}</div>
-            <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>{postalCode} {city}</div>
+        {/* Karte (ausklappbar) */}
+        {showMap && (
+          <div style={{ borderTop:'1px solid var(--outline)', height:200, position:'relative' }}>
+            <iframe
+              title="Kartenvorschau"
+              src={`https://maps.google.com/maps?q=${encodedAddress}&output=embed&hl=de&z=15`}
+              style={{ width:'100%', height:'100%', border:'none', display:'block' }}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
-          <button
-            onClick={() => isIOS ? setShowDialog(true) : openGoogleMaps()}
-            style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:12, border:'none', background:'var(--pri)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16 }}>directions</span>
-            Route
-          </button>
-        </div>
+        )}
       </div>
 
       {/* App-Auswahl Dialog (iOS) */}
