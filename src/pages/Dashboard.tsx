@@ -2340,23 +2340,25 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
         </div>
 
         {/* ── Leistungen ── */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-          <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)' }}>
-            Leistungen
-            <span style={{ marginLeft:8, fontSize:11, fontWeight:600, color:'var(--txt-muted)', background:'var(--surf-high)', borderRadius:999, padding:'2px 8px' }}>
-              {tasks.filter(t=>t.is_active).length} aktiv
-            </span>
-          </h3>
-          <button onClick={onNewTask} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', padding:'6px 12px', borderRadius:999, border:'none', cursor:'pointer' }}>
-            <span className="material-symbols-outlined icon-sm">add</span> Neue Leistung
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <h3 style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Leistungen</h3>
+            {tasks.filter(t=>t.is_active).length > 0 && (
+              <span style={{ fontSize:11, fontWeight:700, color:'var(--ok)', background:'var(--ok-bg)', borderRadius:999, padding:'2px 8px' }}>
+                {tasks.filter(t=>t.is_active).length} aktiv
+              </span>
+            )}
+          </div>
+          <button onClick={onNewTask} style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', padding:'7px 14px', borderRadius:999, border:'none', cursor:'pointer' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:15 }}>add</span> Neue Leistung
           </button>
         </div>
 
         {tasks.length === 0 ? (
-          <div style={{ background:'var(--surf-low)', borderRadius:14, padding:'20px 16px', textAlign:'center', color:'var(--txt-muted)', fontSize:13, marginBottom:14 }}>
-            <span className="material-symbols-outlined" style={{ fontSize:28, display:'block', marginBottom:6, opacity:0.4 }}>assignment</span>
-            Noch keine Leistungen hinterlegt.<br/>
-            <span style={{ fontSize:12 }}>Lege die erste Leistung über den Button oben an.</span>
+          <div style={{ background:'var(--surf-low)', borderRadius:16, padding:'24px 16px', textAlign:'center', color:'var(--txt-muted)', fontSize:13, marginBottom:14 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:32, display:'block', marginBottom:8, opacity:0.35 }}>assignment</span>
+            Noch keine Leistungen hinterlegt.
+            <div style={{ fontSize:12, marginTop:4 }}>Lege die erste Leistung über den Button oben an.</div>
           </div>
         ) : tasks.map(t => {
           const cat = t.categories
@@ -2364,93 +2366,122 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
           const taskUpcoming = upcomingAssigns.filter(a => a.task_id === t.id)
           const isExpired = t.end_date && new Date(t.end_date) < new Date()
           return (
-            <div key={t.id} style={{ background:'var(--surf-card)', borderRadius:14, padding:'14px', marginBottom:8, border:'1px solid var(--outline)', opacity:t.is_active && !isExpired ? 1 : 0.55 }}>
-              <div style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
-                <div style={{ width:40, height:40, borderRadius:12, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
+            <div key={t.id} style={{ background:'var(--surf-card)', borderRadius:16, padding:'16px', marginBottom:10, border:'1px solid var(--outline)', opacity:t.is_active && !isExpired ? 1 : 0.5 }}>
+              {/* Zeile 1: Emoji + Titel + Toggle */}
+              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ width:44, height:44, borderRadius:14, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
                   {cat?.emoji || '📋'}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', marginBottom:5, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                  <div style={{ fontSize:15, fontWeight:700, fontFamily:'var(--font-head)', lineHeight:1.25, marginBottom:4 }}>
                     {t.title}
-                    {!t.is_active && <span style={{ fontSize:9, fontWeight:700, color:'var(--txt-muted)', background:'var(--surf-high)', padding:'2px 6px', borderRadius:999 }}>Pausiert</span>}
-                    {isExpired && <span style={{ fontSize:9, fontWeight:700, color:'var(--err)', background:'var(--err-bg)', padding:'2px 6px', borderRadius:999 }}>Abgelaufen</span>}
                   </div>
-                  <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom: taskUpcoming.length > 0 ? 6 : 0 }}>
-                    <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', background:'var(--surf-high)', padding:'2px 8px', borderRadius:999, display:'flex', alignItems:'center', gap:3 }}>
-                      <span className="material-symbols-outlined icon-sm">{INTERVAL_ICONS[t.interval]||'repeat'}</span>{t.interval}
+                  <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', background:'var(--surf-high)', padding:'2px 7px', borderRadius:999, display:'flex', alignItems:'center', gap:3 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:11 }}>{INTERVAL_ICONS[t.interval]||'repeat'}</span>{t.interval}
                     </span>
                     {user?.full_name && (
-                      <span style={{ fontSize:10, fontWeight:600, color:'var(--pri)', background:'var(--pri-xl)', padding:'2px 8px', borderRadius:999, display:'flex', alignItems:'center', gap:3 }}>
-                        <span className="material-symbols-outlined icon-sm">person</span>{user.full_name.split(' ')[0]}
+                      <span style={{ fontSize:10, fontWeight:600, color:'var(--pri)', background:'var(--pri-xl)', padding:'2px 7px', borderRadius:999, display:'flex', alignItems:'center', gap:3 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:11 }}>person</span>{user.full_name.split(' ')[0]}
                       </span>
                     )}
                     {t.contracts && (
-                      <span style={{ fontSize:10, fontWeight:600, color:'var(--sec)', background:'var(--sec-c)', padding:'2px 8px', borderRadius:999 }}>
+                      <span style={{ fontSize:10, fontWeight:600, color:'var(--sec)', background:'var(--sec-c)', padding:'2px 7px', borderRadius:999 }}>
                         {t.contracts.type === 'jahresvertrag' ? 'Jahresvertrag' : 'Einmalig'}
                       </span>
                     )}
+                    {!t.is_active && <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', background:'var(--surf-high)', padding:'2px 7px', borderRadius:999 }}>Pausiert</span>}
+                    {isExpired && <span style={{ fontSize:10, fontWeight:700, color:'var(--err)', background:'var(--err-bg)', padding:'2px 7px', borderRadius:999 }}>Abgelaufen</span>}
                     {t.end_date && !isExpired && (
                       <span style={{ fontSize:10, color:'var(--txt-muted)', padding:'2px 4px' }}>
                         bis {new Date(t.end_date).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'2-digit'})}
                       </span>
                     )}
                   </div>
-                  {taskUpcoming.length > 0 && (
-                    <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, color:'var(--pri)' }}>
-                      <span className="material-symbols-outlined icon-sm">event</span>
+                </div>
+                <button onClick={()=>onToggleTask(t.id, t.is_active)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', color:t.is_active && !isExpired?'var(--ok)':'var(--txt-muted)', flexShrink:0 }}>
+                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:28 }}>{t.is_active?'toggle_on':'toggle_off'}</span>
+                </button>
+              </div>
+              {/* Zeile 2: Trennlinie + Aktionen */}
+              <div style={{ marginTop:12, paddingTop:10, borderTop:'1px solid var(--outline)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div style={{ fontSize:11, display:'flex', alignItems:'center', gap:4 }}>
+                  {taskUpcoming.length > 0 ? (
+                    <span style={{ color:'var(--pri)', display:'flex', alignItems:'center', gap:4 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:13 }}>event</span>
                       {taskUpcoming.length} Termin{taskUpcoming.length > 1 ? 'e' : ''} in 30 Tagen
-                    </div>
+                    </span>
+                  ) : (
+                    <span style={{ color:'var(--txt-muted)' }}>Keine Termine geplant</span>
                   )}
                 </div>
-                <div style={{ display:'flex', gap:4, flexShrink:0 }}>
-                  <button onClick={()=>onEditTask(t)} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:8, width:30, height:30, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt-muted)' }}>
-                    <span className="material-symbols-outlined icon-sm">edit</span>
-                  </button>
-                  <button onClick={()=>onToggleTask(t.id, t.is_active)} style={{ background:'none', border:'none', padding:4, cursor:'pointer', color:t.is_active?'var(--ok)':'var(--txt-muted)' }}>
-                    <span className="material-symbols-outlined icon-fill" style={{ fontSize:24 }}>{t.is_active?'toggle_on':'toggle_off'}</span>
-                  </button>
-                </div>
+                <button onClick={()=>onEditTask(t)} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color:'var(--txt-muted)', background:'var(--surf-low)', padding:'5px 10px', borderRadius:999, border:'none', cursor:'pointer' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:13 }}>edit</span> Bearbeiten
+                </button>
               </div>
             </div>
           )
         })}
 
         {/* ── Nächste Termine ── */}
-        {upcomingAssigns.length > 0 && (
-          <>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:22, marginBottom:10 }}>
-              <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)' }}>Nächste Termine</h3>
-              <span style={{ fontSize:11, color:'var(--txt-muted)' }}>nächste 30 Tage</span>
-            </div>
-            {upcomingAssigns.slice(0, 10).map((a:any) => {
-              const task = tasks.find(t => t.id === a.task_id)
-              const stMeta = STATUS_META[a.status] || STATUS_META['offen']
-              const isToday = a.due_date === localToday()
-              return (
-                <div key={a.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background: isToday ? 'var(--pri-xl)' : 'var(--surf-card)', borderRadius:12, marginBottom:6, border: isToday ? '1px solid var(--pri-l)' : '1px solid var(--outline)' }}>
-                  <div style={{ width:8, height:8, borderRadius:'50%', background:stMeta.color, flexShrink:0 }} />
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                      {task?.categories?.emoji} {task?.title}
-                    </div>
-                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{(a.users as any)?.full_name || '–'}</div>
-                  </div>
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <div style={{ fontSize:12, fontWeight:700, color: isToday ? 'var(--pri)' : 'var(--txt-sec)' }}>
-                      {isToday ? 'Heute' : new Date(a.due_date).toLocaleDateString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit'})}
-                    </div>
-                    <div style={{ fontSize:10, color:stMeta.color, fontWeight:600 }}>{stMeta.label}</div>
-                  </div>
-                </div>
-              )
-            })}
-            {upcomingAssigns.length > 10 && (
-              <div style={{ textAlign:'center', fontSize:12, color:'var(--txt-muted)', padding:'6px 0 4px' }}>
-                +{upcomingAssigns.length - 10} weitere Termine
+        {upcomingAssigns.length > 0 && (() => {
+          const grouped: Record<string, any[]> = {}
+          upcomingAssigns.forEach((a: any) => {
+            if (!grouped[a.due_date]) grouped[a.due_date] = []
+            grouped[a.due_date].push(a)
+          })
+          const sortedDates = Object.keys(grouped).sort().slice(0, 14)
+          const today = localToday()
+          return (
+            <>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:24, marginBottom:12 }}>
+                <h3 style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Nächste Termine</h3>
+                <span style={{ fontSize:11, color:'var(--txt-muted)' }}>nächste 30 Tage</span>
               </div>
-            )}
-          </>
-        )}
+              {sortedDates.map(date => {
+                const isToday = date === today
+                const dateLabel = isToday ? 'Heute' : new Date(date).toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'2-digit'})
+                const assignments = grouped[date]
+                return (
+                  <div key={date} style={{ marginBottom:14 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color: isToday ? 'var(--pri)' : 'var(--txt-sec)', fontFamily:'var(--font-head)', whiteSpace:'nowrap' }}>
+                        {dateLabel}
+                      </div>
+                      <div style={{ flex:1, height:1, background:'var(--outline)' }} />
+                      <div style={{ fontSize:10, color:'var(--txt-muted)', whiteSpace:'nowrap' }}>{assignments.length} Aufgabe{assignments.length !== 1 ? 'n' : ''}</div>
+                    </div>
+                    <div style={{ background:'var(--surf-card)', borderRadius:14, border:`1px solid ${isToday ? 'var(--pri-l)' : 'var(--outline)'}`, overflow:'hidden' }}>
+                      {assignments.map((a: any, idx: number) => {
+                        const task = tasks.find(t => t.id === a.task_id)
+                        const stMeta = STATUS_META[a.status] || STATUS_META['offen']
+                        return (
+                          <div key={a.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderTop: idx > 0 ? '1px solid var(--outline)' : 'none', background: isToday ? 'var(--pri-xl)' : 'transparent' }}>
+                            <div style={{ fontSize:18, flexShrink:0, lineHeight:1 }}>{task?.categories?.emoji || '📋'}</div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                                {task?.title}
+                              </div>
+                              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{(a.users as any)?.full_name || '–'}</div>
+                            </div>
+                            <span style={{ fontSize:10, fontWeight:700, color:stMeta.color, background:stMeta.bg, padding:'3px 8px', borderRadius:999, flexShrink:0 }}>
+                              {stMeta.label}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+              {Object.keys(grouped).length > 14 && (
+                <div style={{ textAlign:'center', fontSize:12, color:'var(--txt-muted)', padding:'4px 0 8px' }}>
+                  +{Object.keys(grouped).length - 14} weitere Tage
+                </div>
+              )}
+            </>
+          )
+        })()}
 
       </>)}
 
