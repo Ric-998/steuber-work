@@ -1927,6 +1927,14 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
   const [newObjCpPhone, setNewObjCpPhone] = useState('')
   const [newObjCpEmail, setNewObjCpEmail] = useState('')
   const [objCpSaving, setObjCpSaving] = useState(false)
+  const [selectedObjContact, setSelectedObjContact] = useState<any|null>(null)
+  const [editingObjContact, setEditingObjContact] = useState(false)
+  const [editObjCpFn, setEditObjCpFn] = useState('')
+  const [editObjCpLn, setEditObjCpLn] = useState('')
+  const [editObjCpRole, setEditObjCpRole] = useState('')
+  const [editObjCpPhone, setEditObjCpPhone] = useState('')
+  const [editObjCpEmail, setEditObjCpEmail] = useState('')
+  const [editObjCpSaving, setEditObjCpSaving] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -2061,28 +2069,49 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       {loadingDetail ? <Loader/> : (<>
 
         {/* ── Kundenkarte ── */}
-        {customer && (
+        {customer && (() => {
+          const typeLabel: Record<string,string> = { privatperson:'Privatperson', firma:'Firma', 'weg-verwaltung':'WEG-Verwaltung', mietverwaltung:'Mietverwaltung' }
+          const typeIcon: Record<string,string>  = { privatperson:'person', firma:'business', 'weg-verwaltung':'apartment', mietverwaltung:'home_work' }
+          return (
           <div style={{ background:'var(--surf-card)', borderRadius:16, padding:'16px', marginBottom:14, border:'1px solid var(--outline)' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom: 10 }}>
               <div style={{ width:36, height:36, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>{customer.customer_type==='firma'?'business':'person'}</span>
+                <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>{typeIcon[customer.customer_type]||'person'}</span>
               </div>
               <div>
                 <div style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)' }}>{customer.name}</div>
                 <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>
-                  {customer.customer_type==='firma'?'Firma':'Privatperson'}
+                  {typeLabel[customer.customer_type]||customer.customer_type}
                   {customer.lexware_id && <span style={{ marginLeft:8, background:'#e8f4f5', color:'var(--pri)', borderRadius:999, padding:'1px 6px', fontSize:10, fontWeight:700 }}>LX</span>}
                 </div>
               </div>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-              {customer.contact_person && <div style={{ fontSize:12, color:'var(--txt-sec)', display:'flex', gap:8 }}><span style={{ color:'var(--txt-muted)', minWidth:80 }}>Ansprechp.</span>{customer.contact_person}</div>}
               {customer.phone && <div style={{ fontSize:12, color:'var(--txt-sec)', display:'flex', gap:8 }}><span style={{ color:'var(--txt-muted)', minWidth:80 }}>Telefon</span><a href={`tel:${customer.phone}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.phone}</a></div>}
               {customer.email && <div style={{ fontSize:12, color:'var(--txt-sec)', display:'flex', gap:8 }}><span style={{ color:'var(--txt-muted)', minWidth:80 }}>E-Mail</span><a href={`mailto:${customer.email}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.email}</a></div>}
               {customer.street && <div style={{ fontSize:12, color:'var(--txt-sec)', display:'flex', gap:8 }}><span style={{ color:'var(--txt-muted)', minWidth:80 }}>Adresse</span>{customer.street}, {customer.postal_code} {customer.city}</div>}
+              {(customer.customer_type==='weg-verwaltung'||customer.customer_type==='mietverwaltung') && customer.hausverwaltung && (
+                <div style={{ fontSize:12, color:'var(--txt-sec)', display:'flex', gap:8 }}>
+                  <span style={{ color:'var(--txt-muted)', minWidth:80 }}>{customer.customer_type==='mietverwaltung'?'Verwaltung':'Hausverwaltung'}</span>
+                  <span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span>
+                </div>
+              )}
+              {(customer.customer_type==='weg-verwaltung'||customer.customer_type==='mietverwaltung') && customer.co_contact && (
+                <div style={{ fontSize:12, color:'var(--txt-sec)', display:'flex', gap:8 }}>
+                  <span style={{ color:'var(--txt-muted)', minWidth:80 }}>c/o Kontakt</span>
+                  <span>{customer.co_contact.name}{customer.co_contact.role ? ' · '+customer.co_contact.role : ''}</span>
+                </div>
+              )}
+              {(customer.customer_type==='weg-verwaltung'||customer.customer_type==='mietverwaltung') && customer.hausverwaltung_objekt_id && (
+                <div style={{ fontSize:12, color:'var(--txt-sec)', display:'flex', gap:8 }}>
+                  <span style={{ color:'var(--txt-muted)', minWidth:80 }}>Objekt-ID</span>
+                  <span style={{ fontFamily:'monospace' }}>{customer.hausverwaltung_objekt_id}</span>
+                </div>
+              )}
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* ── Ansprechpartner ── */}
         <div style={{ background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', padding:'14px 16px', marginBottom:14 }}>
@@ -2102,19 +2131,17 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             const dn = [cp.first_name, cp.last_name].filter(Boolean).join(' ') || cp.name || '–'
             const ini = ((cp.first_name?.[0]||'')+(cp.last_name?.[0]||'')).toUpperCase() || '?'
             return (
-              <div key={cp.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:10, background:'var(--surf-low)', marginBottom:6, border:'1px solid var(--outline)' }}>
-                <div style={{ width:32, height:32, borderRadius:10, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>{ini}</div>
+              <div key={cp.id} onClick={() => { setSelectedObjContact(cp); setEditingObjContact(false) }}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:12, background:'var(--surf-low)', marginBottom:6, border:'1px solid var(--outline)', cursor:'pointer', transition:'background 0.15s' }}
+                onMouseEnter={e=>(e.currentTarget.style.background='var(--pri-xl)')} onMouseLeave={e=>(e.currentTarget.style.background='var(--surf-low)')}>
+                <div style={{ width:38, height:38, borderRadius:12, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, flexShrink:0 }}>{ini}</div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{dn}</div>
-                  {cp.role && <div style={{ fontSize:11, color:'var(--txt-sec)' }}>{cp.role}</div>}
-                  <div style={{ display:'flex', gap:10, marginTop:2 }}>
-                    {cp.phone && <a href={'tel:'+cp.phone} style={{ fontSize:11, color:'var(--pri)', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined" style={{ fontSize:13 }}>phone</span>{cp.phone}</a>}
-                    {cp.email && <a href={'mailto:'+cp.email} style={{ fontSize:11, color:'var(--pri)', textDecoration:'none', display:'flex', alignItems:'center', gap:3 }}><span className="material-symbols-outlined" style={{ fontSize:13 }}>mail</span>{cp.email}</a>}
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{dn}</div>
+                  <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>
+                    {cp.role || (cp.phone ? cp.phone : (cp.email ? cp.email : 'Kein Kontakt hinterlegt'))}
                   </div>
                 </div>
-                <button onClick={() => removeObjCp(cp.id)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--err-dot)', padding:4, display:'flex', flexShrink:0 }}>
-                  <span className="material-symbols-outlined icon-sm">delete</span>
-                </button>
+                <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)' }}>chevron_right</span>
               </div>
             )
           })}
@@ -2464,6 +2491,142 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
           </div>
         </div>
       )}
+
+      {/* ── Kontakt-Detail Bottom Sheet ── */}
+      {selectedObjContact && (() => {
+        const cp = selectedObjContact
+        const dn = [cp.first_name, cp.last_name].filter(Boolean).join(' ') || cp.name || '–'
+        const ini = ((cp.first_name?.[0]||'')+(cp.last_name?.[0]||'')).toUpperCase() || '?'
+        const saveEditCp = async () => {
+          if (!editObjCpLn.trim() && !editObjCpFn.trim()) return
+          setEditObjCpSaving(true)
+          const { data } = await supabase.from('contact_persons').update({
+            name: `${editObjCpFn.trim()} ${editObjCpLn.trim()}`.trim(),
+            first_name: editObjCpFn.trim() || null,
+            last_name: editObjCpLn.trim() || null,
+            role: editObjCpRole.trim() || null,
+            phone: editObjCpPhone.trim() || null,
+            email: editObjCpEmail.trim() || null,
+          }).eq('id', cp.id).select().single()
+          setEditObjCpSaving(false)
+          if (data) {
+            setObjContacts(prev => prev.map(c => c.id === cp.id ? data : c))
+            setSelectedObjContact(data)
+            setEditingObjContact(false)
+          }
+        }
+        return (
+          <>
+            <div onClick={() => setSelectedObjContact(null)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:800 }}/>
+            <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:801, background:'var(--surf-card)', borderRadius:'20px 20px 0 0', padding:'0 0 env(safe-area-inset-bottom,16px)', maxHeight:'85vh', overflowY:'auto', boxShadow:'0 -4px 32px rgba(0,0,0,0.18)' }}>
+              <div style={{ width:36, height:4, borderRadius:2, background:'var(--outline)', margin:'12px auto 0' }}/>
+              {/* Header */}
+              <div style={{ display:'flex', alignItems:'center', gap:14, padding:'16px 20px 12px' }}>
+                <div style={{ width:50, height:50, borderRadius:16, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:18, flexShrink:0 }}>{ini}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)' }}>{dn}</div>
+                  {cp.role && <div style={{ fontSize:13, color:'var(--txt-muted)', marginTop:2 }}>{cp.role}</div>}
+                </div>
+                <button onClick={() => setSelectedObjContact(null)} style={{ background:'var(--surf-low)', border:'none', borderRadius:10, padding:8, cursor:'pointer', display:'flex', color:'var(--txt-muted)' }}>
+                  <span className="material-symbols-outlined icon-sm">close</span>
+                </button>
+              </div>
+              <div style={{ height:1, background:'var(--outline)', margin:'0 20px' }}/>
+
+              {!editingObjContact ? (
+                <div style={{ padding:'16px 20px' }}>
+                  {/* Kontaktfelder */}
+                  {cp.role && (
+                    <div style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--outline)' }}>
+                      <div style={{ width:32, height:32, borderRadius:10, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>badge</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize:10, color:'var(--txt-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em' }}>Funktion</div>
+                        <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)', marginTop:1 }}>{cp.role}</div>
+                      </div>
+                    </div>
+                  )}
+                  {cp.phone && (
+                    <a href={'tel:'+cp.phone} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--outline)', textDecoration:'none' }}>
+                      <div style={{ width:32, height:32, borderRadius:10, background:'#e8f5e9', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--ok)' }}>phone</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize:10, color:'var(--txt-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em' }}>Telefon</div>
+                        <div style={{ fontSize:14, fontWeight:600, color:'var(--pri)', marginTop:1 }}>{cp.phone}</div>
+                      </div>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)', marginLeft:'auto' }}>open_in_new</span>
+                    </a>
+                  )}
+                  {cp.email && (
+                    <a href={'mailto:'+cp.email} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:'1px solid var(--outline)', textDecoration:'none' }}>
+                      <div style={{ width:32, height:32, borderRadius:10, background:'#e3f2fd', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        <span className="material-symbols-outlined icon-sm" style={{ color:'#1976d2' }}>mail</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize:10, color:'var(--txt-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em' }}>E-Mail</div>
+                        <div style={{ fontSize:14, fontWeight:600, color:'var(--pri)', marginTop:1 }}>{cp.email}</div>
+                      </div>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)', marginLeft:'auto' }}>open_in_new</span>
+                    </a>
+                  )}
+                  {!cp.role && !cp.phone && !cp.email && (
+                    <div style={{ textAlign:'center', padding:'20px 0', color:'var(--txt-muted)', fontSize:13 }}>Keine Kontaktdaten hinterlegt</div>
+                  )}
+                  {/* Aktionen */}
+                  <div style={{ display:'flex', gap:10, marginTop:16 }}>
+                    <button onClick={() => { setEditObjCpFn(cp.first_name||''); setEditObjCpLn(cp.last_name||cp.name||''); setEditObjCpRole(cp.role||''); setEditObjCpPhone(cp.phone||''); setEditObjCpEmail(cp.email||''); setEditingObjContact(true) }}
+                      style={{ flex:1, padding:'11px', borderRadius:12, border:'1.5px solid var(--pri)', background:'var(--pri-xl)', color:'var(--pri)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                      <span className="material-symbols-outlined icon-sm">edit</span>Bearbeiten
+                    </button>
+                    <button onClick={async()=>{ if(!window.confirm(`${dn} wirklich entfernen?`)) return; await removeObjCp(cp.id); setSelectedObjContact(null) }}
+                      style={{ padding:'11px 14px', borderRadius:12, border:'none', background:'#fde8e8', color:'var(--err-dot)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
+                      <span className="material-symbols-outlined icon-sm">delete</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ padding:'16px 20px' }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'var(--pri)', marginBottom:12 }}>Kontakt bearbeiten</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                    <div>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Vorname</div>
+                      <input value={editObjCpFn} onChange={e=>setEditObjCpFn(e.target.value)} placeholder="Max" style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)', fontSize:13, color:'var(--txt)', outline:'none', boxSizing:'border-box' }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Nachname *</div>
+                      <input value={editObjCpLn} onChange={e=>setEditObjCpLn(e.target.value)} placeholder="Mustermann" style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)', fontSize:13, color:'var(--txt)', outline:'none', boxSizing:'border-box' }}/>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Funktion</div>
+                    <input value={editObjCpRole} onChange={e=>setEditObjCpRole(e.target.value)} placeholder="Verwalter" style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)', fontSize:13, color:'var(--txt)', outline:'none', boxSizing:'border-box' }}/>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16 }}>
+                    <div>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Telefon</div>
+                      <input value={editObjCpPhone} onChange={e=>setEditObjCpPhone(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)', fontSize:13, color:'var(--txt)', outline:'none', boxSizing:'border-box' }}/>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>E-Mail</div>
+                      <input value={editObjCpEmail} onChange={e=>setEditObjCpEmail(e.target.value)} placeholder="max@firma.de" inputMode="email" style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)', fontSize:13, color:'var(--txt)', outline:'none', boxSizing:'border-box' }}/>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:10 }}>
+                    <button onClick={()=>setEditingObjContact(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:13, fontWeight:700, cursor:'pointer' }}>Abbrechen</button>
+                    <button onClick={saveEditCp} disabled={editObjCpSaving || (!editObjCpFn.trim() && !editObjCpLn.trim())}
+                      style={{ flex:2, padding:'11px', borderRadius:12, border:'none', background:'var(--pri)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, opacity: editObjCpSaving ? 0.7 : 1 }}>
+                      <span className="material-symbols-outlined icon-sm">{editObjCpSaving ? 'hourglass_empty' : 'check'}</span>
+                      {editObjCpSaving ? 'Speichert…' : 'Speichern'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }
@@ -3722,9 +3885,10 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       }).select('id').single()
       if (e || !cust) { setError(e?.message || 'Kunde konnte nicht angelegt werden'); setSaving(false); return }
       customerId = cust.id
-      // Alle Typen: Ansprechpartner speichern
-      if (newContacts.length > 0) {
-        for (const cp of newContacts) {
+      // Alle Typen: Ansprechpartner speichern (inkl. offenes Formular auto-commiten)
+      const allContacts = [...newContacts, ...(cpFn.trim() || cpLn.trim() ? [{ first_name: cpFn.trim(), last_name: cpLn.trim(), role: cpRl.trim(), phone: cpPh.trim(), email: cpEm.trim() }] : [])]
+      if (allContacts.length > 0) {
+        for (const cp of allContacts) {
           await supabase.from('contact_persons').insert({
             customer_id: cust.id,
             name: `${cp.first_name} ${cp.last_name}`.trim(),
