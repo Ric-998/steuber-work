@@ -12,16 +12,18 @@ function urlBase64ToUint8Array(base64String: string) {
 export async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return null
   try {
+    const hadController = !!navigator.serviceWorker.controller
     const reg = await navigator.serviceWorker.register('/sw.js')
 
-    // Wenn ein neuer SW die Kontrolle übernimmt → Seite neu laden
-    // (skipWaiting im SW aktiviert sofort, aber der laufende JS-Bundle
-    //  ist noch alt – ein Reload zieht den neuen Code)
-    let refreshing = false
+    // Stündlich auf Updates prüfen (für lang laufende PWA-Sessions)
+    setInterval(() => reg.update(), 60 * 60 * 1000)
+
+    // Wenn ein neuer SW die Kontrolle übernimmt:
+    // - Erststart (kein vorheriger Controller) → still, kein Banner nötig
+    // - Update (vorheriger Controller war aktiv) → Banner anzeigen
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshing) return
-      refreshing = true
-      window.location.reload()
+      if (!hadController) return
+      window.dispatchEvent(new CustomEvent('swupdated'))
     })
 
     return reg

@@ -27,6 +27,13 @@ export default function App() {
   const [profile, setProfile]   = useState<UserProfile | null>(null)
   const [loading, setLoading]   = useState(true)
   const [devViewOverride, setDevViewOverride] = useState<'admin'|'mitarbeiter'|null>(null)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setUpdateAvailable(true)
+    window.addEventListener('swupdated', handler)
+    return () => window.removeEventListener('swupdated', handler)
+  }, [])
 
   // Einladungs-Token aus URL lesen
   const registerToken = new URLSearchParams(window.location.search).get('register')
@@ -113,6 +120,24 @@ export default function App() {
 
   return (
     <div style={{ position:'relative' }}>
+      {/* ── UPDATE BANNER ── */}
+      {updateAvailable && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:99999, background:'var(--pri)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px', gap:12, boxShadow:'0 2px 16px rgba(0,0,0,0.2)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:20 }}>system_update</span>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700 }}>Update verfügbar</div>
+              <div style={{ fontSize:11, opacity:0.85 }}>Neue Version bereit – kurzer Reload</div>
+            </div>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ flexShrink:0, padding:'8px 16px', borderRadius:10, border:'2px solid rgba(255,255,255,0.5)', background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', backdropFilter:'blur(4px)' }}>
+            Jetzt laden ↻
+          </button>
+        </div>
+      )}
+
       {/* ── DEV SWITCHER ── */}
       {DEV_MODE && (
         <div style={{ position:'fixed', bottom:80, right:16, zIndex:9999, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
