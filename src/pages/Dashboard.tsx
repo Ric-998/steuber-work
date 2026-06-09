@@ -1960,12 +1960,16 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       const ols = (olData || []).filter((u: any) => u.roles?.name === 'objektleiter')
       setOlList(ols.map((u: any) => ({ id: u.id, full_name: u.full_name })))
 
-      // Contacts für dieses Objekt laden
-      supabase.from('contact_persons')
-        .select('id,name,first_name,last_name,role,phone,email')
-        .eq('object_id', obj.id)
-        .order('last_name')
-        .then(({ data }) => { if (data) setObjContacts(data) })
+      // Contacts laden: object_id-Kontakte + Kundenkontakte (customer_id)
+      const contactPromises = [
+        supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email').eq('object_id', obj.id).order('last_name'),
+        ...(obj.customer_id ? [supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email').eq('customer_id', obj.customer_id).order('last_name')] : [])
+      ]
+      Promise.all(contactPromises).then(results => {
+        const seen = new Set<string>()
+        const merged = results.flatMap(r => (r.data || [])).filter(cp => { if (seen.has(cp.id)) return false; seen.add(cp.id); return true })
+        setObjContacts(merged)
+      })
 
       setLoadingDetail(false)
     }
@@ -3717,8 +3721,8 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       }).select('id').single()
       if (e || !cust) { setError(e?.message || 'Kunde konnte nicht angelegt werden'); setSaving(false); return }
       customerId = cust.id
-      // Firma: erster Ansprechpartner
-      if (['firma', 'weg-verwaltung', 'mietverwaltung'].includes(newCustType) && newContacts.length > 0) {
+      // Alle Typen: Ansprechpartner speichern
+      if (newContacts.length > 0) {
         for (const cp of newContacts) {
           await supabase.from('contact_persons').insert({
             customer_id: cust.id,
