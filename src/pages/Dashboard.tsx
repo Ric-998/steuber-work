@@ -957,6 +957,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             onUpdated={c => { setCustomers(prev => prev.map(x => x.id===c.id?c:x)); setSelectedCustomer(c); showToast('✔ Kunde gespeichert', 'ok') }}
             onDeleted={() => { setCustomers(prev => prev.filter(x => x.id!==selectedCustomer.id)); setSelectedCustomer(null) }}
             onObjectClick={obj => { setTab('objekte'); setSelectedObject(obj) }}
+            isDesktop={isDesktop}
           />
         )}
 
@@ -5222,13 +5223,14 @@ function KundenList({ customers, objects, loading, onSelect }: {
 }
 
 // ─── Kunde Detail ─────────────────────────────────────────────────────────────
-function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObjectClick }: {
+function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObjectClick, isDesktop }: {
   customer: CustomerItem
   objects: ObjectItem[]
   onBack: () => void
   onUpdated: (c: CustomerItem) => void
   onDeleted: () => void
   onObjectClick: (o: ObjectItem) => void
+  isDesktop?: boolean
 }) {
   const [showEdit, setShowEdit]               = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -5414,6 +5416,7 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
           onClose={() => setShowEdit(false)}
           onSaved={c => { setShowEdit(false); onUpdated(c) }}
           onDelete={() => { setShowEdit(false); setShowDeleteConfirm(true) }}
+          isDesktop={isDesktop}
         />
       )}
 
@@ -5613,9 +5616,8 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
     onSaved(data as CustomerItem)
   }
 
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:900, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}>
-      <div style={{ background:'var(--bg)', borderRadius:'24px 24px 0 0', maxHeight:'92vh', overflowY:'auto', paddingBottom:40 }}>
+  const inner = (
+    <div style={{ background:'var(--bg)', borderRadius:'24px 24px 0 0', maxHeight:'92vh', overflowY:'auto', paddingBottom:40 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'20px 20px 16px', position:'sticky', top:0, background:'var(--bg)', borderBottom:'1px solid var(--outline)', zIndex:1 }}>
           <button onClick={onClose} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
             <span className="material-symbols-outlined icon-sm">close</span>
@@ -5772,13 +5774,20 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
           </button>
         </div>
       </div>
+  )
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:900, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}>
+        {inner}
+      </div>
     </div>
   )
 }
 
 // ─── Edit Customer Overlay ────────────────────────────────────────────────────
-function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
-  customer: CustomerItem; onClose: () => void; onSaved: (c: CustomerItem) => void; onDelete: () => void
+function EditCustomerOverlay({ customer, onClose, onSaved, onDelete, isDesktop }: {
+  customer: CustomerItem; onClose: () => void; onSaved: (c: CustomerItem) => void; onDelete: () => void; isDesktop?: boolean
 }) {
   const [custType, setCustType]       = useState<CustomerType>(customer.customer_type)
   const [companyName, setCompanyName] = useState(customer.customer_type === 'firma' ? customer.name : '')
@@ -5845,9 +5854,8 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
     onSaved(data as CustomerItem)
   }
 
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:900, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}>
-      <div style={{ background:'var(--bg)', borderRadius:'24px 24px 0 0', maxHeight:'92vh', overflowY:'auto', paddingBottom:40 }}>
+  const inner = (
+    <div style={{ background:'var(--bg)', borderRadius: isDesktop ? 24 : '24px 24px 0 0', maxHeight: isDesktop ? '90dvh' : '92vh', overflowY:'auto', paddingBottom:40 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, padding:'20px 20px 16px', position:'sticky', top:0, background:'var(--bg)', borderBottom:'1px solid var(--outline)', zIndex:1 }}>
           <button onClick={onClose} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
             <span className="material-symbols-outlined icon-sm">close</span>
@@ -5976,6 +5984,14 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
             {saving?'Wird gespeichert…':'Änderungen speichern'}
           </button>
         </div>
+    </div>
+  )
+  return (
+    <div
+      style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:900, display:'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent:'center', padding: isDesktop ? 24 : 0 }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth: isDesktop ? 640 : undefined, borderRadius: isDesktop ? 24 : undefined, overflow:'hidden', boxShadow: isDesktop ? '0 24px 80px rgba(0,0,0,0.3)' : undefined }}>
+        {inner}
       </div>
     </div>
   )
