@@ -2756,7 +2756,7 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
           <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:10, alignItems:'start' }}>
             <div>
               <label style={s.fieldLabel}>PLZ *</label>
-              <div style={s.inputWrap}>
+              <div className="iw" style={s.inputWrap}>
                 <input value={postal} onChange={e => lookupCity(e.target.value)} placeholder="34212" maxLength={5} style={{ ...s.input, width:'100%' }} />
                 {plzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)', animation:'spin 1s linear infinite' }}>progress_activity</span>}
               </div>
@@ -2801,7 +2801,7 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
 
           {showCustSearch && (
             <div style={{ marginBottom:16 }}>
-              <div style={s.inputWrap}>
+              <div className="iw" style={s.inputWrap}>
                 <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
                 <input value={custQuery} onChange={e => searchCustomers(e.target.value)} placeholder="Name, Firma, E-Mail, Telefon …" style={s.input} autoFocus />
                 {custSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
@@ -3072,7 +3072,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
 
             <div style={{ marginBottom:16 }}>
               <label style={s.fieldLabel}>Titel *</label>
-              <div style={s.inputWrap}>
+              <div className="iw" style={s.inputWrap}>
                 <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>edit</span>
                 <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="z.B. Treppenhaus reinigen" style={s.input}/>
               </div>
@@ -3103,7 +3103,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
             {objectContracts.length > 0 && (
               <div style={{ marginBottom:20 }}>
                 <label style={s.fieldLabel}>Vertrag</label>
-                <div style={s.inputWrap}>
+                <div className="iw" style={s.inputWrap}>
                   <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>description</span>
                   <select value={contractId} onChange={e=>setContractId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
                     <option value="">Kein Vertrag zuweisen</option>
@@ -3122,7 +3122,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
 
             <div style={{ marginBottom:20 }}>
               <label style={s.fieldLabel}>Intervall</label>
-              <div style={s.inputWrap}>
+              <div className="iw" style={s.inputWrap}>
                 <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>repeat</span>
                 <select
                   value={interval}
@@ -3141,7 +3141,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
               <label style={s.fieldLabel}>Zuständiger Mitarbeiter</label>
               {team.filter(m=>m.role_name!=='admin').length === 0
                 ? <div style={{ fontSize:13, color:'var(--txt-muted)', padding:'12px 0' }}>Noch keine Mitarbeiter vorhanden. Lade zuerst Mitarbeiter ein.</div>
-                : <div style={s.inputWrap}>
+                : <div className="iw" style={s.inputWrap}>
                     <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
                     <select
                       value={assigneeId}
@@ -3167,7 +3167,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
             {interval === 'einmalig' && (
               <div style={{ marginBottom:20 }}>
                 <label style={s.fieldLabel}>Fälligkeitsdatum *</label>
-                <div style={s.inputWrap}>
+                <div className="iw" style={s.inputWrap}>
                   <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>event</span>
                   <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }}/>
                 </div>
@@ -3178,7 +3178,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
             {interval === 'täglich' && (
               <div style={{ marginBottom:20 }}>
                 <label style={s.fieldLabel}>Startdatum</label>
-                <div style={s.inputWrap}>
+                <div className="iw" style={s.inputWrap}>
                   <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>event</span>
                   <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }}/>
                 </div>
@@ -3262,7 +3262,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
 
                 {monthlyMode === 'day' && (
                   <>
-                    <div style={s.inputWrap}>
+                    <div className="iw" style={s.inputWrap}>
                       <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>calendar_month</span>
                       <select value={dayOfMonth} onChange={e=>setDayOfMonth(Number(e.target.value))} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
                         {Array.from({length:28},(_,i)=>i+1).map(d=>(
@@ -3284,7 +3284,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
             {interval === 'quartalsweise' && (
               <div style={{ marginBottom:20 }}>
                 <label style={s.fieldLabel}>Erster Termin *</label>
-                <div style={s.inputWrap}>
+                <div className="iw" style={s.inputWrap}>
                   <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>event</span>
                   <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }}/>
                 </div>
@@ -3295,7 +3295,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
             {interval !== 'einmalig' && (
               <div style={{ marginBottom:20 }}>
                 <label style={s.fieldLabel}>Enddatum (optional)</label>
-                <div style={s.inputWrap}>
+                <div className="iw" style={s.inputWrap}>
                   <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>event_busy</span>
                   <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }}/>
                   {endDate && <button onClick={()=>setEndDate('')} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex', alignItems:'center' }}>
@@ -3417,7 +3417,7 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
         {/* Titel */}
         <div style={{ marginBottom:16 }}>
           <label style={s.fieldLabel}>Titel *</label>
-          <div style={s.inputWrap}>
+          <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>edit</span>
             <input value={title} onChange={e=>setTitle(e.target.value)} style={s.input} placeholder="Aufgabentitel"/>
           </div>
@@ -3432,7 +3432,7 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
         {/* Kategorie */}
         <div style={{ marginBottom:16 }}>
           <label style={s.fieldLabel}>Kategorie</label>
-          <div style={s.inputWrap}>
+          <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>category</span>
             <select value={categoryId} onChange={e=>setCategoryId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
               <option value="">Keine Kategorie</option>
@@ -3445,7 +3445,7 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
         {/* Objekt */}
         <div style={{ marginBottom:16 }}>
           <label style={s.fieldLabel}>Objekt</label>
-          <div style={s.inputWrap}>
+          <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>apartment</span>
             <select value={objectId} onChange={e=>setObjectId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
               <option value="">Kein Objekt</option>
@@ -3458,7 +3458,7 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
         {/* Intervall */}
         <div style={{ marginBottom:16 }}>
           <label style={s.fieldLabel}>Intervall</label>
-          <div style={s.inputWrap}>
+          <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>repeat</span>
             <select value={interval} onChange={e=>setInterval(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
               {['täglich','wöchentlich','monatlich','quartalsweise','einmalig'].map(iv=>(
@@ -3472,7 +3472,7 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
         {/* Mitarbeiter */}
         <div style={{ marginBottom:16 }}>
           <label style={s.fieldLabel}>Zuständiger Mitarbeiter</label>
-          <div style={s.inputWrap}>
+          <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
             <select value={assigneeId} onChange={e=>setAssigneeId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
               <option value="">Nicht zugewiesen</option>
@@ -3492,7 +3492,7 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
         {interval === 'einmalig' ? (
           <div style={{ marginBottom:16 }}>
             <label style={s.fieldLabel}>Fälligkeitsdatum</label>
-            <div style={s.inputWrap}>
+            <div className="iw" style={s.inputWrap}>
               <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>event</span>
               <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }}/>
             </div>
@@ -3500,7 +3500,7 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
         ) : (
           <div style={{ marginBottom:16 }}>
             <label style={s.fieldLabel}>Vertragsende (optional)</label>
-            <div style={s.inputWrap}>
+            <div className="iw" style={s.inputWrap}>
               <span className="material-symbols-outlined icon-sm" style={{ color: isExpired ? 'var(--err-dot)' : 'var(--txt-muted)' }}>event_busy</span>
               <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color: isExpired ? 'var(--err-dot)' : 'var(--txt)' }}/>
               {endDate && <button onClick={()=>setEndDate('')} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex', alignItems:'center' }}>
@@ -4168,7 +4168,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
           {/* Straße */}
           <div style={{ marginBottom: 12 }}>
             <label style={s.fieldLabel}>Straße + Hausnummer *</label>
-            <div style={s.inputWrap}>
+            <div className="iw" style={s.inputWrap}>
               <span className="material-symbols-outlined icon-sm" style={{ color: 'var(--txt-muted)' }}>location_on</span>
               <input value={street} onChange={e => setStreet(e.target.value)} placeholder="Bahnhofstraße 14" style={s.input} />
             </div>
@@ -4177,7 +4177,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
           {/* Adresszusatz */}
           <div style={{ marginBottom: 12 }}>
             <label style={s.fieldLabel}>Adresszusatz (optional)</label>
-            <div style={s.inputWrap}>
+            <div className="iw" style={s.inputWrap}>
               <span className="material-symbols-outlined icon-sm" style={{ color: 'var(--txt-muted)' }}>layers</span>
               <input value={addrSup} onChange={e => setAddrSup(e.target.value)} placeholder="z.B. 2. OG, Hinterhaus, c/o ..." style={s.input} />
             </div>
@@ -4248,7 +4248,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
           {/* Suchfeld */}
           {!selectedCust && !createMode && (<>
             <div style={{ position: 'relative', marginBottom: 12 }}>
-              <div style={s.inputWrap}>
+              <div className="iw" style={s.inputWrap}>
                 <span className="material-symbols-outlined icon-sm" style={{ color: 'var(--txt-muted)' }}>search</span>
                 <input
                   value={custQuery}
@@ -4387,13 +4387,13 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8, alignItems:'start' }}>
                     <div>
                       <label style={s.fieldLabel}>Vorname 1 *</label>
-                      <div style={s.inputWrap}>
+                      <div className="iw" style={s.inputWrap}>
                         <input value={newVorname} onChange={e => setNewVorname(e.target.value)} placeholder="Max" style={s.input}/>
                       </div>
                     </div>
                     <div>
                       <label style={s.fieldLabel}>Vorname 2 *</label>
-                      <div style={s.inputWrap}>
+                      <div className="iw" style={s.inputWrap}>
                         <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
                         <input value={newVorname2} onChange={e => setNewVorname2(e.target.value)} placeholder="Maria" style={s.input}/>
                       </div>
@@ -4402,7 +4402,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   {/* Gemeinsamer Nachname – volle Breite */}
                   <div style={{ marginBottom:10 }}>
                     <label style={s.fieldLabel}>Gemeinsamer Nachname *</label>
-                    <div style={s.inputWrap}>
+                    <div className="iw" style={s.inputWrap}>
                       <input value={newNachname} onChange={e => setNewNachname(e.target.value)} placeholder="Mustermann" style={s.input}/>
                     </div>
                   </div>
@@ -4411,13 +4411,13 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10, alignItems:'start' }}>
                     <div>
                       <label style={s.fieldLabel}>Vorname *</label>
-                      <div style={s.inputWrap}>
+                      <div className="iw" style={s.inputWrap}>
                         <input value={newVorname} onChange={e => setNewVorname(e.target.value)} placeholder="Max" style={s.input}/>
                       </div>
                     </div>
                     <div>
                       <label style={s.fieldLabel}>Nachname *</label>
-                      <div style={s.inputWrap}>
+                      <div className="iw" style={s.inputWrap}>
                         <input value={newNachname} onChange={e => setNewNachname(e.target.value)} placeholder="Mustermann" style={s.input}/>
                       </div>
                     </div>
@@ -4427,7 +4427,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 {/* Adresse */}
                 <div style={{ marginBottom:10 }}>
                   <label style={s.fieldLabel}>Straße + Hausnummer</label>
-                  <div style={s.inputWrap}>
+                  <div className="iw" style={s.inputWrap}>
                     <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>home</span>
                     <input value={newStreet} onChange={e => setNewStreet(e.target.value)} placeholder="Musterstraße 1" style={s.input}/>
                   </div>
@@ -4435,7 +4435,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:8, marginBottom:10, alignItems:'start' }}>
                   <div>
                     <label style={s.fieldLabel}>PLZ</label>
-                    <div style={s.inputWrap}>
+                    <div className="iw" style={s.inputWrap}>
                       <input value={newPostal} onChange={e => lookupNewCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
                       {newPlzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                     </div>
@@ -4452,14 +4452,14 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 {/* Kontakt */}
                 <div style={{ marginBottom:10 }}>
                   <label style={s.fieldLabel}>Telefon</label>
-                  <div style={s.inputWrap}>
+                  <div className="iw" style={s.inputWrap}>
                     <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>phone</span>
                     <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="+49 561 …" style={s.input}/>
                   </div>
                 </div>
                 <div style={{ marginBottom:10 }}>
                   <label style={s.fieldLabel}>E-Mail</label>
-                  <div style={s.inputWrap}>
+                  <div className="iw" style={s.inputWrap}>
                     <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>mail</span>
                     <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="max@beispiel.de" style={s.input}/>
                   </div>
@@ -4475,7 +4475,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 ].map(f => (
                   <div key={f.label} style={{ marginBottom: 10 }}>
                     <label style={s.fieldLabel}>{f.label}</label>
-                    <div style={s.inputWrap}>
+                    <div className="iw" style={s.inputWrap}>
                       <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>{f.icon}</span>
                       <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={s.input}/>
                     </div>
@@ -4484,7 +4484,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:8, marginBottom:10, alignItems:'start' }}>
                   <div>
                     <label style={s.fieldLabel}>PLZ</label>
-                    <div style={s.inputWrap}>
+                    <div className="iw" style={s.inputWrap}>
                       <input value={newPostal} onChange={e => lookupNewCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
                       {newPlzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                     </div>
@@ -4527,7 +4527,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 {/* Objekt-ID der Hausverwaltung / Verwaltung */}
                 <div style={{ marginBottom: 16 }}>
                   <label style={s.fieldLabel}>{newCustType === 'mietverwaltung' ? 'Objekt-ID der Verwaltung (optional)' : 'Objekt-ID der Hausverwaltung (optional)'}</label>
-                  <div style={s.inputWrap}>
+                  <div className="iw" style={s.inputWrap}>
                     <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>tag</span>
                     <input value={wegObjId} onChange={e => setWegObjId(e.target.value)} placeholder="z.B. 4711 oder OBJ-2024-001" style={s.input}/>
                   </div>
@@ -4543,7 +4543,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 {/* HV Suche / Auswahl */}
                 {!selectedHv && !hvCreateMode && (
                   <>
-                    <div style={s.inputWrap}>
+                    <div className="iw" style={s.inputWrap}>
                       <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>domain</span>
                       <input
                         value={hvQuery}
@@ -4616,7 +4616,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     {/* Name mit Live-Suche */}
                     <div style={{ marginBottom:8, position:'relative' }}>
                       <label style={{ ...s.fieldLabel, fontSize:10 }}>Name *</label>
-                      <div style={s.inputWrap}>
+                      <div className="iw" style={s.inputWrap}>
                         <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>domain</span>
                         <input
                           value={hvNewName}
@@ -4653,12 +4653,12 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     {/* Straße */}
                     <div style={{ marginBottom:8 }}>
                       <label style={{ ...s.fieldLabel, fontSize:10 }}>Straße + Hausnummer</label>
-                      <div style={s.inputWrap}><input value={hvNewStreet} onChange={e => setHvNewStreet(e.target.value)} placeholder="Beispielweg 5" style={s.input}/></div>
+                      <div className="iw" style={s.inputWrap}><input value={hvNewStreet} onChange={e => setHvNewStreet(e.target.value)} placeholder="Beispielweg 5" style={s.input}/></div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:8 }}>
                       <div>
                         <label style={{ ...s.fieldLabel, fontSize:10 }}>PLZ</label>
-                        <div style={s.inputWrap}>
+                        <div className="iw" style={s.inputWrap}>
                           <input value={hvNewPostal} onChange={e => lookupHvCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
                           {hvNewPlzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                         </div>
@@ -4782,11 +4782,11 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8, alignItems:'start' }}>
                       <div>
                         <label style={{ ...s.fieldLabel, fontSize:10 }}>Vorname</label>
-                        <div style={s.inputWrap}><input value={cpFn} onChange={e=>{ setCpFn(e.target.value); checkCpDupe(e.target.value, cpLn) }} placeholder="Max" style={s.input}/></div>
+                        <div className="iw" style={s.inputWrap}><input value={cpFn} onChange={e=>{ setCpFn(e.target.value); checkCpDupe(e.target.value, cpLn) }} placeholder="Max" style={s.input}/></div>
                       </div>
                       <div>
                         <label style={{ ...s.fieldLabel, fontSize:10 }}>Nachname *</label>
-                        <div style={s.inputWrap}><input value={cpLn} onChange={e=>{ setCpLn(e.target.value); checkCpDupe(cpFn, e.target.value) }} placeholder="Mustermann" style={s.input}/></div>
+                        <div className="iw" style={s.inputWrap}><input value={cpLn} onChange={e=>{ setCpLn(e.target.value); checkCpDupe(cpFn, e.target.value) }} placeholder="Mustermann" style={s.input}/></div>
                       </div>
                     </div>
                     {/* Duplikat-Hinweis */}
@@ -4822,16 +4822,16 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     )}
                     <div style={{ marginBottom:8 }}>
                       <label style={{ ...s.fieldLabel, fontSize:10 }}>Funktion / Rolle</label>
-                      <div style={s.inputWrap}><input value={cpRl} onChange={e=>setCpRl(e.target.value)} placeholder="Verwalter" style={s.input}/></div>
+                      <div className="iw" style={s.inputWrap}><input value={cpRl} onChange={e=>setCpRl(e.target.value)} placeholder="Verwalter" style={s.input}/></div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10, alignItems:'start' }}>
                       <div>
                         <label style={{ ...s.fieldLabel, fontSize:10 }}>Telefon</label>
-                        <div style={s.inputWrap}><input value={cpPh} onChange={e=>setCpPh(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={s.input}/></div>
+                        <div className="iw" style={s.inputWrap}><input value={cpPh} onChange={e=>setCpPh(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={s.input}/></div>
                       </div>
                       <div>
                         <label style={{ ...s.fieldLabel, fontSize:10 }}>E-Mail</label>
-                        <div style={s.inputWrap}><input value={cpEm} onChange={e=>setCpEm(e.target.value)} placeholder="max@firma.de" inputMode="email" style={s.input}/></div>
+                        <div className="iw" style={s.inputWrap}><input value={cpEm} onChange={e=>setCpEm(e.target.value)} placeholder="max@firma.de" inputMode="email" style={s.input}/></div>
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:8 }}>
@@ -5503,7 +5503,7 @@ function ContactPersonOverlay({ customerId, existing, onClose, onSaved }: {
           ].map(f => (
             <div key={f.label} style={{ marginBottom:14 }}>
               <label style={s.fieldLabel}>{f.label}</label>
-              <div style={s.inputWrap}>
+              <div className="iw" style={s.inputWrap}>
                 <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>{f.icon}</span>
                 <input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={s.input}/>
               </div>
@@ -5637,26 +5637,26 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
           {custType === 'firma' && (<>
             <div style={{ marginBottom:14 }}>
               <label style={s.fieldLabel}>Firmenname *</label>
-              <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>business</span><input value={companyName} onChange={e=>setCompanyName(e.target.value)} placeholder="Mustermann GmbH" style={s.input}/></div>
+              <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>business</span><input value={companyName} onChange={e=>setCompanyName(e.target.value)} placeholder="Mustermann GmbH" style={s.input}/></div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 100px', gap:10, marginBottom:14 }}>
               <div>
                 <label style={s.fieldLabel}>Straße *</label>
-                <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>location_on</span><input value={streetName} onChange={e=>setStreetName(e.target.value)} placeholder="Musterstraße" style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>location_on</span><input value={streetName} onChange={e=>setStreetName(e.target.value)} placeholder="Musterstraße" style={s.input}/></div>
               </div>
               <div>
                 <label style={s.fieldLabel}>Nr.</label>
-                <div style={s.inputWrap}><input value={streetNumber} onChange={e=>setStreetNumber(e.target.value)} placeholder="12a" style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><input value={streetNumber} onChange={e=>setStreetNumber(e.target.value)} placeholder="12a" style={s.input}/></div>
               </div>
             </div>
             <div style={{ marginBottom:14 }}>
               <label style={s.fieldLabel}>Adresszusatz</label>
-              <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>layers</span><input value={addrSup} onChange={e=>setAddrSup(e.target.value)} placeholder="c/o, Gebäude B, …" style={s.input}/></div>
+              <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>layers</span><input value={addrSup} onChange={e=>setAddrSup(e.target.value)} placeholder="c/o, Gebäude B, …" style={s.input}/></div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14, alignItems:'start' }}>
               <div>
                 <label style={s.fieldLabel}>PLZ</label>
-                <div style={s.inputWrap}>
+                <div className="iw" style={s.inputWrap}>
                   <input value={postal} onChange={e=>lookupCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
                   {plzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                 </div>
@@ -5678,11 +5678,11 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
                 <div>
                   <label style={{ ...s.fieldLabel, marginBottom:4 }}>Vorname</label>
-                  <div style={s.inputWrap}><input value={contactFirstName} onChange={e=>setContactFirstName(e.target.value)} placeholder="Max" style={s.input}/></div>
+                  <div className="iw" style={s.inputWrap}><input value={contactFirstName} onChange={e=>setContactFirstName(e.target.value)} placeholder="Max" style={s.input}/></div>
                 </div>
                 <div>
                   <label style={{ ...s.fieldLabel, marginBottom:4 }}>Nachname</label>
-                  <div style={s.inputWrap}><input value={contactLastName} onChange={e=>setContactLastName(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
+                  <div className="iw" style={s.inputWrap}><input value={contactLastName} onChange={e=>setContactLastName(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
                 </div>
               </div>
               {[
@@ -5692,7 +5692,7 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
               ].map(f => (
                 <div key={f.label} style={{ marginBottom:10 }}>
                   <label style={{ ...s.fieldLabel, marginBottom:4 }}>{f.label}</label>
-                  <div style={s.inputWrap}><input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
+                  <div className="iw" style={s.inputWrap}><input value={f.val} onChange={e=>f.set(e.target.value)} placeholder={f.ph} style={s.input}/></div>
                 </div>
               ))}
             </div>
@@ -5703,35 +5703,35 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
               <div>
                 <label style={s.fieldLabel}>Vorname *</label>
-                <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Max" style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span><input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Max" style={s.input}/></div>
               </div>
               <div>
                 <label style={s.fieldLabel}>Nachname *</label>
-                <div style={s.inputWrap}><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
               </div>
             </div>
             <div style={{ marginBottom:14 }}>
               <label style={s.fieldLabel}>Telefon</label>
-              <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>phone</span><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+49 561 …" type="tel" style={s.input}/></div>
+              <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>phone</span><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+49 561 …" type="tel" style={s.input}/></div>
             </div>
             <div style={{ marginBottom:14 }}>
               <label style={s.fieldLabel}>E-Mail</label>
-              <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>mail</span><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="max@beispiel.de" type="email" style={s.input}/></div>
+              <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>mail</span><input value={email} onChange={e=>setEmail(e.target.value)} placeholder="max@beispiel.de" type="email" style={s.input}/></div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 100px', gap:10, marginBottom:14 }}>
               <div>
                 <label style={s.fieldLabel}>Straße</label>
-                <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>home</span><input value={streetName} onChange={e=>setStreetName(e.target.value)} placeholder="Musterstraße" style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>home</span><input value={streetName} onChange={e=>setStreetName(e.target.value)} placeholder="Musterstraße" style={s.input}/></div>
               </div>
               <div>
                 <label style={s.fieldLabel}>Nr.</label>
-                <div style={s.inputWrap}><input value={streetNumber} onChange={e=>setStreetNumber(e.target.value)} placeholder="1" style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><input value={streetNumber} onChange={e=>setStreetNumber(e.target.value)} placeholder="1" style={s.input}/></div>
               </div>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14, alignItems:'start' }}>
               <div>
                 <label style={s.fieldLabel}>PLZ</label>
-                <div style={s.inputWrap}>
+                <div className="iw" style={s.inputWrap}>
                   <input value={postal} onChange={e=>lookupCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
                   {plzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
                 </div>
@@ -5749,7 +5749,7 @@ function CreateCustomerOverlay({ onClose, onSaved }: { onClose: () => void; onSa
           {/* Gemeinsame Felder */}
           <div style={{ marginBottom:14 }}>
             <label style={s.fieldLabel}>Vertragsart</label>
-            <div style={s.inputWrap}>
+            <div className="iw" style={s.inputWrap}>
               <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>description</span>
               <select value={contractType} onChange={e=>setContractType(e.target.value as any)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer' }}>
                 <option value="">Keine Angabe</option>
@@ -5886,17 +5886,17 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
           {custType === 'firma' ? (
             <div style={{ marginBottom:14 }}>
               <label style={s.fieldLabel}>Firmenname *</label>
-              <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>business</span><input value={companyName} onChange={e=>setCompanyName(e.target.value)} style={s.input}/></div>
+              <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>business</span><input value={companyName} onChange={e=>setCompanyName(e.target.value)} style={s.input}/></div>
             </div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
               <div>
                 <label style={s.fieldLabel}>Vorname *</label>
-                <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span><input value={firstName} onChange={e=>setFirstName(e.target.value)} style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span><input value={firstName} onChange={e=>setFirstName(e.target.value)} style={s.input}/></div>
               </div>
               <div>
                 <label style={s.fieldLabel}>Nachname *</label>
-                <div style={s.inputWrap}><input value={lastName} onChange={e=>setLastName(e.target.value)} style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><input value={lastName} onChange={e=>setLastName(e.target.value)} style={s.input}/></div>
               </div>
             </div>
           )}
@@ -5905,11 +5905,11 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
               <div>
                 <label style={s.fieldLabel}>Ansprechpartner Vorname</label>
-                <div style={s.inputWrap}><input value={contactFirstName} onChange={e=>setContactFirstName(e.target.value)} placeholder="Max" style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><input value={contactFirstName} onChange={e=>setContactFirstName(e.target.value)} placeholder="Max" style={s.input}/></div>
               </div>
               <div>
                 <label style={s.fieldLabel}>Nachname</label>
-                <div style={s.inputWrap}><input value={contactLastName} onChange={e=>setContactLastName(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
+                <div className="iw" style={s.inputWrap}><input value={contactLastName} onChange={e=>setContactLastName(e.target.value)} placeholder="Mustermann" style={s.input}/></div>
               </div>
             </div>
           )}
@@ -5917,21 +5917,21 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
           <div style={{ display:'grid', gridTemplateColumns:'1fr 100px', gap:10, marginBottom:14 }}>
             <div>
               <label style={s.fieldLabel}>Straße</label>
-              <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>location_on</span><input value={streetName} onChange={e=>setStreetName(e.target.value)} style={s.input}/></div>
+              <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>location_on</span><input value={streetName} onChange={e=>setStreetName(e.target.value)} style={s.input}/></div>
             </div>
             <div>
               <label style={s.fieldLabel}>Nr.</label>
-              <div style={s.inputWrap}><input value={streetNumber} onChange={e=>setStreetNumber(e.target.value)} placeholder="12a" style={s.input}/></div>
+              <div className="iw" style={s.inputWrap}><input value={streetNumber} onChange={e=>setStreetNumber(e.target.value)} placeholder="12a" style={s.input}/></div>
             </div>
           </div>
           <div style={{ marginBottom:14 }}>
             <label style={s.fieldLabel}>Adresszusatz</label>
-            <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>layers</span><input value={addrSup} onChange={e=>setAddrSup(e.target.value)} placeholder="c/o, Gebäude B, …" style={s.input}/></div>
+            <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>layers</span><input value={addrSup} onChange={e=>setAddrSup(e.target.value)} placeholder="c/o, Gebäude B, …" style={s.input}/></div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:10, marginBottom:14, alignItems:'start' }}>
             <div>
               <label style={s.fieldLabel}>PLZ</label>
-              <div style={s.inputWrap}>
+              <div className="iw" style={s.inputWrap}>
                 <input value={postal} onChange={e=>lookupCity(e.target.value)} maxLength={5} style={s.input}/>
                 {plzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
               </div>
@@ -5946,15 +5946,15 @@ function EditCustomerOverlay({ customer, onClose, onSaved, onDelete }: {
           </div>
           <div style={{ marginBottom:14 }}>
             <label style={s.fieldLabel}>Telefon</label>
-            <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>phone</span><input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" style={s.input}/></div>
+            <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>phone</span><input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" style={s.input}/></div>
           </div>
           <div style={{ marginBottom:14 }}>
             <label style={s.fieldLabel}>E-Mail</label>
-            <div style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>mail</span><input value={email} onChange={e=>setEmail(e.target.value)} type="email" style={s.input}/></div>
+            <div className="iw" style={s.inputWrap}><span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>mail</span><input value={email} onChange={e=>setEmail(e.target.value)} type="email" style={s.input}/></div>
           </div>
           <div style={{ marginBottom:14 }}>
             <label style={s.fieldLabel}>Vertragsart</label>
-            <div style={s.inputWrap}>
+            <div className="iw" style={s.inputWrap}>
               <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>description</span>
               <select value={contractType} onChange={e=>setContractType(e.target.value as any)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer' }}>
                 <option value="">Keine Angabe</option>
