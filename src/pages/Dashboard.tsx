@@ -2137,19 +2137,17 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
               <div style={{ fontSize:12, color:'var(--txt-muted)', paddingTop:2 }}>Noch keine Ansprechpartner hinterlegt.</div>
             )}
 
-            {objContacts.map(cp => {
+            {objContacts.map((cp, idx) => {
               const dn = [cp.first_name, cp.last_name].filter(Boolean).join(' ') || cp.name || '–'
               const ini = ((cp.first_name?.[0]||'')+(cp.last_name?.[0]||'')).toUpperCase() || '?'
               return (
                 <div key={cp.id} onClick={() => { setSelectedObjContact(cp); setEditingObjContact(false) }}
-                  style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'1px solid var(--outline)', cursor:'pointer', transition:'opacity 0.15s' }}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderTop: idx > 0 ? '1px solid var(--outline)' : 'none', cursor:'pointer', transition:'opacity 0.15s' }}
                   onMouseEnter={e=>(e.currentTarget.style.opacity='0.7')} onMouseLeave={e=>(e.currentTarget.style.opacity='1')}>
                   <div style={{ width:34, height:34, borderRadius:10, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, flexShrink:0 }}>{ini}</div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{dn}</div>
-                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>
-                      {cp.role || (cp.phone ? cp.phone : (cp.email ? cp.email : '–'))}
-                    </div>
+                    {(cp.phone || cp.email) && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{cp.phone || cp.email}</div>}
                   </div>
                   <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--txt-muted)' }}>chevron_right</span>
                 </div>
@@ -2585,7 +2583,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
               ) : (
                 <div style={{ padding:'16px 20px' }}>
                   <div style={{ fontSize:12, fontWeight:700, color:'var(--pri)', marginBottom:12 }}>Kontakt bearbeiten</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8, alignItems:'start' }}>
                     <div>
                       <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Vorname</div>
                       <input value={editObjCpFn} onChange={e=>setEditObjCpFn(e.target.value)} placeholder="Max" style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-low)', fontSize:13, color:'var(--txt)', outline:'none', boxSizing:'border-box' }}/>
@@ -3691,6 +3689,20 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
+  // Objektleiter-Auswahl
+  const [olId, setOlId]         = useState<string>('')
+  const [olOptions, setOlOptions] = useState<{id:string;full_name:string}[]>([])
+  useEffect(() => {
+    supabase
+      .from('users')
+      .select('id,full_name,roles(name)')
+      .eq('is_active', true)
+      .then(({ data }) => {
+        const ols = (data || []).filter((u:any) => u.roles?.name === 'objektleiter')
+        setOlOptions(ols.map((u:any) => ({ id: u.id, full_name: u.full_name })))
+      })
+  }, [])
+
   // PLZ → Ort auto-lookup
   const lookupCity = async (plz: string) => {
     setPostal(plz)
@@ -3978,6 +3990,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       is_active: true,
       lat: geoLat,
       lng: geoLng,
+      objektleiter_id: olId || null,
     }).select('id').single()
 
     if (objErr) { setError(objErr.message); setSaving(false); return }
@@ -4074,7 +4087,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
         // Zurück-Logik: bei Typ ausgefüllt → zurück zur Typ-Auswahl; bei Typ-Auswahl → zurück zu Schritt 1; sonst Schritt zurück
         const handleBack = () => {
           if (step === 2 && createMode && newCustType) {
-            setNewCustType(''); setNewAnrede(''); setNewVorname(''); setNewNachname(''); setNewVorname2(''); setNewNachname2(''); setNewContacts([]); setCpFn(''); setCpLn('')
+            setNewCustType(''); setNewCustName(''); setNewStreet(''); setNewAnrede(''); setNewVorname(''); setNewNachname(''); setNewVorname2(''); setNewNachname2(''); setNewContacts([]); setCpFn(''); setCpLn(''); setWegObjId('')
           } else if (step === 2) {
             setStep(1); setError('')
           } else {
@@ -4092,18 +4105,20 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 {subtitle} · Schritt {effStep} von {totalSteps}
               </div>
             </div>
-            <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-              {Array.from({ length: totalSteps }, (_, i) => i + 1).map(i => (
-                <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i <= effStep ? 'var(--pri)' : 'var(--outline)', transition:'background 0.2s' }} />
-              ))}
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5 }}>
+              <div style={{ display:'flex', gap:5 }}>
+                {Array.from({ length: totalSteps }, (_, i) => i + 1).map(i => (
+                  <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i <= effStep ? 'var(--pri)' : 'var(--outline)', transition:'background 0.2s' }} />
+                ))}
+              </div>
               {newCustType && (
                 <button
-                  onClick={() => { setNewCustType(''); setNewAnrede(''); setNewVorname(''); setNewNachname(''); setNewVorname2(''); setNewNachname2(''); setNewContacts([]); setCpFn(''); setCpLn('') }}
+                  onClick={() => { setNewCustType(''); setNewCustName(''); setNewStreet(''); setNewAnrede(''); setNewVorname(''); setNewNachname(''); setNewVorname2(''); setNewNachname2(''); setNewContacts([]); setCpFn(''); setCpLn(''); setWegObjId('') }}
                   title="Typ ändern"
-                  style={{ display:'flex', alignItems:'center', gap:4, background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:20, padding:'3px 9px 3px 5px', marginLeft:4, cursor:'pointer' }}>
+                  style={{ display:'flex', alignItems:'center', gap:4, background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:20, padding:'3px 9px 3px 6px', cursor:'pointer' }}>
                   <span className="material-symbols-outlined" style={{ fontSize:13, color:'var(--pri)' }}>{ti[newCustType]||'person'}</span>
-                  <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)' }}>{tl[newCustType]||newCustType}</span>
-                  <span className="material-symbols-outlined" style={{ fontSize:11, color:'var(--pri)', marginLeft:1 }}>edit</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:'var(--pri)' }}>{tl[newCustType]||newCustType}</span>
+                  <span className="material-symbols-outlined" style={{ fontSize:12, color:'var(--pri)' }}>edit</span>
                 </button>
               )}
             </div>
@@ -4186,6 +4201,29 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Objektleiter (optional) */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={s.fieldLabel}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>manage_accounts</span>
+              Objektleiter (optional)
+            </label>
+            <div style={{ position:'relative' }}>
+              <select
+                value={olId}
+                onChange={e => setOlId(e.target.value)}
+                style={{ ...s.input, appearance:'none', WebkitAppearance:'none', paddingLeft:14, paddingRight:36, height:42, border:'1.5px solid var(--outline)', borderRadius:12, background:'var(--surf-card)', color: olId ? 'var(--txt)' : 'var(--txt-muted)', width:'100%', fontSize:13, cursor:'pointer' }}>
+                <option value=''>Keiner zugewiesen</option>
+                {olOptions.map(ol => (
+                  <option key={ol.id} value={ol.id}>{ol.full_name}</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:18, color:'var(--txt-muted)', pointerEvents:'none' }}>expand_more</span>
+            </div>
+            {olOptions.length === 0 && (
+              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Noch keine Nutzer mit Objektleiter-Rolle angelegt.</div>
+            )}
           </div>
 
           {/* Vorschau-Karte */}
@@ -4394,7 +4432,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     <input value={newStreet} onChange={e => setNewStreet(e.target.value)} placeholder="Musterstraße 1" style={s.input}/>
                   </div>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:8, marginBottom:10, alignItems:'start' }}>
                   <div>
                     <label style={s.fieldLabel}>PLZ</label>
                     <div style={s.inputWrap}>
@@ -4443,7 +4481,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     </div>
                   </div>
                 ))}
-                <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'120px 1fr', gap:8, marginBottom:10, alignItems:'start' }}>
                   <div>
                     <label style={s.fieldLabel}>PLZ</label>
                     <div style={s.inputWrap}>
@@ -4741,7 +4779,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     )}
                     {/* Formular */}
                     <div style={{ fontSize:11, fontWeight:700, color:'var(--pri)', marginBottom:10 }}>Neuer Ansprechpartner</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8, alignItems:'start' }}>
                       <div>
                         <label style={{ ...s.fieldLabel, fontSize:10 }}>Vorname</label>
                         <div style={s.inputWrap}><input value={cpFn} onChange={e=>{ setCpFn(e.target.value); checkCpDupe(e.target.value, cpLn) }} placeholder="Max" style={s.input}/></div>
@@ -4786,7 +4824,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                       <label style={{ ...s.fieldLabel, fontSize:10 }}>Funktion / Rolle</label>
                       <div style={s.inputWrap}><input value={cpRl} onChange={e=>setCpRl(e.target.value)} placeholder="Verwalter" style={s.input}/></div>
                     </div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10, alignItems:'start' }}>
                       <div>
                         <label style={{ ...s.fieldLabel, fontSize:10 }}>Telefon</label>
                         <div style={s.inputWrap}><input value={cpPh} onChange={e=>setCpPh(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={s.input}/></div>

@@ -32,9 +32,9 @@ export default function MapView({ address, city, postalCode }: Props) {
 
   return (
     <>
-      <div style={{ background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', overflow:'hidden' }}>
+      <div>
         {/* Adresszeile */}
-        <div style={{ padding:'12px 14px', display:'flex', alignItems:'center', gap:12 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <div style={{ width:36, height:36, borderRadius:10, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>location_on</span>
           </div>
@@ -60,7 +60,7 @@ export default function MapView({ address, city, postalCode }: Props) {
 
         {/* Karte (ausklappbar) */}
         {showMap && (
-          <div style={{ borderTop:'1px solid var(--outline)', height:200, position:'relative' }}>
+          <div style={{ marginTop:10, borderRadius:10, overflow:'hidden', height:200, position:'relative' }}>
             <iframe
               title="Kartenvorschau"
               src={`https://maps.google.com/maps?q=${encodedAddress}&output=embed&hl=de&z=15`}
