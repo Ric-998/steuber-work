@@ -8049,14 +8049,30 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
   const saveEdit = async (cp: any) => {
     if (!editData) return
     setEditSaving(true)
-    const { error } = await supabase.from('contact_persons').update({
-      first_name: editData.first_name.trim() || null,
-      last_name:  editData.last_name.trim()  || null,
-      name:       [editData.first_name, editData.last_name].filter(Boolean).join(' ').trim() || editData.last_name.trim(),
-      role:       editData.role.trim()  || null,
-      phone:      editData.phone.trim() || null,
-      email:      editData.email.trim() || null,
-    }).eq('id', cp.id)
+    let error: any = null
+    if (cp._isCust) {
+      // Privatperson → customers-Tabelle updaten
+      const realId = cp.customer_id
+      const res = await supabase.from('customers').update({
+        first_name: editData.first_name.trim() || null,
+        last_name:  editData.last_name.trim()  || null,
+        name:       [editData.first_name, editData.last_name].filter(Boolean).join(' ').trim() || editData.last_name.trim(),
+        phone:      editData.phone.trim() || null,
+        email:      editData.email.trim() || null,
+      }).eq('id', realId)
+      error = res.error
+    } else {
+      // Normaler Ansprechpartner → contact_persons
+      const res = await supabase.from('contact_persons').update({
+        first_name: editData.first_name.trim() || null,
+        last_name:  editData.last_name.trim()  || null,
+        name:       [editData.first_name, editData.last_name].filter(Boolean).join(' ').trim() || editData.last_name.trim(),
+        role:       editData.role.trim()  || null,
+        phone:      editData.phone.trim() || null,
+        email:      editData.email.trim() || null,
+      }).eq('id', cp.id)
+      error = res.error
+    }
     setEditSaving(false)
     if (error) { showToast('⚠ Fehler beim Speichern'); return }
     showToast('✓ Gespeichert')
@@ -8239,7 +8255,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                   {editMode ? 'Bearbeiten' : 'Ansprechpartner'}
                 </div>
                 <div style={{ display:'flex', gap:6 }}>
-                  {!isPrivat && !editMode && (
+                  {!editMode && (
                     <button onClick={() => openEdit(cp)} style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', padding:'6px 12px', borderRadius:999, border:'none', cursor:'pointer' }}>
                       <span className="material-symbols-outlined" style={{ fontSize:14 }}>edit</span> Bearbeiten
                     </button>
@@ -8262,7 +8278,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                   {[
                     { key:'first_name', label:'Vorname', icon:'badge', placeholder:'Max' },
                     { key:'last_name',  label:'Nachname', icon:'badge', placeholder:'Mustermann' },
-                    { key:'role',       label:'Funktion / Rolle', icon:'work', placeholder:'z.B. Hausmeister' },
+                    ...(!cp._isCust ? [{ key:'role', label:'Funktion / Rolle', icon:'work', placeholder:'z.B. Hausmeister' }] : []),
                     { key:'phone',      label:'Telefon', icon:'phone', placeholder:'+49 …' },
                     { key:'email',      label:'E-Mail', icon:'mail', placeholder:'max@beispiel.de' },
                   ].map(f => (
@@ -8282,7 +8298,9 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                   <div style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'10px 12px', background:'var(--pri-xl)', borderRadius:12, marginBottom:16, marginTop:4 }}>
                     <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--pri)', flexShrink:0, marginTop:1 }}>info</span>
                     <div style={{ fontSize:12, color:'var(--pri)', lineHeight:1.4 }}>
-                      Änderungen gelten für alle Objekte, denen dieser Ansprechpartner zugewiesen ist.
+                      {cp._isCust
+                        ? 'Privatperson — Änderungen werden im Kunden-Datensatz gespeichert und sind überall sichtbar.'
+                        : 'Änderungen gelten für alle Objekte, denen dieser Ansprechpartner zugewiesen ist.'}
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:8, marginBottom:8 }}>
@@ -8294,7 +8312,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                     </button>
                   </div>
                   {/* Löschen */}
-                  {!showDeleteConfirm ? (
+                  {!cp._isCust && !showDeleteConfirm ? (
                     <button onClick={() => setShowDeleteConfirm(true)} style={{ width:'100%', padding:'12px', borderRadius:14, border:'1.5px solid var(--err)', background:'transparent', color:'var(--err)', fontSize:13, fontWeight:700, cursor:'pointer', marginBottom:16 }}>
                       Ansprechpartner löschen
                     </button>
