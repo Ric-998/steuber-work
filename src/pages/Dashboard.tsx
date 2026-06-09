@@ -933,6 +933,10 @@ export default function Dashboard({ userName, onLogout }: Props) {
               setSelectedObject(updated)
             }}
             onObjectDeleted={() => { setSelectedObject(null); loadAll() }}
+            onNavigateToCustomer={(customerId) => {
+              const cust = customers.find(c => c.id === customerId)
+              if (cust) { setSelectedCustomer(cust); setTab('kunden') }
+            }}
           />
         )}
 
@@ -1870,11 +1874,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
 }
 
 // ─── Object Detail View ──────────────────────────────────────────────────────
-function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTask, onToggleTask, onNewTask, onHistory, onQR, onRefresh, onObjectUpdated, onObjectDeleted }: {
+function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTask, onToggleTask, onNewTask, onHistory, onQR, onRefresh, onObjectUpdated, onObjectDeleted, onNavigateToCustomer }: {
   obj: ObjectItem; tasks: TaskItem[]; team: TeamMember[]; categories: Category[]; objects: ObjectItem[]
   onBack: () => void; onEditTask: (t: TaskItem) => void; onToggleTask: (id: string, cur: boolean) => void
   onNewTask: () => void; onHistory: () => void; onQR: () => void; onRefresh: () => void
   onObjectUpdated: (updated: ObjectItem) => void; onObjectDeleted: () => void
+  onNavigateToCustomer?: (customerId: string) => void
 }) {
   const [customerLink, setCustomerLink] = useState<string | null>(null)
   const [customerLinkLoading, setCustomerLinkLoading] = useState(false)
@@ -2078,7 +2083,14 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             if (customer.phone) rows.push({ label:'Tel', value:<a href={`tel:${customer.phone}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.phone}</a> })
             if (customer.email) rows.push({ label:'Mail', value:<a href={`mailto:${customer.email}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.email}</a> })
             if (customer.street) rows.push({ label:'Adresse', value:`${customer.street}, ${customer.postal_code||''} ${customer.city||''}`.trim() })
-            if (isHV && customer.hausverwaltung) rows.push({ label:customer.customer_type==='mietverwaltung'?'Verwaltung':'Hausverwaltung', value:<span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span> })
+            if (isHV && customer.hausverwaltung) rows.push({ label:customer.customer_type==='mietverwaltung'?'Verwaltung':'Hausverwaltung', value:
+              onNavigateToCustomer
+                ? <button onClick={() => onNavigateToCustomer((customer.hausverwaltung as any).id)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4, color:'var(--pri)', fontWeight:700, fontSize:'inherit' }}>
+                    {customer.hausverwaltung.name}
+                    <span className="material-symbols-outlined" style={{ fontSize:13 }}>open_in_new</span>
+                  </button>
+                : <span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span>
+            })
             if (isHV && customer.co_contact) rows.push({ label:'c/o', value:`${customer.co_contact.name}${customer.co_contact.role?' · '+customer.co_contact.role:''}` })
             if (isHV && customer.hausverwaltung_objekt_id) rows.push({ label:'Objekt-ID', value:<span style={{ fontFamily:'monospace', fontWeight:700 }}>{customer.hausverwaltung_objekt_id}</span> })
             return (<>
