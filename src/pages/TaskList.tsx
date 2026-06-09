@@ -86,7 +86,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   const [problemNote, setProblemNote] = useState('')
   const [problemUrgent, setProblemUrgent] = useState(false)
   const [vertretungNote, setVertretungNote] = useState('')
-  const [photoFile, setPhotoFile] = useState<File|null>(null)
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [photoUploading, setPhotoUploading] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [toast, setToast] = useState<{msg:string;type:'ok'|'warn'}|null>(null)
@@ -284,18 +284,17 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
     setPhotoUploading(true)
 
     if (sheetType === 'complete') {
-      let photoUrl: string | null = null
-
-      // Upload photo if selected
-      if (photoFile) {
-        const ext = photoFile.name.split('.').pop()
-        const path = `${sheetTask.id}/${Date.now()}.${ext}`
+      // Upload all selected photos
+      const photoUrls: string[] = []
+      for (const file of photoFiles) {
+        const ext = file.name.split('.').pop()
+        const path = `${sheetTask.id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}.${ext}`
         const { error: upErr } = await supabase.storage
           .from('task-photos')
-          .upload(path, photoFile, { upsert: true })
+          .upload(path, file, { upsert: true })
         if (!upErr) {
           const { data } = supabase.storage.from('task-photos').getPublicUrl(path)
-          photoUrl = data.publicUrl
+          if (data.publicUrl) photoUrls.push(data.publicUrl)
         }
       }
 
@@ -304,8 +303,8 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       // Save report with photo
       await supabase.from('task_reports').insert({
         assignment_id: sheetTask.id,
-        report_type: photoUrl ? 'foto' : 'abschluss',
-        photo_urls: photoUrl ? [photoUrl] : [],
+        report_type: photoUrls.length > 0 ? 'foto' : 'abschluss',
+        photo_urls: photoUrls,
       })
 
       showToast('✓ Aufgabe abgeschlossen!', 'ok')
@@ -343,7 +342,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       showToast('⚠ Problem wurde gemeldet', 'warn')
     }
 
-    setPhotoFile(null)
+    setPhotoFiles([])
     setPhotoUploading(false)
   }
 
@@ -794,11 +793,21 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
                     </div>
                   )
                 }
+                const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0)
+                const selMidnight = new Date(selectedDay); selMidnight.setHours(0,0,0,0)
+                const isToday2 = selMidnight.getTime() === todayMidnight.getTime()
+                const isPast = selMidnight < todayMidnight
+                const emptyIcon = isToday2 ? 'celebration' : isPast ? 'event_busy' : 'event_available'
+                const emptyTitle = isToday2 ? 'Heute frei!' : isPast ? 'Kein Einsatz' : 'Noch nichts geplant'
+                const emptyText = isToday2 ? 'Du hast heute keine Aufgaben – genieß den freien Tag.' : isPast ? 'An diesem Tag gab es keine Aufgaben.' : 'Für diesen Tag sind noch keine Aufgaben eingeplant.'
+                const emptyBg = isToday2 ? 'var(--pri-xl)' : 'var(--surf-card)'
+                const emptyBorder = isToday2 ? 'none' : '1px solid var(--outline)'
+                const emptyIconColor = isToday2 ? 'var(--pri)' : 'var(--outline)'
                 return (
-                  <div style={{ background:'var(--surf-card)', borderRadius:16, padding:36, textAlign:'center', border:'1px solid var(--outline)' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:42, color:'var(--outline)', display:'block', marginBottom:8 }}>event_available</span>
-                    <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>Kein Einsatz</div>
-                    <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:4 }}>Für diesen Tag sind keine Aufgaben geplant.</div>
+                  <div style={{ background:emptyBg, borderRadius:16, padding:36, textAlign:'center', border:emptyBorder }}>
+                    <span className="material-symbols-outlined icon-fill" style={{ fontSize:42, color:emptyIconColor, display:'block', marginBottom:8 }}>{emptyIcon}</span>
+                    <div style={{ fontSize:14, fontWeight:700, color: isToday2 ? 'var(--pri)' : 'var(--txt)' }}>{emptyTitle}</div>
+                    <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:4 }}>{emptyText}</div>
                   </div>
                 )
               })()
@@ -1065,7 +1074,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
                         Fahrzeit (Hin + Rückfahrt)
                       </div>
                       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-                        {[0, 15, 30, 45, 60].map(m => (
+                        {[0, 5, 10, 15, 20, 30].map(m => (
                           <button key={m} onClick={() => { setTravelMinutes(m); setCustomTravel('') }}
                             style={{ padding:'7px 14px', borderRadius:10, border:`1.5px solid ${travelMinutes===m && customTravel==='' ? 'var(--pri)' : 'var(--outline)'}`, background:travelMinutes===m && customTravel==='' ? 'var(--pri-xl)' : 'var(--surf-card)', color:travelMinutes===m && customTravel==='' ? 'var(--pri)' : 'var(--txt)', fontSize:13, fontWeight:600, cursor:'pointer' }}>
                             {m === 0 ? 'Keine' : `${m} Min.`}
@@ -1094,6 +1103,43 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
                         <div><div style={{ fontSize: 14, fontWeight: 600 }}>{o.label}</div><div style={{ fontSize: 12, color: 'var(--txt-muted)', marginTop: 2 }}>{o.sub}</div></div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* ── FOTO-PICKER (wenn 'photo' gewählt) ── */}
+                {sheetType === 'complete' && selectedOption === 'photo' && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--txt-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                      Fotos ({photoFiles.length}/5)
+                    </div>
+                    {/* Foto-Vorschau Grid */}
+                    {photoFiles.length > 0 && (
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {photoFiles.map((f, i) => (
+                          <div key={i} style={{ position: 'relative', width: 72, height: 72, borderRadius: 10, overflow: 'hidden', border: '1.5px solid var(--outline)', flexShrink: 0 }}>
+                            <img src={URL.createObjectURL(f)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <button
+                              onClick={() => setPhotoFiles(prev => prev.filter((_, j) => j !== i))}
+                              style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, padding: 0 }}>
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Hinzufügen-Button */}
+                    {photoFiles.length < 5 && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, border: '1.5px dashed var(--pri)', background: 'var(--pri-xl)', cursor: 'pointer', color: 'var(--pri)', fontWeight: 600, fontSize: 13 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 20 }}>add_a_photo</span>
+                        {photoFiles.length === 0 ? 'Foto aufnehmen oder auswählen' : 'Weiteres Foto hinzufügen'}
+                        <input type="file" accept="image/*" capture="environment" multiple style={{ display: 'none' }}
+                          onChange={e => {
+                            const files = Array.from(e.target.files || [])
+                            setPhotoFiles(prev => [...prev, ...files].slice(0, 5))
+                            e.target.value = ''
+                          }} />
+                      </label>
+                    )}
                   </div>
                 )}
 

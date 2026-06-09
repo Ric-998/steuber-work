@@ -9,7 +9,7 @@ import QRCode from '../components/QRCode'
 import MapView from '../components/MapView'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-interface Stats { heute_faellig:number; in_arbeit:number; gesamt_offen:number; diese_woche_done:number; probleme:number; probleme_heute:number }
+interface Stats { heute_faellig:number; in_arbeit:number; gesamt_offen:number; diese_woche_done:number; probleme:number; probleme_heute:number; letzte_woche_done:number; letzte_woche_probleme:number }
 interface ProblemReport { note:string|null; photo_urls:string[]|null; created_at:string }
 interface Problem { id:string; status:string; due_date:string; user_id:string|null; tasks:{ title:string; description:string|null; interval:string|null; objects:{ id:string; address:string; postal_code:string; city:string }|null }|null; users:{ full_name:string; phone:string|null }|null; report:ProblemReport|null }
 interface LeaveRequest {
@@ -141,6 +141,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
   const [stats, setStats]       = useState<Stats|null>(null)
   const [problems, setProblems] = useState<Problem[]>([])
   const [team, setTeam]         = useState<TeamMember[]>([])
+  const [activeWorkerIds, setActiveWorkerIds] = useState<Set<string>>(new Set())
   const [customers, setCustomers] = useState<CustomerItem[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerItem|null>(null)
   const [tasks, setTasks]       = useState<TaskItem[]>([])
@@ -274,8 +275,16 @@ export default function Dashboard({ userName, onLogout }: Props) {
     if (bkRes?.data) setBlackouts(bkRes.data)
     if (cpRes?.data) setContactPersons(cpRes.data)
 
-    // Tauschbörse: assignments with status=vertretung
+    // Live: Wer ist gerade in_arbeit?
     const todayStr = new Date().toISOString().split('T')[0]
+    const { data: liveData } = await supabase
+      .from('task_assignments')
+      .select('user_id')
+      .eq('status', 'in_arbeit')
+      .eq('due_date', todayStr)
+    if (liveData) setActiveWorkerIds(new Set(liveData.map((r: any) => r.user_id)))
+
+    // Tauschbörse: assignments with status=vertretung
     const { data: vertData } = await supabase
       .from('task_assignments')
       .select('id,due_date,user_id,tasks(id,title,categories(emoji,name),objects(name,address,city)),users(full_name,phone)')
@@ -635,8 +644,18 @@ export default function Dashboard({ userName, onLogout }: Props) {
                   </div>
                   <div style={s.bentoSide}>
                     <div style={s.bentoSideLabel}>Erledigt</div>
-                    <div style={s.bentoSideNum}>{stats?.diese_woche_done??0}</div>
-                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Diese Woche</div>
+                    <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                      <div style={s.bentoSideNum}>{stats?.diese_woche_done??0}</div>
+                      {stats && stats.letzte_woche_done > 0 && (() => {
+                        const diff = (stats.diese_woche_done ?? 0) - (stats.letzte_woche_done ?? 0)
+                        if (diff === 0) return null
+                        const up = diff > 0
+                        return <span className="material-symbols-outlined icon-fill" style={{ fontSize:16, color: up ? '#4ade80' : '#f87171', marginTop:2 }}>{up ? 'trending_up' : 'trending_down'}</span>
+                      })()}
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>
+                      Diese Woche{stats && stats.letzte_woche_done > 0 ? ` · ${stats.letzte_woche_done} letzte` : ''}
+                    </div>
                   </div>
                 </div>
 
@@ -648,7 +667,15 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     onMouseLeave={e=>(e.currentTarget.style.filter='none')}
                   >
                     <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'#93000a' }}>warning</span>
-                    <span style={{ fontSize:22, fontWeight:800, color:'#93000a', fontFamily:'var(--font-head)' }}>{stats?.probleme??0}</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:3 }}>
+                      <span style={{ fontSize:22, fontWeight:800, color:'#93000a', fontFamily:'var(--font-head)' }}>{stats?.probleme??0}</span>
+                      {stats && stats.letzte_woche_probleme > 0 && (() => {
+                        const diff = (stats.probleme ?? 0) - (stats.letzte_woche_probleme ?? 0)
+                        if (diff === 0) return null
+                        const up = diff > 0
+                        return <span className="material-symbols-outlined icon-fill" style={{ fontSize:14, color: up ? '#b71c1c' : '#388e3c' }}>{up ? 'trending_up' : 'trending_down'}</span>
+                      })()}
+                    </div>
                     <span style={{ fontSize:10, color:'#93000a', fontWeight:600, opacity:0.8, textAlign:'center' }}>Probleme</span>
                     {(stats?.probleme_heute ?? 0) > 0 && (
                       <span style={{ fontSize:9, color:'#93000a', opacity:0.65, textAlign:'center', marginTop:-2 }}>
@@ -1038,8 +1065,13 @@ export default function Dashboard({ userName, onLogout }: Props) {
                   onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 16px rgba(9,106,112,0.12)')}
                   onMouseLeave={e => (e.currentTarget.style.boxShadow=(s.taskCard as any).boxShadow||'0 1px 4px rgba(0,0,0,0.06)')}
                 >
-                  {/* Avatar */}
-                  <div style={{ width:44, height:44, borderRadius:14, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: m.is_active ? '0 4px 10px rgba(9,106,112,0.25)' : 'none' }}>{ini}</div>
+                  {/* Avatar + Live-Dot */}
+                  <div style={{ position:'relative', flexShrink:0 }}>
+                    <div style={{ width:44, height:44, borderRadius:14, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', boxShadow: m.is_active ? '0 4px 10px rgba(9,106,112,0.25)' : 'none' }}>{ini}</div>
+                    {activeWorkerIds.has(m.id) && (
+                      <span style={{ position:'absolute', bottom:1, right:1, width:11, height:11, borderRadius:'50%', background:'#22c55e', border:'2px solid var(--surf-card)', animation:'livePulse 1.8s ease-in-out infinite' }}/>
+                    )}
+                  </div>
                   {/* Info */}
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:4, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
@@ -1047,7 +1079,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
                       <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color: roleColor[role]||'var(--pri)', background: roleBg[role]||'var(--pri-xl)', borderRadius:20, padding:'3px 8px' }}>
                         <span className="material-symbols-outlined" style={{ fontSize:12 }}>badge</span>{ROLE_LABELS[role]||role}
                       </span>
-                
+                      {activeWorkerIds.has(m.id) && (
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#15803d', background:'#dcfce7', borderRadius:20, padding:'3px 8px' }}>
+                          <span style={{ width:6, height:6, borderRadius:'50%', background:'#22c55e', display:'inline-block', animation:'livePulse 1.8s ease-in-out infinite' }}/>
+                          In Arbeit
+                        </span>
+                      )}
                     </div>
                   </div>
                   {/* Status + Chevron */}
