@@ -116,6 +116,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
   const [showMoreSheet, setShowMoreSheet] = useState(false)
   const [objSearch, setObjSearch] = useState('')
   const [objGroup, setObjGroup] = useState<'none'|'city'|'kunde'>('none')
+  const [objSearchResults, setObjSearchResults] = useState<ObjectItem[]|null>(null)
+  const [objSearching, setObjSearching] = useState(false)
+  const objSearchTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
   const [contactPersons, setContactPersons]   = useState<any[]>([])
   const [kundenSubTab, setKundenSubTab]       = useState<'kunden'|'ansprechpartner'>('kunden')
   const [cpSearch, setCpSearch]               = useState('')
@@ -256,13 +259,13 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.rpc('get_dashboard_stats'),
       supabase.rpc('get_dashboard_problems'),
       supabase.from('users').select('id,full_name,phone,email,is_active,role_id,street,postal_code,city,created_at,employed_since,work_days,work_hours_per_week,work_hours_type,hourly_wage,admin_setup_done,is_onboarded,vacation_days_per_year').order('full_name'),
-      supabase.from('tasks').select('id,title,description,interval,is_active,due_date,end_date,category_id,object_id,contract_id,default_assignee_id,categories(name,emoji),objects(name,address,city),contracts(id,type,start_date,end_date,object_id,customer_id),users!tasks_default_assignee_id_fkey(full_name)').order('created_at',{ascending:false}),
-      supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)').order('address'),
+      supabase.from('tasks').select('id,title,description,interval,is_active,due_date,end_date,category_id,object_id,contract_id,default_assignee_id,categories(name,emoji),objects(name,address,city),contracts(id,type,start_date,end_date,object_id,customer_id),users!tasks_default_assignee_id_fkey(full_name)').order('created_at',{ascending:false}).limit(300),
+      supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)').order('address').limit(200),
       supabase.from('categories').select('*').order('name'),
-      supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name'),
+      supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name').limit(200),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
       supabase.from('vacation_blackouts').select('*').order('from_date',{ascending:true}),
-      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)').not('object_id','is',null).order('last_name').order('name'),
+      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)').not('object_id','is',null).order('last_name').order('name').limit(300),
     ])
     if (stRes.data) setStats(stRes.data)
     if (prRes.data) setProblems((prRes.data || []) as unknown as Problem[])
@@ -883,26 +886,40 @@ export default function Dashboard({ userName, onLogout }: Props) {
               <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
               <input
                 value={objSearch}
-                onChange={e => setObjSearch(e.target.value)}
-                placeholder="Adresse, Ort, PLZ, Kunde, Objektnr. …"
+                onChange={e => {
+                  const v = e.target.value
+                  setObjSearch(v)
+                  if (objSearchTimer.current) clearTimeout(objSearchTimer.current)
+                  if (v.trim().length < 2) { setObjSearchResults(null); setObjSearching(false); return }
+                  setObjSearching(true)
+                  objSearchTimer.current = setTimeout(async () => {
+                    const q = v.trim()
+                    const { data } = await supabase
+                      .from('objects')
+                      .select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)')
+                      .or(`address.ilike.%${q}%,city.ilike.%${q}%,postal_code.ilike.%${q}%,object_number.ilike.%${q}%,notes.ilike.%${q}%`)
+                      .limit(80)
+                    setObjSearchResults((data as unknown as ObjectItem[]) || [])
+                    setObjSearching(false)
+                  }, 350)
+                }}
+                placeholder="Adresse, Ort, PLZ, Objektnr. …"
                 style={{ ...s.input, fontSize:14 }}
               />
+              {objSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)', animation:'spin 1s linear infinite' }}>progress_activity</span>}
               {objSearch && (
-                <button onClick={()=>setObjSearch('')} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}>
+                <button onClick={()=>{ setObjSearch(''); setObjSearchResults(null); setObjSearching(false) }} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}>
                   <span className="material-symbols-outlined icon-sm">close</span>
                 </button>
               )}
             </div>
 
             {loading ? <Loader/> : (() => {
-              const q = objSearch.trim().toLowerCase()
-              const filtered = q ? objects.filter(o => {
-                const haystack = [
-                  o.address, o.city, o.postal_code, o.object_number,
-                  o.customers?.name, o.notes, o.access_note, o.floor_info
-                ].filter(Boolean).join(' ').toLowerCase()
-                return q.split(' ').filter(Boolean).every(word => haystack.includes(word))
-              }) : objects
+              // Wenn DB-Suche aktiv → DB-Ergebnisse nutzen, sonst lokale Liste (bis 200)
+              const filtered: ObjectItem[] = objSearchResults !== null ? objSearchResults
+                : objSearch.trim().length >= 2
+                  ? [] // warte auf DB
+                  : objects
               if (objects.length === 0) return (
                 <div style={s.emptyState}>
                   <span className="material-symbols-outlined" style={{ fontSize:48, color:'var(--txt-muted)', opacity:0.3 }}>apartment</span>
@@ -5070,6 +5087,26 @@ function KundenList({ customers, objects, loading, onSelect }: {
   const [search, setSearch] = useState('')
   const [filterChip, setFilterChip] = useState<'alle'|'privatperson'|'firma'|'verwaltung'|'hausverwaltung'>('alle')
   const [showExport, setShowExport] = useState(false)
+  const [dbResults, setDbResults] = useState<CustomerItem[]|null>(null)
+  const [dbSearching, setDbSearching] = useState(false)
+  const searchTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
+
+  const handleSearch = (v: string) => {
+    setSearch(v)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (v.trim().length < 2) { setDbResults(null); setDbSearching(false); return }
+    setDbSearching(true)
+    searchTimer.current = setTimeout(async () => {
+      const q = v.trim()
+      const { data } = await supabase
+        .from('customers')
+        .select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)')
+        .or(`name.ilike.%${q}%,contact_person.ilike.%${q}%,city.ilike.%${q}%,email.ilike.%${q}%,postal_code.ilike.%${q}%`)
+        .limit(80)
+      setDbResults((data as unknown as CustomerItem[]) || [])
+      setDbSearching(false)
+    }, 350)
+  }
 
   const exportFields = [
     { key:'type',           label:'Kundentyp',       default:true },
@@ -5160,13 +5197,15 @@ function KundenList({ customers, objects, loading, onSelect }: {
     setShowExport(false)
   }
 
-  const filtered = customers.filter(c => {
-    // Chip filter
+  // DB-Ergebnisse haben Vorrang wenn Suche aktiv
+  const baseList = dbResults !== null ? dbResults : customers
+  const filtered = baseList.filter(c => {
     if (filterChip === 'privatperson' && c.customer_type !== 'privatperson') return false
     if (filterChip === 'firma' && c.customer_type !== 'firma') return false
     if (filterChip === 'verwaltung' && c.customer_type !== 'weg-verwaltung' && c.customer_type !== 'mietverwaltung') return false
     if (filterChip === 'hausverwaltung' && !c.is_hausverwaltung) return false
-    // Text search
+    // Für lokale Liste (≤200): auch client-seitig filtern; DB-Ergebnisse sind bereits gefiltert
+    if (dbResults !== null) return true
     const q = search.trim().toLowerCase()
     if (!q) return true
     const contactName = [c.contact_first_name, c.contact_last_name].filter(Boolean).join(' ')
@@ -5249,7 +5288,8 @@ function KundenList({ customers, objects, loading, onSelect }: {
         {/* Search */}
         <div style={{ ...s.inputWrap, marginBottom:10 }}>
           <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Name, Firma, Stadt, Hausverwaltung …" style={s.input} />
+          <input value={search} onChange={e => handleSearch(e.target.value)} placeholder="Name, Firma, Stadt, Hausverwaltung …" style={s.input} />
+          {dbSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
           {search && <button onClick={() => setSearch('')} style={{ background:'none', border:'none', cursor:'pointer', display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
         </div>
         {/* Filter Chips */}
@@ -7969,6 +8009,27 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
   const [showExport, setShowExport] = useState(false)
   const [selectedContact, setSelectedContact] = useState<any>(null)
   const [editMode, setEditMode] = useState(false)
+  const [dbResults, setDbResults] = useState<any[]|null>(null)
+  const [dbSearching, setDbSearching] = useState(false)
+  const searchTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
+
+  const handleSearchChange = (v: string) => {
+    onSearchChange(v)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (v.trim().length < 2) { setDbResults(null); setDbSearching(false); return }
+    setDbSearching(true)
+    searchTimer.current = setTimeout(async () => {
+      const q = v.trim()
+      const { data } = await supabase
+        .from('contact_persons')
+        .select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)')
+        .not('object_id', 'is', null)
+        .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,name.ilike.%${q}%,role.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
+        .limit(100)
+      setDbResults(data || [])
+      setDbSearching(false)
+    }, 350)
+  }
   const [editData, setEditData] = useState<any>(null)
   const [editSaving, setEditSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -8030,12 +8091,18 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
     }))
   const allContacts = [...contacts, ...privatpersonen]
 
-  // Filter
+  // DB-Ergebnisse haben Vorrang (merged mit privatpersonen aus lokaler Liste)
+  const baseContacts = dbResults !== null ? [...dbResults, ...privatpersonen] : allContacts
   const q = search.trim().toLowerCase()
-  const filtered = q ? allContacts.filter(cp => {
-    const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, cp.customers?.name].filter(Boolean).join(' ').toLowerCase()
-    return q.split(' ').filter(Boolean).every((w: string) => hay.includes(w))
-  }) : allContacts
+  const filtered = (dbResults !== null)
+    ? baseContacts.filter(cp => {
+        const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, cp.customers?.name].filter(Boolean).join(' ').toLowerCase()
+        return !q || q.split(' ').filter(Boolean).every((w: string) => hay.includes(w))
+      })
+    : q ? allContacts.filter(cp => {
+        const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, cp.customers?.name].filter(Boolean).join(' ').toLowerCase()
+        return q.split(' ').filter(Boolean).every((w: string) => hay.includes(w))
+      }) : allContacts
 
   // Sort alphabetically by last_name, then first_name
   const sorted = [...filtered].sort((a, b) => {
@@ -8085,8 +8152,9 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
         {/* Suche */}
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', overflow:'hidden', marginBottom:4 }}>
           <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
-          <input value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Name, Funktion, Telefon, Firma …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
-          {search && <button onClick={() => onSearchChange('')} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
+          <input value={search} onChange={e => handleSearchChange(e.target.value)} placeholder="Name, Funktion, Telefon, Firma …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
+          {dbSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
+          {search && <button onClick={() => { handleSearchChange(''); setDbResults(null) }} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
         </div>
       </div>
 
