@@ -13,6 +13,17 @@ export async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return null
   try {
     const reg = await navigator.serviceWorker.register('/sw.js')
+
+    // Wenn ein neuer SW die Kontrolle übernimmt → Seite neu laden
+    // (skipWaiting im SW aktiviert sofort, aber der laufende JS-Bundle
+    //  ist noch alt – ein Reload zieht den neuen Code)
+    let refreshing = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return
+      refreshing = true
+      window.location.reload()
+    })
+
     return reg
   } catch(e) {
     console.warn('SW registration failed:', e)
