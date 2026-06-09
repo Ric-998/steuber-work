@@ -198,26 +198,33 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
   const fetchAssignments = async () => {
     setLoading(true)
-    // Fetch wider range to cover week navigation
-    const rangeStart = new Date()
-    rangeStart.setDate(rangeStart.getDate() - 14)
-    const rangeEnd = new Date()
-    rangeEnd.setDate(rangeEnd.getDate() + 28)
-    const { data } = await supabase
-      .from('task_assignments')
-      .select(`*, tasks(id,title,description,interval,categories(id,name,emoji),objects(id,name,address,city,postal_code,access_note,parking_note,floor_info,notes,customers(id,name)))`)
-      .eq('user_id', userId)
-      .gte('due_date', rangeStart.toISOString().split('T')[0])
-      .lte('due_date', rangeEnd.toISOString().split('T')[0])
-      .order('due_date', { ascending: true })
-    if (data) {
-      const sorted = (data as TaskAssignment[]).sort((a, b) => {
-        if (a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date)
-        return (a.sort_order ?? 0) - (b.sort_order ?? 0)
-      })
-      setAssignments(sorted)
+    try {
+      // Fetch wider range to cover week navigation
+      const rangeStart = new Date()
+      rangeStart.setDate(rangeStart.getDate() - 14)
+      const rangeEnd = new Date()
+      rangeEnd.setDate(rangeEnd.getDate() + 28)
+      const { data, error } = await supabase
+        .from('task_assignments')
+        .select(`*, tasks(id,title,description,interval,categories(id,name,emoji),objects(id,name,address,city,postal_code,access_note,parking_note,floor_info,notes,customers(id,name)))`)
+        .eq('user_id', userId)
+        .gte('due_date', rangeStart.toISOString().split('T')[0])
+        .lte('due_date', rangeEnd.toISOString().split('T')[0])
+        .order('due_date', { ascending: true })
+      if (error) throw error
+      if (data) {
+        const sorted = (data as TaskAssignment[]).sort((a, b) => {
+          if (a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date)
+          return (a.sort_order ?? 0) - (b.sort_order ?? 0)
+        })
+        setAssignments(sorted)
+      }
+    } catch (err) {
+      console.error('fetchAssignments failed:', err)
+      showToast('Aufgaben konnten nicht geladen werden', 'warn')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const filteredByDay = assignments.filter(a => {

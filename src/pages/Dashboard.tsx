@@ -147,6 +147,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
   const [objects, setObjects]   = useState<ObjectItem[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading]   = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const realtimeDebounce = useRef<ReturnType<typeof setTimeout>|null>(null)
   const [showCreate, setShowCreate] = useState<string|false>(false)  // false | objectId
   // Daily Report State
   const [dailyReport, setDailyReport] = useState<any>(null)
@@ -222,26 +224,33 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
   // Realtime: Auto-Reload bei Statusänderungen durch Mitarbeiter
   useEffect(() => {
+    const debouncedLoadAll = () => {
+      if (realtimeDebounce.current) clearTimeout(realtimeDebounce.current)
+      realtimeDebounce.current = setTimeout(() => { loadAll() }, 1500)
+    }
     const channel = supabase
       .channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'task_assignments' }, () => {
-        loadAll()
+        debouncedLoadAll()
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, () => {
-        loadAll()
+        debouncedLoadAll()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leave_requests' }, (payload: any) => {
-        loadAll()
-        // Show toast so admin notices even if they're on another tab
-        const name = (payload?.new as any)?.user_id ? 'Ein Mitarbeiter' : 'Ein Mitarbeiter'
+        debouncedLoadAll()
         showToast('📋 Neuer Urlaubsantrag eingegangen – bitte prüfen', 'info')
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+      if (realtimeDebounce.current) clearTimeout(realtimeDebounce.current)
+    }
   }, [])
 
   const loadAll = async () => {
     setLoading(true)
+    setLoadError(false)
+    try {
     const [stRes, prRes, tmRes, tkRes, obRes, catRes, custRes, lvRes, bkRes, cpRes] = await Promise.all([
       supabase.rpc('get_dashboard_stats'),
       supabase.rpc('get_dashboard_problems'),
@@ -293,7 +302,13 @@ export default function Dashboard({ userName, onLogout }: Props) {
       .order('title')
     if (tplData) setTemplates(tplData as unknown as TaskItem[])
 
-    setLoading(false)
+    } catch (err) {
+      console.error('loadAll failed:', err)
+      setLoadError(true)
+      showToast('⚠ Daten konnten nicht geladen werden. Bitte Seite neu laden.', 'warn')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const loadDailyReport = async () => {
@@ -391,8 +406,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
   }
 
   const toggleActive = async (id:string, current:boolean) => {
-    await supabase.from('users').update({ is_active:!current }).eq('id',id)
     setTeam(prev=>prev.map(m=>m.id===id?{...m,is_active:!current}:m))
+    const { error } = await supabase.from('users').update({ is_active:!current }).eq('id',id)
+    if (error) {
+      setTeam(prev=>prev.map(m=>m.id===id?{...m,is_active:current}:m))
+      showToast('⚠ Status konnte nicht geändert werden', 'warn')
+    }
   }
 
   const loadHistory = async (obj: ObjectItem) => {
@@ -408,8 +427,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
   }
 
   const toggleTask = async (id:string, current:boolean) => {
-    await supabase.from('tasks').update({ is_active:!current }).eq('id',id)
     setTasks(prev=>prev.map(t=>t.id===id?{...t,is_active:!current}:t))
+    const { error } = await supabase.from('tasks').update({ is_active:!current }).eq('id',id)
+    if (error) {
+      setTasks(prev=>prev.map(t=>t.id===id?{...t,is_active:current}:t))
+      showToast('⚠ Aufgabe konnte nicht geändert werden', 'warn')
+    }
   }
 
   // ── Computed badge counts (hoisted for use across desktop + mobile nav) ──
@@ -435,6 +458,15 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
   return (
     <div style={{ ...s.shell, flexDirection: isDesktop ? 'row' : 'column' }}>
+
+      {/* ── Load Error Banner ── */}
+      {loadError && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:2000, background:'#b71c1c', color:'#fff', padding:'10px 16px', display:'flex', alignItems:'center', gap:10, fontSize:13, fontWeight:600 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:18 }}>wifi_off</span>
+          <span style={{ flex:1 }}>Daten konnten nicht geladen werden.</span>
+          <button onClick={() => loadAll()} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'#fff', padding:'5px 12px', borderRadius:8, fontWeight:700, cursor:'pointer', fontSize:12 }}>Neu laden</button>
+        </div>
+      )}
 
       {/* ── Desktop Sidebar ── */}
       {isDesktop && (
@@ -937,6 +969,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
               const cust = customers.find(c => c.id === customerId)
               if (cust) { setSelectedCustomer(cust); setTab('kunden') }
             }}
+            onToast={(msg, type) => showToast(msg, type)}
           />
         )}
 
@@ -1253,10 +1286,10 @@ export default function Dashboard({ userName, onLogout }: Props) {
                                 setLeaveConflictAssigns(affected)
                               } else {
                                 setLeaveLoading(req.id)
-                                await supabase.from('leave_requests').update({ status:'genehmigt' }).eq('id', req.id)
-                                setLeaveRequests(prev => prev.map(r => r.id === req.id ? {...r, status:'genehmigt'} : r))
+                                const { error: appErr } = await supabase.from('leave_requests').update({ status:'genehmigt' }).eq('id', req.id)
                                 setLeaveLoading(null)
-                                showToast('✔ Antrag genehmigt', 'ok')
+                                if (appErr) { showToast('⚠ Fehler beim Genehmigen', 'warn') }
+                                else { setLeaveRequests(prev => prev.map(r => r.id === req.id ? {...r, status:'genehmigt'} : r)); showToast('✔ Antrag genehmigt', 'ok') }
                               }
                             }}
                             style={{ padding:'7px 12px', borderRadius:10, border:'none', background:'var(--ok)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
@@ -1267,10 +1300,10 @@ export default function Dashboard({ userName, onLogout }: Props) {
                             disabled={leaveLoading === req.id}
                             onClick={async () => {
                               setLeaveLoading(req.id)
-                              await supabase.from('leave_requests').update({ status:'abgelehnt' }).eq('id', req.id)
-                              setLeaveRequests(prev => prev.map(r => r.id === req.id ? {...r, status:'abgelehnt'} : r))
+                              const { error: rejErr } = await supabase.from('leave_requests').update({ status:'abgelehnt' }).eq('id', req.id)
                               setLeaveLoading(null)
-                              showToast('Antrag abgelehnt', 'warn')
+                              if (rejErr) { showToast('⚠ Fehler beim Ablehnen', 'warn') }
+                              else { setLeaveRequests(prev => prev.map(r => r.id === req.id ? {...r, status:'abgelehnt'} : r)); showToast('Antrag abgelehnt', 'warn') }
                             }}
                             style={{ padding:'7px 12px', borderRadius:10, border:'1.5px solid var(--err-dot)', background:'transparent', color:'var(--err-dot)', fontSize:12, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
                             <span className="material-symbols-outlined" style={{ fontSize:14 }}>close</span>
@@ -1875,12 +1908,13 @@ export default function Dashboard({ userName, onLogout }: Props) {
 }
 
 // ─── Object Detail View ──────────────────────────────────────────────────────
-function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTask, onToggleTask, onNewTask, onHistory, onQR, onRefresh, onObjectUpdated, onObjectDeleted, onNavigateToCustomer }: {
+function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTask, onToggleTask, onNewTask, onHistory, onQR, onRefresh, onObjectUpdated, onObjectDeleted, onNavigateToCustomer, onToast }: {
   obj: ObjectItem; tasks: TaskItem[]; team: TeamMember[]; categories: Category[]; objects: ObjectItem[]
   onBack: () => void; onEditTask: (t: TaskItem) => void; onToggleTask: (id: string, cur: boolean) => void
   onNewTask: () => void; onHistory: () => void; onQR: () => void; onRefresh: () => void
   onObjectUpdated: (updated: ObjectItem) => void; onObjectDeleted: () => void
   onNavigateToCustomer?: (customerId: string) => void
+  onToast?: (msg: string, type: 'ok'|'warn'|'info') => void
 }) {
   const [customerLink, setCustomerLink] = useState<string | null>(null)
   const [customerLinkLoading, setCustomerLinkLoading] = useState(false)
@@ -2021,7 +2055,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
   const addObjCp = async (cp: {first_name:string;last_name:string;role:string;phone:string;email:string}) => {
     if (!cp.last_name.trim() && !cp.first_name.trim()) return
     setObjCpSaving(true)
-    const { data } = await supabase.from('contact_persons').insert({
+    const { data, error } = await supabase.from('contact_persons').insert({
       object_id: obj.id,
       customer_id: obj.customer_id,
       name: `${cp.first_name} ${cp.last_name}`.trim(),
@@ -2031,14 +2065,25 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       phone: cp.phone.trim() || null,
       email: cp.email.trim() || null,
     }).select('id,name,first_name,last_name,role,phone,email').single()
-    if (data) setObjContacts(prev => [...prev, data].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')))
-    setNewObjCpFn(''); setNewObjCpLn(''); setNewObjCpRole(''); setNewObjCpPhone(''); setNewObjCpEmail('')
-    setShowAddObjCp(false); setObjCpSaving(false)
+    if (error) {
+      onToast?.('⚠ Ansprechpartner konnte nicht gespeichert werden', 'warn')
+    } else {
+      if (data) setObjContacts(prev => [...prev, data].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')))
+      setNewObjCpFn(''); setNewObjCpLn(''); setNewObjCpRole(''); setNewObjCpPhone(''); setNewObjCpEmail('')
+      setShowAddObjCp(false)
+    }
+    setObjCpSaving(false)
   }
 
   const removeObjCp = async (id: string) => {
-    await supabase.from('contact_persons').delete().eq('id', id)
     setObjContacts(prev => prev.filter(c => c.id !== id))
+    const { error } = await supabase.from('contact_persons').delete().eq('id', id)
+    if (error) {
+      // rollback
+      onToast?.('⚠ Ansprechpartner konnte nicht gelöscht werden', 'warn')
+      const { data: restored } = await supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,customers(id,name,customer_type)').eq('id', id).single()
+      if (restored) setObjContacts(prev => [...prev, restored as any].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')))
+    }
   }
 
   return (
