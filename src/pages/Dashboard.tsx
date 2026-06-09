@@ -1809,13 +1809,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {/* ── PROBLEM DETAIL OVERLAY ── */}
       {/* ── Problems Bottom Sheet ── */}
       {showProblemsSheet && (
-        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(13,31,34,0.45)', display:'flex', alignItems:'flex-end' }}
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(13,31,34,0.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}
           onClick={() => setShowProblemsSheet(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:640, margin:'0 auto', background:'var(--surf-card)', borderRadius:'24px 24px 0 0', maxHeight:'80dvh', display:'flex', flexDirection:'column', overflow:'hidden' }}>
-            {/* Handle */}
-            <div style={{ display:'flex', justifyContent:'center', padding:'12px 0 4px' }}>
-              <div style={{ width:36, height:4, borderRadius:2, background:'var(--outline)' }}/>
-            </div>
+          <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:560, background:'var(--surf-card)', borderRadius:24, maxHeight:'80dvh', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 24px 80px rgba(0,0,0,0.25)' }}>
+            {/* Spacer statt Handle */}
+            <div style={{ height:4 }}/>
             {/* Header */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 20px 14px' }}>
               <div>
