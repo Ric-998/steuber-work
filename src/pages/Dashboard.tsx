@@ -685,7 +685,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                   </div>
                   {[
                     { icon:'today',        label:'Heute fällig', val: stats?.heute_faellig ?? 0, color:'#92400e', bg:'#fff8e6', onClick: () => setShowTodayOverlay(true) },
-                    { icon:'pending_actions', label:'Offen gesamt', val: stats?.gesamt_offen ?? 0, color:'var(--pri)', bg:'var(--pri-xl)', onClick: () => setShowTodayOverlay(true) },
+                    { icon:'task_alt', label:'Heute erledigt', val: (dailyReport?.assignments??[]).filter((a:any)=>a.status==='erledigt').length, color:'var(--ok)', bg:'var(--ok-bg)', onClick: () => setShowTodayOverlay(true) },
                   ].map(({icon,label,val,color,bg,onClick})=>(
                     <div key={label} onClick={onClick} style={{ ...s.statChip, background:bg, cursor:'pointer' }}
                       onMouseEnter={e=>(e.currentTarget.style.filter='brightness(0.95)')}
@@ -1811,7 +1811,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       {showProblemsSheet && (
         <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(13,31,34,0.45)', display:'flex', alignItems:'flex-end' }}
           onClick={() => setShowProblemsSheet(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{ width:'100%', background:'var(--surf-card)', borderRadius:'24px 24px 0 0', maxHeight:'80dvh', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:640, margin:'0 auto', background:'var(--surf-card)', borderRadius:'24px 24px 0 0', maxHeight:'80dvh', display:'flex', flexDirection:'column', overflow:'hidden' }}>
             {/* Handle */}
             <div style={{ display:'flex', justifyContent:'center', padding:'12px 0 4px' }}>
               <div style={{ width:36, height:4, borderRadius:2, background:'var(--outline)' }}/>
