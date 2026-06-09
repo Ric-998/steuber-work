@@ -4055,29 +4055,52 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   return (
     <PageOverlay isDesktop={isDesktop} onClose={onClose}>
       {/* Header */}
-      <div style={s.overlayHead}>
-        <button style={s.backBtn} onClick={step === 1 ? onClose : () => { setStep(1); setError('') }}>
-          <span className="material-symbols-outlined">{step === 1 ? 'close' : 'arrow_back'}</span>
-        </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-head)' }}>Neues Objekt</div>
-          <div style={{ fontSize: 11, color: 'var(--txt-muted)' }}>
-            {step === 1 ? 'Objektdaten' : 'Kunde zuordnen'} · Schritt {step} von 2
-          </div>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-          {(step === 2 && createMode && newCustType) ? (() => {
-            const tl: Record<string,string> = { privatperson:'Privatperson', firma:'Firma', 'weg-verwaltung':'WEG', mietverwaltung:'Mietverwaltung' }
-            const ti: Record<string,string> = { privatperson:'person', firma:'business', 'weg-verwaltung':'apartment', mietverwaltung:'home_work' }
-            return (
-              <div style={{ display:'flex', alignItems:'center', gap:4, background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:20, padding:'4px 10px 4px 6px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--pri)' }}>{ti[newCustType]||'person'}</span>
-                <span style={{ fontSize:11, fontWeight:700, color:'var(--pri)' }}>{tl[newCustType]||newCustType}</span>
+      {(() => {
+        // Effektiver Schritt: Typ ausgewählt beim Neukunden → Schritt 3
+        const effStep = step === 2 && createMode && newCustType ? 3 : step
+        const totalSteps = step === 2 && createMode ? 3 : 2
+        const subtitle =
+          step === 1 ? 'Objektdaten' :
+          (createMode && newCustType) ? 'Neuer Kunde · Daten eingeben' :
+          createMode ? 'Neuer Kunde · Typ wählen' :
+          'Kunde zuordnen'
+        const tl: Record<string,string> = { privatperson:'Privatperson', firma:'Firma', 'weg-verwaltung':'WEG', mietverwaltung:'Mietverwaltung' }
+        const ti: Record<string,string> = { privatperson:'person', firma:'business', 'weg-verwaltung':'apartment', mietverwaltung:'home_work' }
+        // Zurück-Logik: bei Typ ausgefüllt → zurück zur Typ-Auswahl; bei Typ-Auswahl → zurück zu Schritt 1; sonst Schritt zurück
+        const handleBack = () => {
+          if (step === 2 && createMode && newCustType) {
+            setNewCustType(''); setNewAnrede(''); setNewVorname(''); setNewNachname(''); setNewVorname2(''); setNewNachname2(''); setNewContacts([]); setCpFn(''); setCpLn('')
+          } else if (step === 2) {
+            setStep(1); setError('')
+          } else {
+            onClose()
+          }
+        }
+        return (
+          <div style={s.overlayHead}>
+            <button style={s.backBtn} onClick={handleBack}>
+              <span className="material-symbols-outlined">{step === 1 ? 'close' : 'arrow_back'}</span>
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-head)' }}>Neues Objekt</div>
+              <div style={{ fontSize: 11, color: 'var(--txt-muted)' }}>
+                {subtitle} · Schritt {effStep} von {totalSteps}
               </div>
-            )
-          })() : [1, 2].map(i => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i <= step ? 'var(--pri)' : 'var(--outline)' }} />)}
-        </div>
-      </div>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+              {Array.from({ length: totalSteps }, (_, i) => i + 1).map(i => (
+                <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i <= effStep ? 'var(--pri)' : 'var(--outline)', transition:'background 0.2s' }} />
+              ))}
+              {newCustType && (
+                <div style={{ display:'flex', alignItems:'center', gap:4, background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:20, padding:'3px 9px 3px 5px', marginLeft:4 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:13, color:'var(--pri)' }}>{ti[newCustType]||'person'}</span>
+                  <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)' }}>{tl[newCustType]||newCustType}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
 
