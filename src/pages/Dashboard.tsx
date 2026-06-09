@@ -64,6 +64,7 @@ interface CustomerItem {
   contract_type?: 'jahresvertrag'|'einmalig'|null
   // WEG-Verwaltung: Verknüpfung zur Hausverwaltung + c/o-Ansprechpartner
   hausverwaltung_id?: string|null
+  hausverwaltung_objekt_id?: string|null
   co_contact_id?: string|null
   is_hausverwaltung?: boolean
   hausverwaltung?: { id:string; name:string; customer_type:CustomerType } | null
@@ -1937,7 +1938,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
 
       const [custRes, assignRes] = await Promise.all([
         obj.customer_id
-          ? supabase.from('customers').select('*').eq('id', obj.customer_id).single()
+          ? supabase.from('customers').select('*,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').eq('id', obj.customer_id).single()
           : Promise.resolve({ data: null }),
         taskIds.length > 0
           ? supabase.from('task_assignments')
@@ -4384,7 +4385,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     <label style={s.fieldLabel}>MV-Name *</label>
                     <div style={{ ...s.inputWrap, background: newCustName.trim() ? 'var(--ok-bg)' : undefined }}>
                       <span className="material-symbols-outlined icon-sm" style={{ color: newCustName.trim() ? 'var(--ok)' : 'var(--txt-muted)' }}>home_work</span>
-                      <input value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="MV Musterstraße 10" style={s.input}/>
+                      <input value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="z.B. Max Müller oder Müller GmbH" style={s.input}/>
                       {newCustName.trim() && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>}
                     </div>
                   </div>
@@ -5138,10 +5139,27 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
               {customer.co_contact.phone && <><br/><a href={`tel:${customer.co_contact.phone}`} style={{ color:'var(--pri)', textDecoration:'none', fontSize:12 }}>{customer.co_contact.phone}</a></>}
             </Row>
           )}
-          {/* Mietverwaltung: Verwaltungsgesellschaft */}
+          {customer.customer_type === 'weg-verwaltung' && customer.hausverwaltung_objekt_id && (
+            <Row icon="tag" label="Objekt-ID HV">
+              <span style={{ fontFamily:'monospace', fontSize:13 }}>{customer.hausverwaltung_objekt_id}</span>
+            </Row>
+          )}
+          {/* Mietverwaltung: Verwaltungsgesellschaft + c/o + Objekt-ID */}
           {customer.customer_type === 'mietverwaltung' && customer.hausverwaltung && (
             <Row icon="home_work" label="Verwaltung">
               <span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span>
+            </Row>
+          )}
+          {customer.customer_type === 'mietverwaltung' && customer.co_contact && (
+            <Row icon="contact_phone" label="c/o Kontakt">
+              <span style={{ fontWeight:600 }}>{customer.co_contact.name}</span>
+              {customer.co_contact.role && <span style={{ color:'var(--txt-muted)' }}> · {customer.co_contact.role}</span>}
+              {customer.co_contact.phone && <><br/><a href={`tel:${customer.co_contact.phone}`} style={{ color:'var(--pri)', textDecoration:'none', fontSize:12 }}>{customer.co_contact.phone}</a></>}
+            </Row>
+          )}
+          {customer.customer_type === 'mietverwaltung' && customer.hausverwaltung_objekt_id && (
+            <Row icon="tag" label="Objekt-ID Verwaltung">
+              <span style={{ fontFamily:'monospace', fontSize:13 }}>{customer.hausverwaltung_objekt_id}</span>
             </Row>
           )}
           {!customer.street && !customer.phone && !customer.email && !customer.notes && !customer.hausverwaltung && !customer.co_contact && (
