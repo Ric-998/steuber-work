@@ -1029,6 +1029,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             customers={customers}
             search={cpSearch}
             onSearchChange={setCpSearch}
+            onRefresh={loadAll}
           />
         )}
 
@@ -7958,14 +7959,59 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
 }
 
 // ─── AnsprechpartnerList ──────────────────────────────────────────────────────
-function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
+function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRefresh }: {
   contacts: any[]
   customers: any[]
   search: string
   onSearchChange: (v: string) => void
+  onRefresh?: () => void
 }) {
   const [showExport, setShowExport] = useState(false)
   const [selectedContact, setSelectedContact] = useState<any>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editData, setEditData] = useState<any>(null)
+  const [editSaving, setEditSaving] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [toast, setToast] = useState<string|null>(null)
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2800)
+  }
+
+  const openEdit = (cp: any) => {
+    setEditData({ first_name: cp.first_name||'', last_name: cp.last_name||cp.name||'', role: cp.role||'', phone: cp.phone||'', email: cp.email||'' })
+    setEditMode(true)
+    setShowDeleteConfirm(false)
+  }
+
+  const saveEdit = async (cp: any) => {
+    if (!editData) return
+    setEditSaving(true)
+    const { error } = await supabase.from('contact_persons').update({
+      first_name: editData.first_name.trim() || null,
+      last_name:  editData.last_name.trim()  || null,
+      name:       [editData.first_name, editData.last_name].filter(Boolean).join(' ').trim() || editData.last_name.trim(),
+      role:       editData.role.trim()  || null,
+      phone:      editData.phone.trim() || null,
+      email:      editData.email.trim() || null,
+    }).eq('id', cp.id)
+    setEditSaving(false)
+    if (error) { showToast('⚠ Fehler beim Speichern'); return }
+    showToast('✓ Gespeichert')
+    setEditMode(false)
+    setSelectedContact(null)
+    onRefresh?.()
+  }
+
+  const deleteContact = async (cp: any) => {
+    const { error } = await supabase.from('contact_persons').delete().eq('id', cp.id)
+    if (error) { showToast('⚠ Löschen fehlgeschlagen'); setShowDeleteConfirm(false); return }
+    showToast('Ansprechpartner gelöscht')
+    setShowDeleteConfirm(false)
+    setSelectedContact(null)
+    onRefresh?.()
+  }
 
   // Merge: contact_persons + privatperson customers (they ARE persons)
   const privatpersonen = (customers || [])
@@ -8113,85 +8159,173 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange }: {
         const initials = ((cp.first_name?.[0]||'') + (cp.last_name?.[0]||cp.name?.[0]||'')).toUpperCase() || '?'
         return (
           <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1100, display:'flex', alignItems: window.innerWidth >= 768 ? 'center' : 'flex-end', justifyContent: window.innerWidth >= 768 ? 'center' : 'stretch' }}
-            onClick={() => setSelectedContact(null)}>
-            <div style={{ background:'var(--bg)', borderRadius: window.innerWidth >= 768 ? 20 : '24px 24px 0 0', width: window.innerWidth >= 768 ? 400 : '100%', maxHeight:'85vh', overflowY:'auto', paddingBottom: window.innerWidth >= 768 ? 0 : 'env(safe-area-inset-bottom, 20px)', boxShadow: window.innerWidth >= 768 ? '0 8px 40px rgba(0,0,0,0.2)' : 'none' }}
+            onClick={() => { setSelectedContact(null); setEditMode(false); setShowDeleteConfirm(false) }}>
+            <div style={{ background:'var(--bg)', borderRadius: window.innerWidth >= 768 ? 20 : '24px 24px 0 0', width: window.innerWidth >= 768 ? 420 : '100%', maxHeight:'92vh', overflowY:'auto', paddingBottom: window.innerWidth >= 768 ? 0 : 'env(safe-area-inset-bottom, 20px)', boxShadow: window.innerWidth >= 768 ? '0 8px 40px rgba(0,0,0,0.2)' : 'none' }}
               onClick={e => e.stopPropagation()}>
-              {/* Handle */}
+              {/* Handle + Header-Zeile */}
               <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 0' }}>
                 <div style={{ width:36, height:4, borderRadius:2, background:'var(--surf-high)' }}/>
               </div>
-              {/* Avatar + Name */}
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'20px 20px 16px', gap:10 }}>
-                <div style={{ width:72, height:72, borderRadius:22, background: isPrivat ? 'var(--pri-xl)' : 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: isPrivat ? 'var(--pri)' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:24, fontFamily:'var(--font-head)', boxShadow: isPrivat ? 'none' : '0 6px 20px rgba(9,106,112,0.3)' }}>
-                  {initials}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px 0' }}>
+                <div style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)' }}>
+                  {editMode ? 'Bearbeiten' : 'Ansprechpartner'}
                 </div>
-                <div style={{ textAlign:'center' }}>
-                  <div style={{ fontSize:20, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:4 }}>{displayName}</div>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                    {cp.role && cp.role !== 'Privatperson' && (
-                      <span style={{ fontSize:12, color:'var(--txt-sec)', fontWeight:600 }}>{cp.role}</span>
-                    )}
-                    {isPrivat && <span style={{ fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 8px' }}>Privatperson</span>}
-                  </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  {!isPrivat && !editMode && (
+                    <button onClick={() => openEdit(cp)} style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', padding:'6px 12px', borderRadius:999, border:'none', cursor:'pointer' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:14 }}>edit</span> Bearbeiten
+                    </button>
+                  )}
+                  <button onClick={() => { setSelectedContact(null); setEditMode(false); setShowDeleteConfirm(false) }} style={{ background:'var(--surf-low)', border:'none', width:32, height:32, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>close</span>
+                  </button>
                 </div>
               </div>
-              {/* Infos */}
-              <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
-                {/* Kontaktdaten */}
-                {(cp.phone || cp.email) && (
-                  <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
-                    {cp.phone && (
-                      <a href={'tel:' + cp.phone}
-                        style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', textDecoration:'none', borderBottom: cp.email ? '1px solid var(--outline)' : 'none' }}>
-                        <div style={{ width:38, height:38, borderRadius:12, background:'#e8f5e9', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize:20, color:'#2e7d32' }}>phone</span>
-                        </div>
-                        <div>
-                          <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Telefon</div>
-                          <div style={{ fontSize:15, fontWeight:700, color:'var(--pri)', marginTop:1 }}>{cp.phone}</div>
-                        </div>
-                      </a>
-                    )}
-                    {cp.email && (
-                      <a href={'mailto:' + cp.email}
-                        style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', textDecoration:'none' }}>
-                        <div style={{ width:38, height:38, borderRadius:12, background:'#e3f2fd', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize:20, color:'#1565c0' }}>mail</span>
-                        </div>
-                        <div>
-                          <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>E-Mail</div>
-                          <div style={{ fontSize:15, fontWeight:700, color:'var(--pri)', marginTop:1 }}>{cp.email}</div>
-                        </div>
-                      </a>
-                    )}
-                  </div>
-                )}
-                {/* Verknüpfter Kunde */}
-                {cp.customers?.name && (
-                  <div style={{ background:'var(--surf-card)', borderRadius:16, border:'1px solid var(--outline)', padding:'14px 16px', display:'flex', alignItems:'center', gap:14 }}>
-                    <div style={{ width:38, height:38, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--pri)' }}>
-                        {cp.customers.customer_type === 'privatperson' ? 'person' : cp.customers.customer_type === 'firma' ? 'business' : 'apartment'}
-                      </span>
-                    </div>
-                    <div>
-                      <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Kunde</div>
-                      <div style={{ fontSize:15, fontWeight:700, color:'var(--txt)', marginTop:1 }}>{cp.customers.name}</div>
+
+              {editMode && editData ? (
+                /* ── Edit-Formular ── */
+                <div style={{ padding:'16px 16px 0' }}>
+                  {/* Avatar zentriert */}
+                  <div style={{ display:'flex', justifyContent:'center', marginBottom:18 }}>
+                    <div style={{ width:64, height:64, borderRadius:20, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:22, fontFamily:'var(--font-head)' }}>
+                      {((editData.first_name?.[0]||'') + (editData.last_name?.[0]||'')).toUpperCase() || initials}
                     </div>
                   </div>
-                )}
-              </div>
-              {/* Schließen */}
-              <div style={{ padding:'0 16px 8px' }}>
-                <button onClick={() => setSelectedContact(null)}
-                  style={{ width:'100%', padding:'13px', borderRadius:14, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:14, fontWeight:700, cursor:'pointer' }}>
-                  Schließen
-                </button>
-              </div>
+                  {[
+                    { key:'first_name', label:'Vorname', icon:'badge', placeholder:'Max' },
+                    { key:'last_name',  label:'Nachname', icon:'badge', placeholder:'Mustermann' },
+                    { key:'role',       label:'Funktion / Rolle', icon:'work', placeholder:'z.B. Hausmeister' },
+                    { key:'phone',      label:'Telefon', icon:'phone', placeholder:'+49 …' },
+                    { key:'email',      label:'E-Mail', icon:'mail', placeholder:'max@beispiel.de' },
+                  ].map(f => (
+                    <div key={f.key} style={{ marginBottom:12 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', marginBottom:5, display:'flex', alignItems:'center', gap:5, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:13 }}>{f.icon}</span>{f.label}
+                      </div>
+                      <input
+                        value={(editData as any)[f.key]}
+                        onChange={e => setEditData((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        style={{ width:'100%', padding:'11px 13px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', fontSize:14, color:'var(--txt)', outline:'none', boxSizing:'border-box' }}
+                      />
+                    </div>
+                  ))}
+                  {/* Info-Hinweis globale Änderung */}
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'10px 12px', background:'var(--pri-xl)', borderRadius:12, marginBottom:16, marginTop:4 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--pri)', flexShrink:0, marginTop:1 }}>info</span>
+                    <div style={{ fontSize:12, color:'var(--pri)', lineHeight:1.4 }}>
+                      Änderungen gelten für alle Objekte, denen dieser Ansprechpartner zugewiesen ist.
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                    <button onClick={() => { setEditMode(false); setShowDeleteConfirm(false) }} style={{ flex:1, padding:'13px', borderRadius:14, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                      Abbrechen
+                    </button>
+                    <button onClick={() => saveEdit(cp)} disabled={editSaving} style={{ flex:2, padding:'13px', borderRadius:14, border:'none', background: editSaving ? 'var(--surf-high)' : 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: editSaving ? 'var(--txt-muted)' : '#fff', fontSize:14, fontWeight:700, cursor: editSaving ? 'default' : 'pointer' }}>
+                      {editSaving ? 'Speichern …' : 'Speichern'}
+                    </button>
+                  </div>
+                  {/* Löschen */}
+                  {!showDeleteConfirm ? (
+                    <button onClick={() => setShowDeleteConfirm(true)} style={{ width:'100%', padding:'12px', borderRadius:14, border:'1.5px solid var(--err)', background:'transparent', color:'var(--err)', fontSize:13, fontWeight:700, cursor:'pointer', marginBottom:16 }}>
+                      Ansprechpartner löschen
+                    </button>
+                  ) : (
+                    <div style={{ background:'var(--err-bg)', borderRadius:14, padding:'14px 16px', marginBottom:16 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'var(--err)', marginBottom:8 }}>Wirklich löschen?</div>
+                      <div style={{ fontSize:12, color:'var(--txt-muted)', marginBottom:12 }}>
+                        Der Ansprechpartner wird von allen Objekten entfernt. Diese Aktion kann nicht rückgängig gemacht werden.
+                      </div>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button onClick={() => setShowDeleteConfirm(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                          Abbrechen
+                        </button>
+                        <button onClick={() => deleteContact(cp)} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'var(--err)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                          Löschen
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* ── Lese-Ansicht ── */
+                <>
+                  {/* Avatar + Name */}
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'16px 20px 16px', gap:10 }}>
+                    <div style={{ width:72, height:72, borderRadius:22, background: isPrivat ? 'var(--pri-xl)' : 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: isPrivat ? 'var(--pri)' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:24, fontFamily:'var(--font-head)', boxShadow: isPrivat ? 'none' : '0 6px 20px rgba(9,106,112,0.3)' }}>
+                      {initials}
+                    </div>
+                    <div style={{ textAlign:'center' }}>
+                      <div style={{ fontSize:20, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:4 }}>{displayName}</div>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                        {cp.role && cp.role !== 'Privatperson' && (
+                          <span style={{ fontSize:12, color:'var(--txt-sec)', fontWeight:600 }}>{cp.role}</span>
+                        )}
+                        {isPrivat && <span style={{ fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 8px' }}>Privatperson</span>}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Infos */}
+                  <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+                    {(cp.phone || cp.email) && (
+                      <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
+                        {cp.phone && (
+                          <a href={'tel:' + cp.phone} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', textDecoration:'none', borderBottom: cp.email ? '1px solid var(--outline)' : 'none' }}>
+                            <div style={{ width:38, height:38, borderRadius:12, background:'#e8f5e9', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize:20, color:'#2e7d32' }}>phone</span>
+                            </div>
+                            <div>
+                              <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Telefon</div>
+                              <div style={{ fontSize:15, fontWeight:700, color:'var(--pri)', marginTop:1 }}>{cp.phone}</div>
+                            </div>
+                          </a>
+                        )}
+                        {cp.email && (
+                          <a href={'mailto:' + cp.email} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', textDecoration:'none' }}>
+                            <div style={{ width:38, height:38, borderRadius:12, background:'#e3f2fd', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize:20, color:'#1565c0' }}>mail</span>
+                            </div>
+                            <div>
+                              <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>E-Mail</div>
+                              <div style={{ fontSize:15, fontWeight:700, color:'var(--pri)', marginTop:1 }}>{cp.email}</div>
+                            </div>
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {cp.customers?.name && (
+                      <div style={{ background:'var(--surf-card)', borderRadius:16, border:'1px solid var(--outline)', padding:'14px 16px', display:'flex', alignItems:'center', gap:14 }}>
+                        <div style={{ width:38, height:38, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--pri)' }}>
+                            {cp.customers.customer_type === 'privatperson' ? 'person' : cp.customers.customer_type === 'firma' ? 'business' : 'apartment'}
+                          </span>
+                        </div>
+                        <div>
+                          <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em' }}>Kunde</div>
+                          <div style={{ fontSize:15, fontWeight:700, color:'var(--txt)', marginTop:1 }}>{cp.customers.name}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Schließen */}
+                  <div style={{ padding:'0 16px 16px' }}>
+                    <button onClick={() => setSelectedContact(null)} style={{ width:'100%', padding:'13px', borderRadius:14, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                      Schließen
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )
       })()}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position:'fixed', bottom:90, left:'50%', transform:'translateX(-50%)', background:'rgba(0,0,0,0.8)', color:'#fff', padding:'10px 20px', borderRadius:999, fontSize:13, fontWeight:600, zIndex:1300, whiteSpace:'nowrap', pointerEvents:'none' }}>
+          {toast}
+        </div>
+      )}
 
       {/* Export-Modal */}
       {showExport && (
