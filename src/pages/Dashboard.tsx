@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
 // xlsx loaded dynamically on demand
 import BugReport from '../components/BugReport'
@@ -6314,7 +6314,59 @@ function ProblemDetailOverlay({ problem, objects, team, onClose, onResolved, onG
 
 // ─── PageOverlay helper ──────────────────────────────────────────────────────
 // Wraps full-page overlays: full-screen on mobile, centered modal on desktop
+// On mobile: supports swipe-from-left-edge to go back (like native iOS)
 function PageOverlay({ isDesktop, onClose, wide, children }: { isDesktop: boolean; onClose?: () => void; wide?: boolean; children: React.ReactNode }) {
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const swipeState = useRef<{ startX: number; startY: number; tracking: boolean; translateX: number } | null>(null)
+
+  useEffect(() => {
+    if (isDesktop || !onClose) return
+    const el = overlayRef.current
+    if (!el) return
+
+    const onTouchStart = (e: TouchEvent) => {
+      const t = e.touches[0]
+      if (t.clientX > 30) return // only trigger from left edge
+      swipeState.current = { startX: t.clientX, startY: t.clientY, tracking: true, translateX: 0 }
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!swipeState.current?.tracking) return
+      const t = e.touches[0]
+      const dx = t.clientX - swipeState.current.startX
+      const dy = Math.abs(t.clientY - swipeState.current.startY)
+      if (dy > 30 && dx < 20) { swipeState.current.tracking = false; el.style.transform = ''; el.style.transition = ''; return }
+      if (dx < 0) return
+      swipeState.current.translateX = dx
+      el.style.transition = 'none'
+      el.style.transform = `translateX(${dx}px)`
+      el.style.boxShadow = `${-dx * 0.05}px 0 ${dx * 0.2}px rgba(0,0,0,${0.15 - dx * 0.0003})`
+    }
+
+    const onTouchEnd = () => {
+      if (!swipeState.current?.tracking) return
+      const dx = swipeState.current.translateX
+      el.style.transition = 'transform 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s'
+      if (dx > window.innerWidth * 0.38) {
+        el.style.transform = `translateX(100%)`
+        setTimeout(() => onClose(), 230)
+      } else {
+        el.style.transform = ''
+        el.style.boxShadow = ''
+      }
+      swipeState.current = null
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: true })
+    el.addEventListener('touchend', onTouchEnd)
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [isDesktop, onClose])
+
   if (isDesktop) {
     return (
       <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.5)', padding:24 }} onClick={onClose}>
@@ -6325,7 +6377,7 @@ function PageOverlay({ isDesktop, onClose, wide, children }: { isDesktop: boolea
     )
   }
   return (
-    <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', flexDirection:'column', background:'var(--bg)' }}>
+    <div ref={overlayRef} style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', flexDirection:'column', background:'var(--bg)', willChange:'transform' }}>
       {children}
     </div>
   )
