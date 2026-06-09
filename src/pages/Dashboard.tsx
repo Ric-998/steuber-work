@@ -262,7 +262,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name'),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
       supabase.from('vacation_blackouts').select('*').order('from_date',{ascending:true}),
-      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,customers(id,name,customer_type)').order('last_name').order('name'),
+      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)').not('object_id','is',null).order('last_name').order('name'),
     ])
     if (stRes.data) setStats(stRes.data)
     if (prRes.data) setProblems((prRes.data || []) as unknown as Problem[])
@@ -5315,25 +5315,11 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
   const [showEdit, setShowEdit]               = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting]               = useState(false)
-  const [contacts, setContacts]               = useState<ContactPerson[]>([])
-  const [loadingContacts, setLoadingContacts] = useState(true)
-  const [showAddContact, setShowAddContact]   = useState(false)
-  const [editContact, setEditContact]         = useState<ContactPerson|null>(null)
+
 
   const OBJ_TYPE_ICON: Record<string, string> = {
     einfamilienhaus: 'house', mehrfamilienhaus: 'apartment',
     firmengelaende: 'business', grundstueck: 'landscape',
-  }
-
-  useEffect(() => {
-    loadContacts()
-  }, [customer.id])
-
-  const loadContacts = async () => {
-    setLoadingContacts(true)
-    const { data } = await supabase.from('contact_persons').select('*').eq('customer_id', customer.id).order('created_at')
-    setContacts(data || [])
-    setLoadingContacts(false)
   }
 
   return (
@@ -5417,47 +5403,7 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
         </div>
       </div>
 
-      {/* Ansprechpartner */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-        <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)' }}>Ansprechpartner</h3>
-        <button onClick={() => setShowAddContact(true)} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', padding:'6px 12px', borderRadius:999, border:'none', cursor:'pointer' }}>
-          <span className="material-symbols-outlined icon-sm">add</span> Hinzufügen
-        </button>
-      </div>
-      {loadingContacts ? <Loader/> : contacts.length === 0 ? (
-        <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'14px', textAlign:'center', color:'var(--txt-muted)', fontSize:13, marginBottom:16 }}>
-          Noch keine Ansprechpartner
-        </div>
-      ) : (
-        <div style={{ marginBottom:16 }}>
-          {contacts.map(cp => (
-            <div key={cp.id} style={{ background:'var(--surf-card)', borderRadius:14, padding:'12px 14px', marginBottom:8, border:'1px solid var(--outline)', display:'flex', alignItems:'flex-start', gap:10 }}>
-              <div style={{ width:36, height:36, borderRadius:10, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>person</span>
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700 }}>{cp.name}</div>
-                {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{cp.role}</div>}
-                <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
-                  {cp.phone && (
-                    <a href={`tel:${cp.phone}`} style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 11px', borderRadius:10, background:'var(--ok-bg)', color:'#2e7d32', textDecoration:'none', fontSize:12, fontWeight:700 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:15 }}>phone</span>{cp.phone}
-                    </a>
-                  )}
-                  {cp.email && (
-                    <a href={`mailto:${cp.email}`} style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 11px', borderRadius:10, background:'#e3f2fd', color:'#1565c0', textDecoration:'none', fontSize:12, fontWeight:700 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:15 }}>mail</span>{cp.email}
-                    </a>
-                  )}
-                </div>
-              </div>
-              <button onClick={() => setEditContact(cp)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex', padding:4 }}>
-                <span className="material-symbols-outlined icon-sm">edit</span>
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Hinweis: Ansprechpartner werden am Objekt verwaltet */}
 
       {/* Objekte */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
@@ -5479,15 +5425,7 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
         </div>
       ))}
 
-      {/* Add/Edit Contact */}
-      {(showAddContact || editContact) && (
-        <ContactPersonOverlay
-          customerId={customer.id}
-          existing={editContact}
-          onClose={() => { setShowAddContact(false); setEditContact(null) }}
-          onSaved={() => { setShowAddContact(false); setEditContact(null); loadContacts() }}
-        />
-      )}
+
 
       {/* Edit Customer */}
       {showEdit && (
