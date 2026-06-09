@@ -684,8 +684,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     )}
                   </div>
                   {[
-                    { icon:'today',    label:'Heute fällig', val:tasks.filter(t=>{const ts=today.toISOString().split('T')[0];return t.is_active&&(t.due_date??'')<=ts&&(!t.end_date||t.end_date>=ts)}).length, color:'#92400e', bg:'#fff8e6', onClick: () => setShowTodayOverlay(true) },
-                    { icon:'task_alt', label:'Aufgaben',     val:tasks.filter(t=>t.is_active).length,   color:'var(--pri)', bg:'var(--pri-xl)', onClick: () => setTab('objekte') },
+                    { icon:'today',        label:'Heute fällig', val: stats?.heute_faellig ?? 0, color:'#92400e', bg:'#fff8e6', onClick: () => setShowTodayOverlay(true) },
+                    { icon:'pending_actions', label:'Offen gesamt', val: stats?.gesamt_offen ?? 0, color:'var(--pri)', bg:'var(--pri-xl)', onClick: () => setShowTodayOverlay(true) },
                   ].map(({icon,label,val,color,bg,onClick})=>(
                     <div key={label} onClick={onClick} style={{ ...s.statChip, background:bg, cursor:'pointer' }}
                       onMouseEnter={e=>(e.currentTarget.style.filter='brightness(0.95)')}
