@@ -6,16 +6,7 @@ import { ChatTab, useChatUnread } from '../components/Chat'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
 import { WasIstNeu } from '../components/WasIstNeu'
 import QRCode from '../components/QRCode'
-const MapView = lazy(() =>
-  import('../components/MapView').catch(() => ({
-    default: () => (
-      <div style={{ height:160, borderRadius:16, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', gap:8, color:'var(--txt-muted)', fontSize:13 }}>
-        <span className="material-symbols-outlined" style={{ fontSize:20 }}>map</span>
-        Karte nicht verfügbar
-      </div>
-    )
-  }))
-)
+import MapView from '../components/MapView'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Stats { heute_faellig:number; in_arbeit:number; gesamt_offen:number; diese_woche_done:number; probleme:number; probleme_heute:number }
@@ -2222,9 +2213,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
           {/* ── Standort ── */}
           <div style={{ padding:'14px 16px' }}>
             <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Standort</div>
-            <Suspense fallback={<div style={{height:48,borderRadius:10,background:'var(--surf-low)'}}/>}>
-              <MapView address={obj.address} city={obj.city} postalCode={obj.postal_code}/>
-            </Suspense>
+            <MapView address={obj.address} city={obj.city} postalCode={obj.postal_code}/>
           </div>
 
           <div style={{ height:1, background:'var(--outline)' }}/>
@@ -4034,8 +4023,10 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       email: r.email || '',
       _source: 'cust',
     }))
-    // Combine, put contact_persons first, then privatpersons
-    const combined = [...fromCp, ...fromCust].slice(0, 8)
+    // Deduplicate: skip fromCust entries whose full name already exists in fromCp
+    const cpNames = new Set(fromCp.map(r => (r.first_name + ' ' + r.last_name).trim().toLowerCase()))
+    const dedupedCust = fromCust.filter(r => !cpNames.has((r.first_name + ' ' + r.last_name).trim().toLowerCase()))
+    const combined = [...fromCp, ...dedupedCust].slice(0, 8)
     setCpSearchRes(combined)
     setCpSearching(false)
   }
@@ -4922,7 +4913,7 @@ const s: Record<string,React.CSSProperties> = {
   backBtn:       { background:'var(--surf-low)', border:'none', width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt)', cursor:'pointer', flexShrink:0 },
   selectCard:    { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:14, border:'1.5px solid var(--outline)', cursor:'pointer', transition:'all 0.15s' },
   formCard:      { background:'var(--surf-card)', borderRadius:20, padding:20, marginBottom:24, boxShadow:'0 2px 16px rgba(9,106,112,0.07)' },
-  fieldLabel:    { display:'flex', alignItems:'center', gap:6, fontSize:11, fontWeight:600, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6, minHeight:16 } as React.CSSProperties,
+  fieldLabel:    { display:'flex', alignItems:'center', gap:6, fontSize:11, fontWeight:600, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6, minHeight:16, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } as React.CSSProperties,
   inputWrap:     { display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', overflow:'hidden' },
   input:         { flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' },
   roleOpt:       { display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 8px', borderRadius:12, border:'1.5px solid var(--outline)', cursor:'pointer', flex:1 } as React.CSSProperties,
