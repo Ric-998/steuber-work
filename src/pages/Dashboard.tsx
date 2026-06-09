@@ -3698,23 +3698,20 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
           builtName = `${newVorname.trim()} ${newNachname.trim()}`
         }
       } else if (newCustType === 'mietverwaltung') {
+        // builtName stays as newCustName (MV-Name field)
         custSalutation = mvEigTyp || null
         custPhone = mvEigPhone.trim() || null
         custEmail = mvEigEmail.trim() || null
         if (mvEigTyp === 'firma') {
-          builtName = mvEigFirma.trim()
+          firstName = mvEigFirma.trim() || null
         } else if (mvEigTyp === 'eheleute') {
           firstName  = mvEigVorname.trim() || null
           lastName   = mvEigNachname.trim() || null
           firstName2 = mvEigVorname2.trim() || null
           lastName2  = mvEigNachname2.trim() || null
-          builtName  = lastName && lastName === lastName2
-            ? `${mvEigVorname.trim()} und ${mvEigVorname2.trim()} ${mvEigNachname.trim()}`
-            : `${mvEigVorname.trim()} ${mvEigNachname.trim()}${mvEigVorname2.trim() ? ` & ${mvEigVorname2.trim()} ${mvEigNachname2.trim()}` : ''}`
         } else {
           firstName = mvEigVorname.trim() || null
           lastName  = mvEigNachname.trim() || null
-          builtName = `${mvEigVorname.trim()} ${mvEigNachname.trim()}`
         }
       }
 
@@ -3732,7 +3729,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
         city: newCity.trim() || null,
         phone: custPhone,
         email: custEmail,
-        hausverwaltung_objekt_id: (newCustType === 'weg-verwaltung' && wegObjId.trim()) ? wegObjId.trim() : null,
+        hausverwaltung_objekt_id: ((newCustType === 'weg-verwaltung' || newCustType === 'mietverwaltung') && wegObjId.trim()) ? wegObjId.trim() : null,
       }).select('id').single()
       if (e || !cust) { setError(e?.message || 'Kunde konnte nicht angelegt werden'); setSaving(false); return }
       customerId = cust.id
@@ -3918,7 +3915,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   )
   const otherTypeValid = newCustType !== '' && newCustType !== 'privatperson' && (
     (newCustType !== 'mietverwaltung' && newCustName.trim() !== '') ||
-    (newCustType === 'mietverwaltung' && mvEigValid)
+    (newCustType === 'mietverwaltung' && mvEigValid && newCustName.trim() !== '' && (selectedMvVerw !== null || (mvVerwCreateMode && mvVerwNewName.trim() !== '')))
   ) && (
     newCustType !== 'weg-verwaltung' || selectedHv !== null || (hvCreateMode && hvNewName.trim() !== '')
   )
@@ -4150,7 +4147,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     { v:'weg-verwaltung',label:'WEG-Verwaltung', icon:'apartment',   desc:'Wohnungseigentümergem.' },
                     { v:'mietverwaltung',label:'Mietverwaltung', icon:'home_work',   desc:'Hausverwaltung, Mieter' },
                   ] as const).map(t => (
-                    <div key={t.v} onClick={() => { setNewCustType(t.v); setNewContacts([]); if (t.v === 'weg-verwaltung') { const parts = [street.trim(), [postal.trim(), city.trim()].filter(Boolean).join(' ')].filter(Boolean); setNewCustName('WEG ' + parts.join(', ')) } }}
+                    <div key={t.v} onClick={() => { setNewCustType(t.v); setNewContacts([]); if (t.v === 'weg-verwaltung') { const parts = [street.trim(), [postal.trim(), city.trim()].filter(Boolean).join(' ')].filter(Boolean); setNewCustName('WEG ' + parts.join(', ')) } if (t.v === 'mietverwaltung') { const parts = [street.trim(), [postal.trim(), city.trim()].filter(Boolean).join(' ')].filter(Boolean); setNewCustName('MV ' + parts.join(', ')) } }}
                       style={{ padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', cursor:'pointer', display:'flex', flexDirection:'column', gap:6, transition:'all 0.15s' }}
                       onMouseEnter={e=>{(e.currentTarget as HTMLDivElement).style.borderColor='var(--pri)';(e.currentTarget as HTMLDivElement).style.background='var(--pri-xl)'}}
                       onMouseLeave={e=>{(e.currentTarget as HTMLDivElement).style.borderColor='var(--outline)';(e.currentTarget as HTMLDivElement).style.background='var(--surf-low)'}}>
@@ -4801,38 +4798,39 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                   </div>
                 )}
 
-                {/* Adresse Eigentümer (optional) */}
-                {mvEigTyp !== '' && (<>
-                  <div style={{ marginBottom: 10 }}>
-                    <label style={s.fieldLabel}>Adresse (optional)</label>
-                    <div style={s.inputWrap}>
-                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>home</span>
-                      <input value={newStreet} onChange={e=>setNewStreet(e.target.value)} placeholder="Musterstraße 1" style={s.input}/>
-                    </div>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, marginBottom:16 }}>
-                    <div>
-                      <label style={s.fieldLabel}>PLZ</label>
-                      <div style={s.inputWrap}>
-                        <input value={newPostal} onChange={e=>lookupNewCity(e.target.value)} placeholder="34212" maxLength={5} style={s.input}/>
-                        {newPlzLoading && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
-                      </div>
-                    </div>
-                    <div>
-                      <label style={s.fieldLabel}>Ort</label>
-                      <div style={{ ...s.inputWrap, background:newCityLocked?'var(--ok-bg)':undefined }}>
-                        <input value={newCity} onChange={e=>{setNewCity(e.target.value);setNewCityLocked(false)}} placeholder="Melsungen" style={s.input}/>
-                        {newCityLocked && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>}
-                      </div>
-                    </div>
-                  </div>
-                </>)}
 
                 {/* ── Verwaltung ── */}
                 {mvEigTyp !== '' && (<>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
                     <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
                     <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Verwaltung</span>
+                    <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                  </div>
+
+                  {/* MV-Name (auto-befüllt aus Schritt 1) */}
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={s.fieldLabel}>MV-Name *</label>
+                    <div style={{ ...s.inputWrap, background: newCustName.startsWith('MV ') ? 'var(--ok-bg)' : undefined }}>
+                      <span className="material-symbols-outlined icon-sm" style={{ color: newCustName.startsWith('MV ') ? 'var(--ok)' : 'var(--txt-muted)' }}>home_work</span>
+                      <input value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="MV Musterstraße 10" style={s.input}/>
+                      {newCustName.startsWith('MV ') && <span className="material-symbols-outlined icon-sm icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>}
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Automatisch aus Objektadresse befüllt – bei Bedarf anpassen.</div>
+                  </div>
+
+                  {/* Objekt-ID der Verwaltung */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={s.fieldLabel}>Objekt-ID der Verwaltung (optional)</label>
+                    <div style={s.inputWrap}>
+                      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>tag</span>
+                      <input value={wegObjId} onChange={e => setWegObjId(e.target.value)} placeholder="z.B. 4711 oder OBJ-2024-001" style={s.input}/>
+                    </div>
+                  </div>
+
+                  {/* Divider Verwaltungsgesellschaft */}
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+                    <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
+                    <span style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>Verwaltungsgesellschaft *</span>
                     <div style={{ flex:1, height:1, background:'var(--outline)' }}/>
                   </div>
 
