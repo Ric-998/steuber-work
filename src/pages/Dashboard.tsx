@@ -112,7 +112,11 @@ const MOTIVATIONS = [
 
 export default function Dashboard({ userName, onLogout }: Props) {
   const [motivation] = useState(() => MOTIVATIONS[Math.floor(Math.random() * MOTIVATIONS.length)])
-  const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'ansprechpartner'|'team'|'bericht'|'chat'|'profil'>('overview')
+  const VALID_TABS = ['overview','objekte','kunden','ansprechpartner','team','bericht','chat','profil']
+  const [tab, setTab]           = useState<'overview'|'objekte'|'kunden'|'ansprechpartner'|'team'|'bericht'|'chat'|'profil'>(() => {
+    const base = window.location.hash.slice(1).split('/')[0]
+    return (VALID_TABS.includes(base) ? base : 'overview') as 'overview'|'objekte'|'kunden'|'ansprechpartner'|'team'|'bericht'|'chat'|'profil'
+  })
   const [showMoreSheet, setShowMoreSheet] = useState(false)
   const [objSearch, setObjSearch] = useState('')
   const [objGroup, setObjGroup] = useState<'none'|'city'|'kunde'>('none')
@@ -225,6 +229,36 @@ export default function Dashboard({ userName, onLogout }: Props) {
   }, [])
 
   useEffect(() => { loadAll(); loadDailyReport() }, [])
+
+  // Sync navigation state → URL hash (enables F5 restore)
+  useEffect(() => {
+    if (selectedObject) {
+      window.location.hash = `objekte/${selectedObject.id}`
+    } else if (selectedCustomer) {
+      window.location.hash = `kunden/${selectedCustomer.id}`
+    } else {
+      window.location.hash = tab
+    }
+  }, [tab, selectedObject, selectedCustomer])
+
+  // Restore selectedObject / selectedCustomer from hash after data loads
+  useEffect(() => {
+    if (objects.length === 0) return
+    const [base, id] = window.location.hash.slice(1).split('/')
+    if (base === 'objekte' && id && !selectedObject) {
+      const found = objects.find(o => o.id === id)
+      if (found) { setTab('objekte'); setSelectedObject(found) }
+    }
+  }, [objects]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (customers.length === 0) return
+    const [base, id] = window.location.hash.slice(1).split('/')
+    if (base === 'kunden' && id && !selectedCustomer) {
+      const found = customers.find(c => c.id === id)
+      if (found) { setTab('kunden'); setSelectedCustomer(found) }
+    }
+  }, [customers]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Realtime: Auto-Reload bei Statusänderungen durch Mitarbeiter
   useEffect(() => {
@@ -2143,7 +2177,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
     <div style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))', maxWidth: 860, margin: '0 auto', width: '100%' }}>
 
       {/* ══ HEADER ══ */}
-      <div style={{ padding: '52px 18px 18px', background: 'var(--surf-card)', borderBottom: '1px solid var(--outline)' }}>
+      <div style={{ padding: 'calc(env(safe-area-inset-top, 0px) + 16px) 18px 20px', background: 'var(--surf-card)', borderBottom: '1px solid var(--outline)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <button onClick={onBack} style={{ background: '#f3f4f5', border: '1px solid #e7e8e9', borderRadius: 12, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 21, color: '#3f484a' }}>arrow_back</span>
@@ -2180,10 +2214,10 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
 
       {loadingDetail ? <Loader/> : (<>
 
-      <div style={{ padding: '0 18px' }}>
+      <div style={{ padding: '0' }}>
 
         {/* ══ INFO CARD ══ */}
-        <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: '4px 16px', marginTop: 18 }}>
+        <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: '4px 16px', marginTop: 18, marginBottom: 0 }}>
 
           {/* Kunde */}
           {customer && (() => {
