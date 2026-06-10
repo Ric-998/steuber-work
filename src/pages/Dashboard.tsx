@@ -2140,350 +2140,371 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
   }
 
   return (
-    <div style={{ paddingBottom: 100, maxWidth:860, margin:'0 auto', width:'100%' }}>
-      {/* Back header */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 0 12px' }}>
-        <button onClick={onBack} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
-          <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--txt-muted)' }}>arrow_back</span>
-        </button>
-        <div style={{ flex:1, minWidth:0 }}>
-          <h1 style={{ fontSize:20, fontWeight:800, fontFamily:'var(--font-head)', marginBottom:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-            {obj.address}, {obj.postal_code} {obj.city}
-          </h1>
-          {obj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{obj.object_number}</div>}
+    <div style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))', maxWidth: 860, margin: '0 auto', width: '100%' }}>
+
+      {/* ══ HEADER ══ */}
+      <div style={{ padding: '52px 18px 18px', background: 'var(--surf-card)', borderBottom: '1px solid var(--outline)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <button onClick={onBack} style={{ background: '#f3f4f5', border: '1px solid #e7e8e9', borderRadius: 12, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 21, color: '#3f484a' }}>arrow_back</span>
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([['history', onHistory], ['qr_code', onQR], ['share', generateCustomerLink]] as [string, () => void][]).map(([ic, fn]) => (
+              <button key={ic} onClick={fn} style={{ background: '#f3f4f5', border: '1px solid #e7e8e9', borderRadius: 11, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 19, color: '#6f797b' }}>{ic}</span>
+              </button>
+            ))}
+            <button onClick={() => setShowEdit(true)} style={{ background: 'var(--pri)', border: 'none', borderRadius: 11, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 19, color: '#fff' }}>edit</span>
+            </button>
+          </div>
         </div>
-        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-          <button onClick={onHistory} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>history</span>
-          </button>
-          <button onClick={onQR} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>qr_code</span>
-          </button>
-          <button onClick={generateCustomerLink} title="Kunden-Link" style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>share</span>
-          </button>
-          <button onClick={() => setShowEdit(true)} style={{ background:'var(--pri)', border:'none', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'#fff' }}>edit</span>
-          </button>
+        {obj.object_type && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--pri-xl)', color: 'var(--pri)', borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 700, marginBottom: 12 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>apartment</span>
+            {obj.object_type}
+          </div>
+        )}
+        <h1 style={{ fontSize: 25, fontWeight: 800, fontFamily: 'var(--font-head)', margin: 0, lineHeight: 1.12, letterSpacing: '-0.02em' }}>
+          {obj.address}
+        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 7, fontSize: 14.5, color: '#6f797b' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#9aa3a5' }}>location_on</span>
+          {obj.postal_code} {obj.city}
+          {obj.object_number && (<>
+            <span style={{ width: 3, height: 3, borderRadius: 2, background: 'var(--outline)' }} />
+            <span style={{ fontFamily: 'monospace', fontSize: 12.5, color: '#9aa3a5' }}>{obj.object_number}</span>
+          </>)}
         </div>
       </div>
 
       {loadingDetail ? <Loader/> : (<>
 
-        {/* ══ INFO-BLOCK: Kunde · Ansprechpartner · Standort · Objektleiter ══ */}
-        <div style={{ background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:16, marginBottom:16, overflow:'hidden' }}>
+      <div style={{ padding: '0 18px' }}>
 
-          {/* ── Kunde ── */}
+        {/* ══ INFO CARD ══ */}
+        <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: '4px 16px', marginTop: 18 }}>
+
+          {/* Kunde */}
           {customer && (() => {
-            const typeLabel: Record<string,string> = { privatperson:'Privatperson', firma:'Firma', 'weg-verwaltung':'WEG-Verwaltung', mietverwaltung:'Mietverwaltung' }
-            const typeIcon: Record<string,string>  = { privatperson:'person', firma:'business', 'weg-verwaltung':'apartment', mietverwaltung:'home_work' }
-            const isHV = customer.customer_type==='weg-verwaltung'||customer.customer_type==='mietverwaltung'
-            const rows: {label:string;value:React.ReactNode}[] = []
-            if (customer.phone) rows.push({ label:'Tel', value:<a href={`tel:${customer.phone}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.phone}</a> })
-            if (customer.email) rows.push({ label:'Mail', value:<a href={`mailto:${customer.email}`} style={{ color:'var(--pri)', textDecoration:'none' }}>{customer.email}</a> })
-            if (customer.street) rows.push({ label:'Adresse', value:`${customer.street}, ${customer.postal_code||''} ${customer.city||''}`.trim() })
-            if (isHV && customer.hausverwaltung) rows.push({ label:customer.customer_type==='mietverwaltung'?'Verwaltung':'Hausverwaltung', value:
-              onNavigateToCustomer
-                ? <button onClick={() => onNavigateToCustomer((customer.hausverwaltung as any).id)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4, color:'var(--pri)', fontWeight:700, fontSize:'inherit' }}>
-                    {customer.hausverwaltung.name}
-                    <span className="material-symbols-outlined" style={{ fontSize:13 }}>open_in_new</span>
-                  </button>
-                : <span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span>
-            })
-            if (isHV && customer.co_contact) rows.push({ label:'c/o', value:`${customer.co_contact.name}${customer.co_contact.role?' · '+customer.co_contact.role:''}` })
-            if (isHV && customer.hausverwaltung_objekt_id) rows.push({ label:'Objekt-ID', value:<span style={{ fontFamily:'monospace', fontWeight:700 }}>{customer.hausverwaltung_objekt_id}</span> })
-            return (<>
-              <div style={{ padding:'14px 16px' }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Kunde</div>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom: rows.length > 0 ? 10 : 0 }}>
-                  <div style={{ width:34, height:34, borderRadius:10, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--pri)' }}>{typeIcon[customer.customer_type]||'person'}</span>
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{customer.name}</div>
-                    <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:2 }}>
-                      <span style={{ fontSize:10, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:20, padding:'1px 7px', border:'1px solid var(--outline)' }}>{typeLabel[customer.customer_type]||customer.customer_type}</span>
-                      {customer.lexware_id && <span style={{ fontSize:10, color:'var(--pri)', background:'#e8f4f5', borderRadius:20, padding:'1px 7px', fontWeight:700 }}>LX</span>}
+            const TYPE_LABEL: Record<string,string> = { privatperson: 'Privatperson', firma: 'Firma', 'weg-verwaltung': 'WEG-Verwaltung', mietverwaltung: 'Mietverwaltung' }
+            const isHV = customer.customer_type === 'weg-verwaltung' || customer.customer_type === 'mietverwaltung'
+            return (
+              <div style={{ padding: '15px 0 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Kunde</span>
+                  {customer.lexware_id && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0, fontSize: 10, fontWeight: 700, color: 'var(--pri)', background: '#e8f4f5', borderRadius: 999, padding: '3px 9px 3px 7px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 13 }}>link</span> Lexware
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 16.5, fontWeight: 800, fontFamily: 'var(--font-head)', color: 'var(--txt)', lineHeight: 1.25, marginTop: 5, letterSpacing: '-0.01em' }}>{customer.name}</div>
+                <div style={{ fontSize: 12, color: '#6f797b', marginTop: 3 }}>{TYPE_LABEL[customer.customer_type] || customer.customer_type}</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  {customer.phone && (
+                    <a href={`tel:${customer.phone}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 9, background: 'var(--pri)', color: '#fff', textDecoration: 'none', fontSize: 12.5, fontWeight: 700 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>call</span> Anrufen
+                    </a>
+                  )}
+                  {customer.email && (
+                    <a href={`mailto:${customer.email}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 9, background: '#f3f4f5', color: '#3f484a', textDecoration: 'none', fontSize: 12.5, fontWeight: 700 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>mail</span> E-Mail
+                    </a>
+                  )}
+                  <a href={`https://maps.google.com/?q=${encodeURIComponent(`${obj.address}, ${obj.postal_code} ${obj.city}`)}`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 9, background: '#f3f4f5', color: '#3f484a', textDecoration: 'none', fontSize: 12.5, fontWeight: 700 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>map</span> Karte
+                  </a>
+                </div>
+
+                {/* Verwaltung row */}
+                {isHV && customer.hausverwaltung && (
+                  <>
+                    <div style={{ height: 1, background: '#f1f3f4', margin: '14px -16px 0' }} />
+                    <button onClick={() => onNavigateToCustomer?.(customer.hausverwaltung.id)} style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '14px 0 0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                          {customer.customer_type === 'mietverwaltung' ? 'Mietverwaltung' : 'Hausverwaltung'}
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--pri)', marginTop: 4, lineHeight: 1.25 }}>{customer.hausverwaltung.name}</div>
+                      </div>
+                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#bfc8ca' }}>chevron_right</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Objekt-ID + Objektleiter row */}
+                <div style={{ height: 1, background: '#f1f3f4', margin: '14px -16px 0' }} />
+                <div style={{ display: 'flex', gap: 14, padding: '14px 0 0' }}>
+                  {(isHV && customer.hausverwaltung_objekt_id) && (
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objekt-ID</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)', marginTop: 5, fontFamily: 'monospace' }}>{customer.hausverwaltung_objekt_id}</div>
                     </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0, ...((isHV && customer.hausverwaltung_objekt_id) ? { borderLeft: '1px solid #f1f3f4', paddingLeft: 14 } : {}) }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objektleiter</div>
+                    {olList.length === 0 ? (
+                      <div style={{ fontSize: 13, color: '#9aa3a5', marginTop: 4 }}>–</div>
+                    ) : (
+                      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginTop: 3, maxWidth: '100%' }}>
+                        <select
+                          value={currentOl || ''}
+                          onChange={e => handleOlChange(e.target.value || null)}
+                          disabled={olSaving}
+                          style={{ appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', border: 'none', background: 'transparent', color: 'var(--pri)', fontWeight: 700, fontSize: 14, fontFamily: 'var(--font-body)', textAlign: 'left', paddingRight: 22, paddingLeft: 0, cursor: 'pointer', outline: 'none', maxWidth: '100%' }}
+                        >
+                          <option value="">Keiner</option>
+                          {olList.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
+                        </select>
+                        <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--pri)', position: 'absolute', right: 0, pointerEvents: 'none' }}>unfold_more</span>
+                      </div>
+                    )}
+                    {olMsg && <div style={{ fontSize: 11, color: 'var(--ok)', marginTop: 3 }}>{olMsg}</div>}
                   </div>
                 </div>
-                {rows.length > 0 && (
-                  <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', columnGap:14, rowGap:6 }}>
-                    {rows.map((r,i) => (
-                      <div key={i} style={{ display:'contents' }}>
-                        <span style={{ fontSize:11, color:'var(--txt-muted)', alignSelf:'center', whiteSpace:'nowrap' }}>{r.label}</span>
-                        <span style={{ fontSize:13, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
-              <div style={{ height:1, background:'var(--outline)' }}/>
-            </>)
+            )
           })()}
+        </div>
 
-          {/* ── Ansprechpartner ── */}
-          <div style={{ padding:'14px 16px' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: objContacts.length > 0 || showAddObjCp ? 12 : 0 }}>
-              <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em' }}>
-                Ansprechpartner{objContacts.length > 0 && <span style={{ marginLeft:6, background:'var(--pri-xl)', color:'var(--pri)', borderRadius:999, padding:'1px 6px', fontSize:10 }}>{objContacts.length}</span>}
-              </div>
-              {!showAddObjCp && (
-                <button onClick={() => setShowAddObjCp(true)} style={{ background:'var(--pri-xl)', border:'none', color:'var(--pri)', fontSize:11, fontWeight:700, padding:'4px 10px', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center', gap:3 }}>
-                  <span className="material-symbols-outlined icon-sm">add</span> Hinzufügen
-                </button>
-              )}
+        {/* ══ ANSPRECHPARTNER ══ */}
+        <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: 16, marginTop: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              Ansprechpartner{objContacts.length > 0 && <span style={{ marginLeft: 6 }}>· {objContacts.length}</span>}
             </div>
-
-            {objContacts.length === 0 && !showAddObjCp && (
-              <div style={{ fontSize:12, color:'var(--txt-muted)', paddingTop:2 }}>Noch keine Ansprechpartner hinterlegt.</div>
+            {!showAddObjCp && (
+              <button onClick={() => setShowAddObjCp(true)} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11.5, fontWeight: 700, color: 'var(--pri)', background: 'var(--pri-xl)', border: 'none', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span> Neu
+              </button>
             )}
+          </div>
 
-            {objContacts.map((cp, idx) => {
-              const dn = [cp.first_name, cp.last_name].filter(Boolean).join(' ') || cp.name || '–'
-              const ini = ((cp.first_name?.[0]||'')+(cp.last_name?.[0]||'')).toUpperCase() || '?'
+          {objContacts.length === 0 && !showAddObjCp && (
+            <div style={{ fontSize: 12, color: 'var(--txt-muted)' }}>Noch keine Ansprechpartner hinterlegt.</div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {objContacts.map((c, i) => {
+              const ini = ((c.first_name?.[0] || '') + (c.last_name?.[0] || '')).toUpperCase() || '?'
+              const dn = [c.first_name, c.last_name].filter(Boolean).join(' ') || c.name || '–'
               return (
-                <div key={cp.id} onClick={() => { setSelectedObjContact(cp); setEditingObjContact(false) }}
-                  style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderTop: idx > 0 ? '1px solid var(--outline)' : 'none', cursor:'pointer', transition:'opacity 0.15s' }}
-                  onMouseEnter={e=>(e.currentTarget.style.opacity='0.7')} onMouseLeave={e=>(e.currentTarget.style.opacity='1')}>
-                  <div style={{ width:34, height:34, borderRadius:10, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, flexShrink:0 }}>{ini}</div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>{dn}</div>
-                    {(cp.phone || cp.email) && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{cp.phone || cp.email}</div>}
+                <div key={c.id} onClick={() => { setSelectedObjContact(c); setEditingObjContact(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? '1px solid #eef0f1' : 'none', cursor: 'pointer' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg,var(--pri),var(--pri-c,#0c8f85))', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12.5, flexShrink: 0 }}>{ini}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dn}</div>
+                    {c.role && <div style={{ fontSize: 11, color: '#6f797b' }}>{c.role}</div>}
                   </div>
-                  <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--txt-muted)' }}>chevron_right</span>
+                  {c.phone && (
+                    <a href={`tel:${c.phone}`} onClick={e => e.stopPropagation()} style={{ width: 36, height: 36, borderRadius: 10, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pri)', textDecoration: 'none', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 17 }}>call</span>
+                    </a>
+                  )}
                 </div>
               )
             })}
+          </div>
 
-            {showAddObjCp && (
-              <div style={{ background:'var(--surf-low)', borderRadius:12, padding:12, border:'1.5px solid var(--pri)', marginTop:10 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-card)', marginBottom:8 }}>
-                  <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>search</span>
-                  <input value={objCpSearchQ} onChange={e=>searchObjCp(e.target.value)} placeholder="Ansprechpartner suchen …" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:13, color:'var(--txt)' }}/>
-                  {objCpSearching && <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>progress_activity</span>}
-                  {objCpSearchQ && <button onClick={()=>{setObjCpSearchQ('');setObjCpSearchRes([])}} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
-                </div>
-                {objCpSearchRes.length > 0 && (
-                  <div style={{ background:'var(--surf-card)', borderRadius:10, border:'1px solid var(--outline)', marginBottom:8, overflow:'hidden' }}>
-                    {objCpSearchRes.map((cp:any) => (
-                      <div key={cp._id} onClick={()=>{ addObjCp({first_name:cp.first_name,last_name:cp.last_name,role:cp.role,phone:cp.phone,email:cp.email}); setObjCpSearchQ(''); setObjCpSearchRes([]) }}
-                        style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', borderBottom:'1px solid var(--outline)', cursor:'pointer' }}>
-                        <div style={{ width:28, height:28, borderRadius:8, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11 }}>
-                          {(cp.first_name?.[0]||cp.last_name?.[0]||'?').toUpperCase()}
-                        </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:13, fontWeight:700 }}>{cp.first_name} {cp.last_name}</div>
-                          {cp.role && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{cp.role}</div>}
-                        </div>
-                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>add_circle</span>
+          {showAddObjCp && (
+            <div style={{ background: 'var(--surf-low)', borderRadius: 12, padding: 12, border: '1.5px solid var(--pri)', marginTop: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, border: '1px solid var(--outline)', background: 'var(--surf-card)', marginBottom: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--txt-muted)' }}>search</span>
+                <input value={objCpSearchQ} onChange={e => searchObjCp(e.target.value)} placeholder="Ansprechpartner suchen …" style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: 'var(--txt)' }}/>
+                {objCpSearching && <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--txt-muted)' }}>progress_activity</span>}
+                {objCpSearchQ && <button onClick={() => { setObjCpSearchQ(''); setObjCpSearchRes([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: 'var(--txt-muted)' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span></button>}
+              </div>
+              {objCpSearchRes.length > 0 && (
+                <div style={{ background: 'var(--surf-card)', borderRadius: 10, border: '1px solid var(--outline)', marginBottom: 8, overflow: 'hidden' }}>
+                  {objCpSearchRes.map((cp: any) => (
+                    <div key={cp._id} onClick={() => { addObjCp({ first_name: cp.first_name, last_name: cp.last_name, role: cp.role, phone: cp.phone, email: cp.email }); setObjCpSearchQ(''); setObjCpSearchRes([]) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--outline)', cursor: 'pointer' }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--pri-xl)', color: 'var(--pri)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 11 }}>
+                        {(cp.first_name?.[0] || cp.last_name?.[0] || '?').toUpperCase()}
                       </div>
-                    ))}
-                  </div>
-                )}
-                <div style={{ fontSize:11, fontWeight:700, color:'var(--pri)', marginBottom:8 }}>Neuer Ansprechpartner</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, alignItems:'start', marginBottom:8 }}>
-                  <div><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Vorname</label>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
-                      <input value={newObjCpFn} onChange={e=>setNewObjCpFn(e.target.value)} placeholder="Max" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>{cp.first_name} {cp.last_name}</div>
+                        {cp.role && <div style={{ fontSize: 11, color: 'var(--txt-muted)' }}>{cp.role}</div>}
+                      </div>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--pri)' }}>add_circle</span>
                     </div>
-                  </div>
-                  <div><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Nachname *</label>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
-                      <input value={newObjCpLn} onChange={e=>setNewObjCpLn(e.target.value)} placeholder="Mustermann" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-                <div style={{ marginBottom:8 }}><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Funktion</label>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
-                    <input value={newObjCpRole} onChange={e=>setNewObjCpRole(e.target.value)} placeholder="Hausmeister" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
-                  </div>
+              )}
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--pri)', marginBottom: 8 }}>Neuer Ansprechpartner</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignItems: 'start', marginBottom: 8 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--txt-sec)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Vorname</label>
+                  <input value={newObjCpFn} onChange={e => setNewObjCpFn(e.target.value)} placeholder="Max" style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--outline)', background: 'var(--surf-card)', fontSize: 13, color: 'var(--txt)', outline: 'none', boxSizing: 'border-box' }}/>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, alignItems:'start', marginBottom:10 }}>
-                  <div><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>Telefon</label>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
-                      <input value={newObjCpPhone} onChange={e=>setNewObjCpPhone(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
-                    </div>
-                  </div>
-                  <div><label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>E-Mail</label>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
-                      <input value={newObjCpEmail} onChange={e=>setNewObjCpEmail(e.target.value)} placeholder="max@beispiel.de" inputMode="email" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={()=>{setShowAddObjCp(false);setNewObjCpFn('');setNewObjCpLn('');setNewObjCpRole('');setNewObjCpPhone('');setNewObjCpEmail('');setObjCpSearchQ('');setObjCpSearchRes([])}} style={{ flex:1, padding:'9px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:13, fontWeight:600, cursor:'pointer' }}>Abbrechen</button>
-                  <button disabled={(!newObjCpFn.trim() && !newObjCpLn.trim()) || objCpSaving} onClick={()=>addObjCp({first_name:newObjCpFn,last_name:newObjCpLn,role:newObjCpRole,phone:newObjCpPhone,email:newObjCpEmail})} style={{ flex:1, padding:'9px', borderRadius:10, border:'none', background:(newObjCpFn.trim()||newObjCpLn.trim())&&!objCpSaving?'var(--pri)':'var(--outline)', color:'#fff', fontSize:13, fontWeight:700, cursor:(newObjCpFn.trim()||newObjCpLn.trim())&&!objCpSaving?'pointer':'not-allowed' }}>Hinzufügen</button>
+                <div>
+                  <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--txt-sec)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Nachname *</label>
+                  <input value={newObjCpLn} onChange={e => setNewObjCpLn(e.target.value)} placeholder="Mustermann" style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--outline)', background: 'var(--surf-card)', fontSize: 13, color: 'var(--txt)', outline: 'none', boxSizing: 'border-box' }}/>
                 </div>
               </div>
-            )}
-          </div>
-
-          <div style={{ height:1, background:'var(--outline)' }}/>
-
-          {/* ── Standort ── */}
-          <div style={{ padding:'14px 16px' }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Standort</div>
-            <MapView address={obj.address} city={obj.city} postalCode={obj.postal_code}/>
-          </div>
-
-          <div style={{ height:1, background:'var(--outline)' }}/>
-
-          {/* ── Objektleiter ── */}
-          <div style={{ padding:'14px 16px' }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Objektleiter</div>
-            {olList.length === 0 ? (
-              <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Noch keine Mitarbeiter mit Objektleiter-Rolle.</div>
-            ) : (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-                <div onClick={() => handleOlChange(null)}
-                  style={{ padding:'6px 14px', borderRadius:20, fontSize:13, fontWeight:600, cursor:'pointer',
-                    border:`1.5px solid ${currentOl===null?'var(--pri)':'var(--outline)'}`,
-                    background:currentOl===null?'var(--pri-xl)':'transparent',
-                    color:currentOl===null?'var(--pri)':'var(--txt-muted)' }}>Keiner</div>
-                {olList.map(ol => (
-                  <div key={ol.id} onClick={() => !olSaving && handleOlChange(ol.id)}
-                    style={{ padding:'6px 14px', borderRadius:20, fontSize:13, fontWeight:600, cursor:olSaving?'wait':'pointer',
-                      border:`1.5px solid ${currentOl===ol.id?'var(--pri)':'var(--outline)'}`,
-                      background:currentOl===ol.id?'var(--pri-xl)':'transparent',
-                      color:currentOl===ol.id?'var(--pri)':'var(--txt-muted)' }}>
-                    {currentOl===ol.id && <span className="material-symbols-outlined" style={{ fontSize:13, verticalAlign:'middle', marginRight:3 }}>check</span>}
-                    {ol.full_name}
-                  </div>
-                ))}
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--txt-sec)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Funktion</label>
+                <input value={newObjCpRole} onChange={e => setNewObjCpRole(e.target.value)} placeholder="Hausmeister" style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--outline)', background: 'var(--surf-card)', fontSize: 13, color: 'var(--txt)', outline: 'none', boxSizing: 'border-box' }}/>
               </div>
-            )}
-            {olMsg && <div style={{ marginTop:8, fontSize:12, color:'var(--ok)', display:'flex', alignItems:'center', gap:4 }}><span className="material-symbols-outlined" style={{ fontSize:14 }}>check_circle</span>{olMsg}</div>}
-          </div>
-        </div>
-
-        {/* ── Leistungen ── */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <h3 style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Leistungen</h3>
-            {tasks.filter(t=>t.is_active).length > 0 && (
-              <span style={{ fontSize:11, fontWeight:700, color:'var(--ok)', background:'var(--ok-bg)', borderRadius:999, padding:'2px 8px' }}>
-                {tasks.filter(t=>t.is_active).length} aktiv
-              </span>
-            )}
-          </div>
-          <button onClick={onNewTask} style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', padding:'7px 14px', borderRadius:999, border:'none', cursor:'pointer' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:15 }}>add</span> Neue Leistung
-          </button>
-        </div>
-
-        {tasks.length === 0 ? (
-          <div style={{ background:'var(--surf-low)', borderRadius:16, padding:'24px 16px', textAlign:'center', color:'var(--txt-muted)', fontSize:13, marginBottom:14 }}>
-            <span className="material-symbols-outlined" style={{ fontSize:32, display:'block', marginBottom:8, opacity:0.35 }}>assignment</span>
-            Noch keine Leistungen hinterlegt.
-            <div style={{ fontSize:12, marginTop:4 }}>Lege die erste Leistung über den Button oben an.</div>
-          </div>
-        ) : tasks.map(t => {
-          const cat = t.categories
-          const user = t.users as any
-          const taskUpcoming = upcomingAssigns.filter(a => a.task_id === t.id)
-          const isExpired = t.end_date && new Date(t.end_date) < new Date()
-          return (
-            <div key={t.id} style={{ background:'var(--surf-card)', borderRadius:16, padding:'16px', marginBottom:10, border:'1px solid var(--outline)', opacity:t.is_active && !isExpired ? 1 : 0.5 }}>
-              {/* Zeile 1: Emoji + Titel + Toggle */}
-              <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-                <div style={{ width:44, height:44, borderRadius:14, background:'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, flexShrink:0 }}>
-                  {cat?.emoji || '📋'}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, alignItems: 'start', marginBottom: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--txt-sec)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Telefon</label>
+                  <input value={newObjCpPhone} onChange={e => setNewObjCpPhone(e.target.value)} placeholder="+49 561 …" inputMode="tel" style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--outline)', background: 'var(--surf-card)', fontSize: 13, color: 'var(--txt)', outline: 'none', boxSizing: 'border-box' }}/>
                 </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:15, fontWeight:700, fontFamily:'var(--font-head)', lineHeight:1.25, marginBottom:4 }}>
-                    {t.title}
-                  </div>
-                  <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
-                    <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', background:'var(--surf-high)', padding:'2px 7px', borderRadius:999, display:'flex', alignItems:'center', gap:3 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:11 }}>{INTERVAL_ICONS[t.interval]||'repeat'}</span>{t.interval}
-                    </span>
-                    {user?.full_name && (
-                      <span style={{ fontSize:10, fontWeight:600, color:'var(--pri)', background:'var(--pri-xl)', padding:'2px 7px', borderRadius:999, display:'flex', alignItems:'center', gap:3 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:11 }}>person</span>{user.full_name.split(' ')[0]}
-                      </span>
-                    )}
-                    {t.contracts && (
-                      <span style={{ fontSize:10, fontWeight:600, color:'var(--sec)', background:'var(--sec-c)', padding:'2px 7px', borderRadius:999 }}>
-                        {t.contracts.type === 'jahresvertrag' ? 'Jahresvertrag' : 'Einmalig'}
-                      </span>
-                    )}
-                    {!t.is_active && <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', background:'var(--surf-high)', padding:'2px 7px', borderRadius:999 }}>Pausiert</span>}
-                    {isExpired && <span style={{ fontSize:10, fontWeight:700, color:'var(--err)', background:'var(--err-bg)', padding:'2px 7px', borderRadius:999 }}>Abgelaufen</span>}
-                    {t.end_date && !isExpired && (
-                      <span style={{ fontSize:10, color:'var(--txt-muted)', padding:'2px 4px' }}>
-                        bis {new Date(t.end_date).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'2-digit'})}
-                      </span>
-                    )}
-                  </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 10, fontWeight: 700, color: 'var(--txt-sec)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>E-Mail</label>
+                  <input value={newObjCpEmail} onChange={e => setNewObjCpEmail(e.target.value)} placeholder="max@beispiel.de" inputMode="email" style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--outline)', background: 'var(--surf-card)', fontSize: 13, color: 'var(--txt)', outline: 'none', boxSizing: 'border-box' }}/>
                 </div>
-                <button onClick={()=>onToggleTask(t.id, t.is_active)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', color:t.is_active && !isExpired?'var(--ok)':'var(--txt-muted)', flexShrink:0 }}>
-                  <span className="material-symbols-outlined icon-fill" style={{ fontSize:28 }}>{t.is_active?'toggle_on':'toggle_off'}</span>
-                </button>
               </div>
-              {/* Zeile 2: Trennlinie + Aktionen */}
-              <div style={{ marginTop:12, paddingTop:10, borderTop:'1px solid var(--outline)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <div style={{ fontSize:11, display:'flex', alignItems:'center', gap:4 }}>
-                  {taskUpcoming.length > 0 ? (
-                    <span style={{ color:'var(--pri)', display:'flex', alignItems:'center', gap:4 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:13 }}>event</span>
-                      {taskUpcoming.length} Termin{taskUpcoming.length > 1 ? 'e' : ''} in 30 Tagen
-                    </span>
-                  ) : (
-                    <span style={{ color:'var(--txt-muted)' }}>Keine Termine geplant</span>
-                  )}
-                </div>
-                <button onClick={()=>onEditTask(t)} style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color:'var(--txt-muted)', background:'var(--surf-low)', padding:'5px 10px', borderRadius:999, border:'none', cursor:'pointer' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:13 }}>edit</span> Bearbeiten
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { setShowAddObjCp(false); setNewObjCpFn(''); setNewObjCpLn(''); setNewObjCpRole(''); setNewObjCpPhone(''); setNewObjCpEmail(''); setObjCpSearchQ(''); setObjCpSearchRes([]) }} style={{ flex: 1, padding: '9px', borderRadius: 10, border: '1.5px solid var(--outline)', background: 'var(--surf-card)', color: 'var(--txt-sec)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Abbrechen</button>
+                <button disabled={(!newObjCpFn.trim() && !newObjCpLn.trim()) || objCpSaving} onClick={() => addObjCp({ first_name: newObjCpFn, last_name: newObjCpLn, role: newObjCpRole, phone: newObjCpPhone, email: newObjCpEmail })}
+                  style={{ flex: 1, padding: '9px', borderRadius: 10, border: 'none', background: (newObjCpFn.trim() || newObjCpLn.trim()) && !objCpSaving ? 'var(--pri)' : 'var(--outline)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: (newObjCpFn.trim() || newObjCpLn.trim()) && !objCpSaving ? 'pointer' : 'not-allowed' }}>
+                  Hinzufügen
                 </button>
               </div>
             </div>
-          )
-        })}
+          )}
+        </div>
 
-        {/* ── Nächste Termine ── */}
-        {upcomingAssigns.length > 0 && (() => {
-          const grouped: Record<string, any[]> = {}
-          upcomingAssigns.forEach((a: any) => {
-            if (!grouped[a.due_date]) grouped[a.due_date] = []
-            grouped[a.due_date].push(a)
-          })
-          const sortedDates = Object.keys(grouped).sort().slice(0, 14)
-          const today = localToday()
-          return (
-            <>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:24, marginBottom:12 }}>
-                <h3 style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Nächste Termine</h3>
-                <span style={{ fontSize:11, color:'var(--txt-muted)' }}>nächste 30 Tage</span>
+        {/* ══ LEISTUNGEN ══ */}
+        {(() => {
+          const LEISTUNG_LABEL: Record<string,string> = { täglich: 'Täglich', wöchentlich: 'Wöchentlich', monatlich: 'Monatlich', quartalsweise: 'Quartalsweise', einmalig: 'Einmalige Aufträge' }
+          const LEISTUNG_ORDER = ['täglich', 'wöchentlich', 'monatlich', 'quartalsweise', 'einmalig']
+          const isOneTime = (t: TaskItem) => (t as any).contracts?.type === 'einmalig'
+          const isExpiredT = (t: TaskItem) => !!(t.end_date && new Date(t.end_date) < new Date())
+          const activeCount = tasks.filter(t => isOneTime(t) ? !isExpiredT(t) : t.is_active).length
+          const taskGroupMap: Record<string, TaskItem[]> = {}
+          tasks.forEach(t => { const k = isOneTime(t) ? 'einmalig' : t.interval; (taskGroupMap[k] = taskGroupMap[k] || []).push(t) })
+          const leistungsGroups = LEISTUNG_ORDER.filter(k => taskGroupMap[k]).map(k => ({ key: k, label: LEISTUNG_LABEL[k], items: taskGroupMap[k] }))
+
+          return (<>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '28px 0 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
+                <h3 style={{ fontSize: 19, fontWeight: 800, fontFamily: 'var(--font-head)', margin: 0, letterSpacing: '-0.01em' }}>Leistungen</h3>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--pri)' }}>{activeCount} aktiv</span>
               </div>
+              <button onClick={onNewTask} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--pri)', background: 'var(--pri-xl)', padding: '8px 14px', borderRadius: 999, border: 'none', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>add</span> Neu
+              </button>
+            </div>
+
+            {tasks.length === 0 ? (
+              <div style={{ background: 'var(--surf-low)', borderRadius: 16, padding: '24px 16px', textAlign: 'center', color: 'var(--txt-muted)', fontSize: 13, marginBottom: 14 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 32, display: 'block', marginBottom: 8, opacity: 0.35 }}>assignment</span>
+                Noch keine Leistungen hinterlegt.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                {leistungsGroups.map(g => {
+                  const intervalIcon = INTERVAL_ICONS[g.key] || 'repeat'
+                  return (
+                    <div key={g.key}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 9 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, fontFamily: 'var(--font-head)', color: '#3f484a', whiteSpace: 'nowrap' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#9aa3a5' }}>{intervalIcon}</span>
+                          {g.label}
+                        </span>
+                        <span style={{ flex: 1, height: 1, background: '#e7e8e9' }} />
+                        <span style={{ fontSize: 10.5, color: '#9aa3a5', fontWeight: 600 }}>{g.items.length}</span>
+                      </div>
+                      <div style={{ background: 'var(--surf-card)', borderRadius: 14, border: '1px solid #e7e8e9', overflow: 'hidden' }}>
+                        {g.items.map((t, i) => {
+                          const oneTime = isOneTime(t)
+                          const isExpired = isExpiredT(t)
+                          const on = t.is_active
+                          const dim = oneTime ? isExpired : (!on || isExpired)
+                          const user = (t as any).users as any
+                          const taskUpcoming = upcomingAssigns.filter((a: any) => a.task_id === t.id)
+                          return (
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderTop: i ? '1px solid #f1f3f4' : 'none', opacity: dim ? 0.55 : 1, transition: 'opacity .2s' }}>
+                              <div style={{ width: 42, height: 42, borderRadius: 12, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, flexShrink: 0 }}>
+                                {(t as any).categories?.emoji || '📋'}
+                              </div>
+                              <button onClick={() => onEditTask(t)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                                <div style={{ fontSize: 15.5, fontWeight: 800, fontFamily: 'var(--font-head)', lineHeight: 1.2, letterSpacing: '-0.01em', color: 'var(--txt)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 3, fontSize: 11.5, color: '#6f797b' }}>
+                                  {user?.full_name && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                      <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#9aa3a5' }}>person</span>
+                                      {user.full_name.split(' ')[0]}
+                                    </span>
+                                  )}
+                                  {user?.full_name && <span style={{ width: 2, height: 2, borderRadius: 1, background: '#cdd4d5', flexShrink: 0 }} />}
+                                  <span style={{ color: taskUpcoming.length ? 'var(--pri)' : '#9aa3a5', fontWeight: 600 }}>
+                                    {taskUpcoming.length ? `${taskUpcoming.length} Termin${taskUpcoming.length > 1 ? 'e' : ''}` : 'Keine Termine'}
+                                  </span>
+                                  {isExpired && <span style={{ fontSize: 10, fontWeight: 700, color: '#93000a', background: '#ffdad6', padding: '1px 6px', borderRadius: 5 }}>Abgelaufen</span>}
+                                </div>
+                              </button>
+                              {oneTime ? (
+                                <span style={{ flexShrink: 0, boxSizing: 'border-box' as const, height: 26, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, padding: '0 10px', borderRadius: 999, color: isExpired ? 'var(--ok)' : '#3f484a', background: isExpired ? '#dcfce7' : '#f3f4f5' }}>
+                                  <span className={`material-symbols-outlined${isExpired ? ' icon-fill' : ''}`} style={{ fontSize: 12 }}>{isExpired ? 'check_circle' : 'looks_one'}</span>
+                                  {isExpired ? 'Erledigt' : 'Einmalig'}
+                                </span>
+                              ) : (
+                                <button onClick={() => onToggleTask(t.id, t.is_active)} style={{ flexShrink: 0, width: 44, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer', padding: 0, position: 'relative' as const, background: on && !isExpired ? 'var(--pri)' : '#cdd4d5', transition: 'background .2s' }}>
+                                  <span style={{ position: 'absolute', top: 3, left: on && !isExpired ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'left .2s' }} />
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>)
+        })()}
+
+        {/* ══ NÄCHSTE TERMINE ══ */}
+        {upcomingAssigns.length > 0 && (() => {
+          const today = localToday()
+          const grouped: Record<string, any[]> = {}
+          upcomingAssigns.forEach((a: any) => { if (!grouped[a.due_date]) grouped[a.due_date] = []; grouped[a.due_date].push(a) })
+          const sortedDates = Object.keys(grouped).sort().slice(0, 14)
+
+          const formatDateLabel = (date: string, todayStr: string) => {
+            if (date === todayStr) return 'Heute'
+            const d = new Date(date + 'T00:00:00')
+            return d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+          }
+
+          return (<>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '28px 0 14px' }}>
+              <h3 style={{ fontSize: 19, fontWeight: 800, fontFamily: 'var(--font-head)', margin: 0, letterSpacing: '-0.01em' }}>Nächste Termine</h3>
+              <span style={{ fontSize: 12, color: '#9aa3a5', fontWeight: 600 }}>30 Tage</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {sortedDates.map(date => {
                 const isToday = date === today
-                const dateLabel = isToday ? 'Heute' : new Date(date).toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'2-digit'})
                 const assignments = grouped[date]
                 return (
-                  <div key={date} style={{ marginBottom:14 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                      <div style={{ fontSize:12, fontWeight:700, color: isToday ? 'var(--pri)' : 'var(--txt-sec)', fontFamily:'var(--font-head)', whiteSpace:'nowrap' }}>
-                        {dateLabel}
-                      </div>
-                      <div style={{ flex:1, height:1, background:'var(--outline)' }} />
-                      <div style={{ fontSize:10, color:'var(--txt-muted)', whiteSpace:'nowrap' }}>{assignments.length} Aufgabe{assignments.length !== 1 ? 'n' : ''}</div>
+                  <div key={date}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 9 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 800, fontFamily: 'var(--font-head)', color: isToday ? 'var(--pri)' : '#3f484a', textTransform: 'capitalize' as const, whiteSpace: 'nowrap' }}>
+                        {formatDateLabel(date, today)}
+                      </span>
+                      <span style={{ flex: 1, height: 1, background: '#e7e8e9' }} />
+                      <span style={{ fontSize: 10.5, color: '#9aa3a5', fontWeight: 600 }}>{assignments.length} Aufg.</span>
                     </div>
-                    <div style={{ background:'var(--surf-card)', borderRadius:14, border:`1px solid ${isToday ? 'var(--pri-l)' : 'var(--outline)'}`, overflow:'hidden' }}>
-                      {assignments.map((a: any, idx: number) => {
+                    <div style={{ background: 'var(--surf-card)', borderRadius: 14, border: `1px solid ${isToday ? '#a8ece8' : '#e7e8e9'}`, overflow: 'hidden' }}>
+                      {assignments.map((a: any, i: number) => {
                         const task = tasks.find(t => t.id === a.task_id)
-                        const stMeta = STATUS_META[a.status] || STATUS_META['offen']
+                        const st = STATUS_META[a.status] || STATUS_META['offen']
                         return (
-                          <div key={a.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderTop: idx > 0 ? '1px solid var(--outline)' : 'none', background: isToday ? 'var(--pri-xl)' : 'transparent' }}>
-                            <div style={{ fontSize:18, flexShrink:0, lineHeight:1 }}>{task?.categories?.emoji || '📋'}</div>
-                            <div style={{ flex:1, minWidth:0 }}>
-                              <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                                {task?.title}
-                              </div>
-                              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{(a.users as any)?.full_name || '–'}</div>
+                          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 14px', borderTop: i ? '1px solid #eef0f1' : 'none' }}>
+                            <span style={{ fontSize: 19, flexShrink: 0 }}>{(task as any)?.categories?.emoji || '📋'}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task?.title}</div>
+                              <div style={{ fontSize: 11.5, color: '#6f797b', marginTop: 1 }}>{(a.users as any)?.full_name || '–'}</div>
                             </div>
-                            <span style={{ fontSize:10, fontWeight:700, color:stMeta.color, background:stMeta.bg, padding:'3px 8px', borderRadius:999, flexShrink:0 }}>
-                              {stMeta.label}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 700, color: st.color, background: st.bg, padding: '4px 9px', borderRadius: 999, flexShrink: 0 }}>
+                              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{st.icon}</span>
+                              {st.label}
                             </span>
                           </div>
                         )
@@ -2493,13 +2514,15 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
                 )
               })}
               {Object.keys(grouped).length > 14 && (
-                <div style={{ textAlign:'center', fontSize:12, color:'var(--txt-muted)', padding:'4px 0 8px' }}>
+                <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--txt-muted)', padding: '4px 0 8px' }}>
                   +{Object.keys(grouped).length - 14} weitere Tage
                 </div>
               )}
-            </>
-          )
+            </div>
+          </>)
         })()}
+
+      </div>
 
       </>)}
 
