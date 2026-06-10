@@ -2212,6 +2212,23 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             <span style={{ fontFamily: 'monospace', fontSize: 12.5, color: '#9aa3a5' }}>{obj.object_number}</span>
           </>)}
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 13, color: '#6f797b' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#9aa3a5' }}>manage_accounts</span>
+          <span style={{ fontSize: 11.5, color: '#9aa3a5', fontWeight: 600 }}>Objektleiter:</span>
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <select
+              value={currentOl || ''}
+              onChange={e => handleOlChange(e.target.value || null)}
+              disabled={olSaving}
+              style={{ appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', border: 'none', background: 'transparent', color: currentOl ? 'var(--pri)' : '#9aa3a5', fontWeight: 700, fontSize: 13, fontFamily: 'var(--font-body)', paddingRight: 18, paddingLeft: 0, cursor: 'pointer', outline: 'none' }}
+            >
+              <option value="">Keiner</option>
+              {olList.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
+            </select>
+            <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#9aa3a5', position: 'absolute', right: 0, pointerEvents: 'none' }}>unfold_more</span>
+          </div>
+          {olMsg && <span style={{ fontSize: 11, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 2 }}><span className="material-symbols-outlined" style={{ fontSize: 12 }}>check_circle</span>{olMsg}</span>}
+        </div>
       </div>
 
       {loadingDetail ? <Loader/> : (<>
@@ -2271,13 +2288,16 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
                   </>
                 )}
 
-                {/* Objekt-ID (nur für HV) */}
+                {/* Objekt-ID + Verwaltungs-ID (nur für HV) */}
                 {isHV && customer.hausverwaltung_objekt_id && (
                   <>
                     <div style={{ height: 1, background: '#f1f3f4', margin: '14px -16px 0' }} />
-                    <div style={{ padding: '14px 0 4px' }}>
-                      <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objekt-ID</div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)', marginTop: 5, fontFamily: 'monospace' }}>{customer.hausverwaltung_objekt_id}</div>
+                    <div style={{ padding: '12px 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#9aa3a5' }}>tag</span>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objekt-ID</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--txt)', marginTop: 2, fontFamily: 'monospace' }}>{customer.hausverwaltung_objekt_id}</div>
+                      </div>
                     </div>
                   </>
                 )}
@@ -2285,27 +2305,6 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             )
           })()}
 
-          {/* Objektleiter — eigene Sektion am unteren Kartenrand */}
-          <div style={{ height: 1, background: '#f1f3f4', margin: '0 -16px' }} />
-          <div style={{ padding: '13px 0 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Objektleiter</div>
-              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                <select
-                  value={currentOl || ''}
-                  onChange={e => handleOlChange(e.target.value || null)}
-                  disabled={olSaving}
-                  style={{ appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', border: 'none', background: 'transparent', color: currentOl ? 'var(--pri)' : 'var(--txt-muted)', fontWeight: 700, fontSize: 14, fontFamily: 'var(--font-body)', textAlign: 'left', paddingRight: 22, paddingLeft: 0, cursor: 'pointer', outline: 'none' }}
-                >
-                  <option value="">Keiner</option>
-                  {olList.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
-                </select>
-                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--txt-muted)', position: 'absolute', right: 0, pointerEvents: 'none' }}>unfold_more</span>
-              </div>
-            </div>
-            {olSaving && <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--txt-muted)', animation: 'spin 1s linear infinite' }}>progress_activity</span>}
-            {olMsg && <span style={{ fontSize: 11, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 13 }}>check_circle</span>{olMsg}</span>}
-          </div>
         </div>
 
         {/* ══ ANSPRECHPARTNER ══ */}
@@ -2409,30 +2408,6 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
         </div>
 
         </div>{/* end 2-col grid */}
-
-        {/* ══ OBJEKTLEITER — eigene Zeile ══ */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 12, padding: '10px 16px', marginTop: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 17, color: '#9aa3a5' }}>manage_accounts</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objektleiter</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {olMsg && <span style={{ fontSize: 11, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 13 }}>check_circle</span>{olMsg}</span>}
-            {olSaving && <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--txt-muted)' }}>progress_activity</span>}
-            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-              <select
-                value={currentOl || ''}
-                onChange={e => handleOlChange(e.target.value || null)}
-                disabled={olSaving}
-                style={{ appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', border: 'none', background: 'transparent', color: currentOl ? 'var(--pri)' : 'var(--txt-muted)', fontWeight: 700, fontSize: 13.5, fontFamily: 'var(--font-body)', paddingRight: 20, paddingLeft: 0, cursor: 'pointer', outline: 'none' }}
-              >
-                <option value="">Keiner</option>
-                {olList.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
-              </select>
-              <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--txt-muted)', position: 'absolute', right: 0, pointerEvents: 'none' }}>unfold_more</span>
-            </div>
-          </div>
-        </div>
 
         {/* ══ LEISTUNGEN ══ */}
         {(() => {
