@@ -2410,6 +2410,30 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
 
         </div>{/* end 2-col grid */}
 
+        {/* ══ OBJEKTLEITER — eigene Zeile ══ */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 12, padding: '10px 16px', marginTop: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 17, color: '#9aa3a5' }}>manage_accounts</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objektleiter</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {olMsg && <span style={{ fontSize: 11, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 13 }}>check_circle</span>{olMsg}</span>}
+            {olSaving && <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--txt-muted)' }}>progress_activity</span>}
+            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <select
+                value={currentOl || ''}
+                onChange={e => handleOlChange(e.target.value || null)}
+                disabled={olSaving}
+                style={{ appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', border: 'none', background: 'transparent', color: currentOl ? 'var(--pri)' : 'var(--txt-muted)', fontWeight: 700, fontSize: 13.5, fontFamily: 'var(--font-body)', paddingRight: 20, paddingLeft: 0, cursor: 'pointer', outline: 'none' }}
+              >
+                <option value="">Keiner</option>
+                {olList.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
+              </select>
+              <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--txt-muted)', position: 'absolute', right: 0, pointerEvents: 'none' }}>unfold_more</span>
+            </div>
+          </div>
+        </div>
+
         {/* ══ LEISTUNGEN ══ */}
         {(() => {
           const LEISTUNG_LABEL: Record<string,string> = { täglich: 'Täglich', wöchentlich: 'Wöchentlich', monatlich: 'Monatlich', quartalsweise: 'Quartalsweise', einmalig: 'Einmalige Aufträge' }
