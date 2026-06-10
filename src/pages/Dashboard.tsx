@@ -1048,6 +1048,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
               if (cust) { setSelectedCustomer(cust); setTab('kunden') }
             }}
             onToast={(msg, type) => showToast(msg, type)}
+            isDesktop={isDesktop}
           />
         )}
 
@@ -1995,13 +1996,14 @@ export default function Dashboard({ userName, onLogout }: Props) {
 }
 
 // ─── Object Detail View ──────────────────────────────────────────────────────
-function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTask, onToggleTask, onNewTask, onHistory, onQR, onRefresh, onObjectUpdated, onObjectDeleted, onNavigateToCustomer, onToast }: {
+function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTask, onToggleTask, onNewTask, onHistory, onQR, onRefresh, onObjectUpdated, onObjectDeleted, onNavigateToCustomer, onToast, isDesktop }: {
   obj: ObjectItem; tasks: TaskItem[]; team: TeamMember[]; categories: Category[]; objects: ObjectItem[]
   onBack: () => void; onEditTask: (t: TaskItem) => void; onToggleTask: (id: string, cur: boolean) => void
   onNewTask: () => void; onHistory: () => void; onQR: () => void; onRefresh: () => void
   onObjectUpdated: (updated: ObjectItem) => void; onObjectDeleted: () => void
   onNavigateToCustomer?: (customerId: string) => void
   onToast?: (msg: string, type: 'ok'|'warn'|'info') => void
+  isDesktop?: boolean
 }) {
   const [customerLink, setCustomerLink] = useState<string | null>(null)
   const [customerLinkLoading, setCustomerLinkLoading] = useState(false)
@@ -2174,10 +2176,10 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
   }
 
   return (
-    <div style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))', maxWidth: 860, margin: '0 auto', width: '100%' }}>
+    <div style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
 
       {/* ══ HEADER ══ */}
-      <div style={{ padding: 'calc(env(safe-area-inset-top, 0px) + 16px) 18px 20px', background: 'var(--surf-card)', borderBottom: '1px solid var(--outline)' }}>
+      <div style={{ padding: isDesktop ? '8px 0 20px' : 'calc(env(safe-area-inset-top, 0px) + 16px) 18px 20px', background: isDesktop ? 'transparent' : 'var(--surf-card)', borderBottom: isDesktop ? 'none' : '1px solid var(--outline)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <button onClick={onBack} style={{ background: '#f3f4f5', border: '1px solid #e7e8e9', borderRadius: 12, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 21, color: '#3f484a' }}>arrow_back</span>
@@ -2199,7 +2201,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             {obj.object_type}
           </div>
         )}
-        <h1 style={{ fontSize: 25, fontWeight: 800, fontFamily: 'var(--font-head)', margin: 0, lineHeight: 1.12, letterSpacing: '-0.02em' }}>
+        <h1 style={{ fontSize: isDesktop ? 22 : 25, fontWeight: 800, fontFamily: 'var(--font-head)', margin: 0, lineHeight: 1.12, letterSpacing: '-0.02em' }}>
           {obj.address}
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 7, fontSize: 14.5, color: '#6f797b' }}>
@@ -2216,8 +2218,10 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
 
       <div style={{ padding: '0' }}>
 
-        {/* ══ INFO CARD ══ */}
-        <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: '4px 16px', marginTop: 18, marginBottom: 0 }}>
+        {/* ══ INFO + ANSPRECHPARTNER — 2-col on desktop ══ */}
+        <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns: isDesktop ? '1fr 1fr' : undefined, gap: isDesktop ? 16 : undefined, alignItems: 'start', marginTop: 20 }}>
+        {/* INFO CARD */}
+        <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: '4px 16px' }}>
 
           {/* Kunde */}
           {customer && (() => {
@@ -2303,7 +2307,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
         </div>
 
         {/* ══ ANSPRECHPARTNER ══ */}
-        <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: 16, marginTop: 14 }}>
+        <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: 16, marginTop: isDesktop ? 0 : 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
               Ansprechpartner{objContacts.length > 0 && <span style={{ marginLeft: 6 }}>· {objContacts.length}</span>}
@@ -2401,6 +2405,8 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
             </div>
           )}
         </div>
+
+        </div>{/* end 2-col grid */}
 
         {/* ══ LEISTUNGEN ══ */}
         {(() => {
