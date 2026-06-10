@@ -2198,7 +2198,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
         {obj.object_type && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--pri-xl)', color: 'var(--pri)', borderRadius: 999, padding: '5px 11px', fontSize: 11.5, fontWeight: 700, marginBottom: 12 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>apartment</span>
-            {obj.object_type}
+            {obj.object_type.charAt(0).toUpperCase() + obj.object_type.slice(1)}
           </div>
         )}
         <h1 style={{ fontSize: isDesktop ? 22 : 25, fontWeight: 800, fontFamily: 'var(--font-head)', margin: 0, lineHeight: 1.12, letterSpacing: '-0.02em' }}>
@@ -2219,7 +2219,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       <div style={{ padding: '0' }}>
 
         {/* ══ INFO + ANSPRECHPARTNER — 2-col on desktop ══ */}
-        <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns: isDesktop ? '1fr 1fr' : undefined, gap: isDesktop ? 16 : undefined, alignItems: 'start', marginTop: 20 }}>
+        <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns: isDesktop ? '1fr 1fr' : undefined, gap: isDesktop ? 16 : undefined, alignItems: 'stretch', marginTop: 20 }}>
         {/* INFO CARD */}
         <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: '4px 16px' }}>
 
@@ -2271,39 +2271,41 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
                   </>
                 )}
 
-                {/* Objekt-ID + Objektleiter row */}
-                <div style={{ height: 1, background: '#f1f3f4', margin: '14px -16px 0' }} />
-                <div style={{ display: 'flex', gap: 14, padding: '14px 0 0' }}>
-                  {(isHV && customer.hausverwaltung_objekt_id) && (
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Objekt-ID (nur für HV) */}
+                {isHV && customer.hausverwaltung_objekt_id && (
+                  <>
+                    <div style={{ height: 1, background: '#f1f3f4', margin: '14px -16px 0' }} />
+                    <div style={{ padding: '14px 0 4px' }}>
                       <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objekt-ID</div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--txt)', marginTop: 5, fontFamily: 'monospace' }}>{customer.hausverwaltung_objekt_id}</div>
                     </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0, ...((isHV && customer.hausverwaltung_objekt_id) ? { borderLeft: '1px solid #f1f3f4', paddingLeft: 14 } : {}) }}>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objektleiter</div>
-                    {olList.length === 0 ? (
-                      <div style={{ fontSize: 13, color: '#9aa3a5', marginTop: 4 }}>–</div>
-                    ) : (
-                      <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginTop: 3, maxWidth: '100%' }}>
-                        <select
-                          value={currentOl || ''}
-                          onChange={e => handleOlChange(e.target.value || null)}
-                          disabled={olSaving}
-                          style={{ appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', border: 'none', background: 'transparent', color: 'var(--pri)', fontWeight: 700, fontSize: 14, fontFamily: 'var(--font-body)', textAlign: 'left', paddingRight: 22, paddingLeft: 0, cursor: 'pointer', outline: 'none', maxWidth: '100%' }}
-                        >
-                          <option value="">Keiner</option>
-                          {olList.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
-                        </select>
-                        <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--pri)', position: 'absolute', right: 0, pointerEvents: 'none' }}>unfold_more</span>
-                      </div>
-                    )}
-                    {olMsg && <div style={{ fontSize: 11, color: 'var(--ok)', marginTop: 3 }}>{olMsg}</div>}
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             )
           })()}
+
+          {/* Objektleiter — eigene Sektion am unteren Kartenrand */}
+          <div style={{ height: 1, background: '#f1f3f4', margin: '0 -16px' }} />
+          <div style={{ padding: '13px 0 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Objektleiter</div>
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <select
+                  value={currentOl || ''}
+                  onChange={e => handleOlChange(e.target.value || null)}
+                  disabled={olSaving}
+                  style={{ appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', border: 'none', background: 'transparent', color: currentOl ? 'var(--pri)' : 'var(--txt-muted)', fontWeight: 700, fontSize: 14, fontFamily: 'var(--font-body)', textAlign: 'left', paddingRight: 22, paddingLeft: 0, cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="">Keiner</option>
+                  {olList.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
+                </select>
+                <span className="material-symbols-outlined" style={{ fontSize: 15, color: 'var(--txt-muted)', position: 'absolute', right: 0, pointerEvents: 'none' }}>unfold_more</span>
+              </div>
+            </div>
+            {olSaving && <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--txt-muted)', animation: 'spin 1s linear infinite' }}>progress_activity</span>}
+            {olMsg && <span style={{ fontSize: 11, color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: 3 }}><span className="material-symbols-outlined" style={{ fontSize: 13 }}>check_circle</span>{olMsg}</span>}
+          </div>
         </div>
 
         {/* ══ ANSPRECHPARTNER ══ */}
@@ -2503,8 +2505,11 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
         {/* ══ NÄCHSTE TERMINE ══ */}
         {upcomingAssigns.length > 0 && (() => {
           const today = localToday()
+          const activeTaskIds = new Set(tasks.filter(t => t.is_active && !(t.end_date && new Date(t.end_date) < new Date())).map(t => t.id))
+          const visibleAssigns = upcomingAssigns.filter((a: any) => activeTaskIds.has(a.task_id))
+          if (visibleAssigns.length === 0) return null
           const grouped: Record<string, any[]> = {}
-          upcomingAssigns.forEach((a: any) => { if (!grouped[a.due_date]) grouped[a.due_date] = []; grouped[a.due_date].push(a) })
+          visibleAssigns.forEach((a: any) => { if (!grouped[a.due_date]) grouped[a.due_date] = []; grouped[a.due_date].push(a) })
           const sortedDates = Object.keys(grouped).sort().slice(0, 14)
 
           const formatDateLabel = (date: string, todayStr: string) => {
