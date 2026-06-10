@@ -8269,12 +8269,26 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
               {editMode && editData ? (
                 /* ── Edit-Formular ── */
                 <div style={{ padding:'16px 16px 0' }}>
-                  {/* Avatar zentriert */}
-                  <div style={{ display:'flex', justifyContent:'center', marginBottom:18 }}>
+                  {/* Avatar + Trash-Icon in einer Zeile */}
+                  <div style={{ display:'flex', justifyContent:'center', alignItems:'center', marginBottom:18, position:'relative' }}>
                     <div style={{ width:64, height:64, borderRadius:20, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:22, fontFamily:'var(--font-head)' }}>
                       {((editData.first_name?.[0]||'') + (editData.last_name?.[0]||'')).toUpperCase() || initials}
                     </div>
+                    {/* Dezenter Papierkorb — nur für echte contact_persons */}
+                    {!cp._isCust && (
+                      <button onClick={() => setShowDeleteConfirm(true)} title="Löschen" style={{ position:'absolute', right:0, top:0, background:'none', border:'none', cursor:'pointer', padding:6, color:'var(--err)', opacity:0.45, transition:'opacity 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity='1')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity='0.45')}>
+                        <span className="material-symbols-outlined" style={{ fontSize:20 }}>delete</span>
+                      </button>
+                    )}
                   </div>
+                  {/* Dezenter Hinweis für Privatpersonen */}
+                  {cp._isCust && (
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', textAlign:'center', marginBottom:14, marginTop:-10 }}>
+                      Wird als Kunden-Datensatz gespeichert
+                    </div>
+                  )}
                   {[
                     { key:'first_name', label:'Vorname', icon:'badge', placeholder:'Max' },
                     { key:'last_name',  label:'Nachname', icon:'badge', placeholder:'Mustermann' },
@@ -8294,16 +8308,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                       />
                     </div>
                   ))}
-                  {/* Info-Hinweis globale Änderung */}
-                  <div style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'10px 12px', background:'var(--pri-xl)', borderRadius:12, marginBottom:16, marginTop:4 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--pri)', flexShrink:0, marginTop:1 }}>info</span>
-                    <div style={{ fontSize:12, color:'var(--pri)', lineHeight:1.4 }}>
-                      {cp._isCust
-                        ? 'Privatperson — Änderungen werden im Kunden-Datensatz gespeichert und sind überall sichtbar.'
-                        : 'Änderungen gelten für alle Objekte, denen dieser Ansprechpartner zugewiesen ist.'}
-                    </div>
-                  </div>
-                  <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                  <div style={{ display:'flex', gap:8, marginBottom:16 }}>
                     <button onClick={() => { setEditMode(false); setShowDeleteConfirm(false) }} style={{ flex:1, padding:'13px', borderRadius:14, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:14, fontWeight:700, cursor:'pointer' }}>
                       Abbrechen
                     </button>
@@ -8311,27 +8316,6 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                       {editSaving ? 'Speichern …' : 'Speichern'}
                     </button>
                   </div>
-                  {/* Löschen */}
-                  {!cp._isCust && !showDeleteConfirm ? (
-                    <button onClick={() => setShowDeleteConfirm(true)} style={{ width:'100%', padding:'12px', borderRadius:14, border:'1.5px solid var(--err)', background:'transparent', color:'var(--err)', fontSize:13, fontWeight:700, cursor:'pointer', marginBottom:16 }}>
-                      Ansprechpartner löschen
-                    </button>
-                  ) : (
-                    <div style={{ background:'var(--err-bg)', borderRadius:14, padding:'14px 16px', marginBottom:16 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'var(--err)', marginBottom:8 }}>Wirklich löschen?</div>
-                      <div style={{ fontSize:12, color:'var(--txt-muted)', marginBottom:12 }}>
-                        Der Ansprechpartner wird von allen Objekten entfernt. Diese Aktion kann nicht rückgängig gemacht werden.
-                      </div>
-                      <div style={{ display:'flex', gap:8 }}>
-                        <button onClick={() => setShowDeleteConfirm(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                          Abbrechen
-                        </button>
-                        <button onClick={() => deleteContact(cp)} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'var(--err)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                          Löschen
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : (
                 /* ── Lese-Ansicht ── */
@@ -8405,6 +8389,31 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
           </div>
         )
       })()}
+
+      {/* Lösch-Bestätigungs-Popup (separates Mini-Modal) */}
+      {showDeleteConfirm && selectedContact && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:1200, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 32px' }}
+          onClick={() => setShowDeleteConfirm(false)}>
+          <div style={{ background:'var(--bg)', borderRadius:20, padding:'24px 20px', width:'100%', maxWidth:340, boxShadow:'0 8px 40px rgba(0,0,0,0.25)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ width:44, height:44, borderRadius:14, background:'var(--err-bg)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:22, color:'var(--err)' }}>delete</span>
+            </div>
+            <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', textAlign:'center', marginBottom:6 }}>Löschen?</div>
+            <div style={{ fontSize:12, color:'var(--txt-muted)', textAlign:'center', lineHeight:1.5, marginBottom:20 }}>
+              Wird von allen Objekten entfernt.
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => setShowDeleteConfirm(false)} style={{ flex:1, padding:'12px', borderRadius:13, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                Abbrechen
+              </button>
+              <button onClick={() => deleteContact(selectedContact)} style={{ flex:1, padding:'12px', borderRadius:13, border:'none', background:'var(--err)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                Löschen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
