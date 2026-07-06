@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 // xlsx loaded dynamically on demand
 import BugReport from '../components/BugReport'
 import { ChatTab, useChatUnread } from '../components/Chat'
@@ -80,8 +81,8 @@ interface TaskItem { id:string; title:string; description:string|null; interval:
 interface Props { userName:string; onLogout:()=>void }
 
 const MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
-const INTERVALS = ['täglich','wöchentlich','monatlich','quartalsweise','einmalig']
-const INTERVAL_ICONS: Record<string,string> = { täglich:'today', wöchentlich:'date_range', monatlich:'calendar_month', quartalsweise:'event_repeat', einmalig:'looks_one' }
+const INTERVALS = ['täglich','wöchentlich','zweiwöchentlich','monatlich','quartalsweise','einmalig']
+const INTERVAL_ICONS: Record<string,string> = { täglich:'today', wöchentlich:'date_range', zweiwöchentlich:'date_range', monatlich:'calendar_month', quartalsweise:'event_repeat', einmalig:'looks_one' }
 const ROLE_LABELS: Record<string,string> = { admin:'Admin', mitarbeiter:'Mitarbeiter', objektleiter:'Objektleiter', support:'Support' }
 const STATUS_META: Record<string,{label:string;icon:string;bg:string;color:string}> = {
   offen:     { label:'Offen',     icon:'radio_button_unchecked', bg:'#fff8e6', color:'#92400e' },
@@ -1064,7 +1065,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
         {tab === 'kunden' && selectedCustomer && (
           <KundeDetail
             customer={selectedCustomer}
-            objects={objects.filter(o => o.customer_id === selectedCustomer.id)}
+            objects={objects.filter(o => {
+              if (o.customer_id === selectedCustomer.id) return true
+              const oc = customers.find(c => c.id === o.customer_id)
+              return oc?.hausverwaltung_id === selectedCustomer.id
+            })}
             onBack={() => setSelectedCustomer(null)}
             onUpdated={c => { setCustomers(prev => prev.map(x => x.id===c.id?c:x)); setSelectedCustomer(c); showToast('✔ Kunde gespeichert', 'ok') }}
             onDeleted={() => { setCustomers(prev => prev.filter(x => x.id!==selectedCustomer.id)); setSelectedCustomer(null) }}
@@ -2055,6 +2060,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
   const [newObjCpEmail, setNewObjCpEmail] = useState('')
   const [objCpSaving, setObjCpSaving] = useState(false)
   const [selectedObjContact, setSelectedObjContact] = useState<any|null>(null)
+  const [confirmRemoveCp, setConfirmRemoveCp] = useState<any>(null)
   const [editingObjContact, setEditingObjContact] = useState(false)
   const [editObjCpFn, setEditObjCpFn] = useState('')
   const [editObjCpLn, setEditObjCpLn] = useState('')
@@ -2160,6 +2166,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       if (data) setObjContacts(prev => [...prev, data].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')))
       setNewObjCpFn(''); setNewObjCpLn(''); setNewObjCpRole(''); setNewObjCpPhone(''); setNewObjCpEmail('')
       setShowAddObjCp(false)
+      onRefresh()  // sync global contacts list in Ansprechpartner-Tab
     }
     setObjCpSaving(false)
   }
@@ -2272,43 +2279,43 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
                   </a>
                 </div>
 
-                {/* Verwaltung row */}
-                {isHV && customer.hausverwaltung && (
-                  <>
-                    <div style={{ height: 1, background: '#f1f3f4', margin: '14px -16px 0' }} />
-                    <button onClick={() => onNavigateToCustomer?.(customer.hausverwaltung.id)} style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '14px 0 0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-                          {customer.customer_type === 'mietverwaltung' ? 'Mietverwaltung' : 'Hausverwaltung'}
-                        </div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--pri)', marginTop: 4, lineHeight: 1.25 }}>{customer.hausverwaltung.name}</div>
-                      </div>
-                      <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#bfc8ca' }}>chevron_right</span>
-                    </button>
-                  </>
-                )}
 
-                {/* Objekt-ID + Verwaltungs-ID (nur für HV) */}
-                {isHV && customer.hausverwaltung_objekt_id && (
-                  <>
-                    <div style={{ height: 1, background: '#f1f3f4', margin: '14px -16px 0' }} />
-                    <div style={{ padding: '12px 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#9aa3a5' }}>tag</span>
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objekt-ID</div>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--txt)', marginTop: 2, fontFamily: 'monospace' }}>{customer.hausverwaltung_objekt_id}</div>
-                      </div>
-                    </div>
-                  </>
-                )}
               </div>
             )
           })()}
 
         </div>
 
-        {/* ══ ANSPRECHPARTNER ══ */}
+        {/* ══ ANSPRECHPARTNER + HAUSVERWALTUNG ══ */}
         <div style={{ background: 'var(--surf-card)', border: '1px solid #e7e8e9', borderRadius: 16, padding: 16, marginTop: isDesktop ? 0 : 14 }}>
+
+          {/* Hausverwaltung / Mietverwaltung */}
+          {customer && (customer.customer_type === 'weg-verwaltung' || customer.customer_type === 'mietverwaltung') && customer.hausverwaltung && (
+            <>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                  {customer.customer_type === 'mietverwaltung' ? 'Mietverwaltung' : 'Hausverwaltung'}
+                </div>
+                <button onClick={() => onNavigateToCustomer?.(customer.hausverwaltung.id)} style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--pri-xl)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--pri)' }}>apartment</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--pri)', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{customer.hausverwaltung.name}</div>
+                    {customer.hausverwaltung_objekt_id && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 12, color: '#9aa3a5' }}>tag</span>
+                        <span style={{ fontSize: 11.5, color: 'var(--txt-muted)', fontFamily: 'monospace' }}>{customer.hausverwaltung_objekt_id}</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#bfc8ca', flexShrink: 0 }}>chevron_right</span>
+                </button>
+              </div>
+              <div style={{ height: 1, background: '#f1f3f4', margin: '0 -16px 14px' }} />
+            </>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
               Ansprechpartner{objContacts.length > 0 && <span style={{ marginLeft: 6 }}>· {objContacts.length}</span>}
@@ -2336,6 +2343,11 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
                     <div style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dn}</div>
                     {c.role && <div style={{ fontSize: 11, color: '#6f797b' }}>{c.role}</div>}
                   </div>
+                  {c.email && (
+                    <a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()} style={{ width: 36, height: 36, borderRadius: 10, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pri)', textDecoration: 'none', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 17 }}>mail</span>
+                    </a>
+                  )}
                   {c.phone && (
                     <a href={`tel:${c.phone}`} onClick={e => e.stopPropagation()} style={{ width: 36, height: 36, borderRadius: 10, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pri)', textDecoration: 'none', flexShrink: 0 }}>
                       <span className="material-symbols-outlined" style={{ fontSize: 17 }}>call</span>
@@ -2411,8 +2423,8 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
 
         {/* ══ LEISTUNGEN ══ */}
         {(() => {
-          const LEISTUNG_LABEL: Record<string,string> = { täglich: 'Täglich', wöchentlich: 'Wöchentlich', monatlich: 'Monatlich', quartalsweise: 'Quartalsweise', einmalig: 'Einmalige Aufträge' }
-          const LEISTUNG_ORDER = ['täglich', 'wöchentlich', 'monatlich', 'quartalsweise', 'einmalig']
+          const LEISTUNG_LABEL: Record<string,string> = { täglich: 'Täglich', wöchentlich: 'Wöchentlich', zweiwöchentlich: 'Zweiwöchentlich', monatlich: 'Monatlich', quartalsweise: 'Quartalsweise', einmalig: 'Einmalige Aufträge' }
+          const LEISTUNG_ORDER = ['täglich', 'wöchentlich', 'zweiwöchentlich', 'monatlich', 'quartalsweise', 'einmalig']
           const isOneTime = (t: TaskItem) => (t as any).contracts?.type === 'einmalig'
           const isExpiredT = (t: TaskItem) => !!(t.end_date && new Date(t.end_date) < new Date())
           const activeCount = tasks.filter(t => isOneTime(t) ? !isExpiredT(t) : t.is_active).length
@@ -2689,6 +2701,19 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
         </div>
       )}
 
+      {/* ── Ansprechpartner entfernen bestätigen ── */}
+      {confirmRemoveCp && (
+        <ConfirmDialog
+          title="Kontakt entfernen?"
+          message={<><strong>{[confirmRemoveCp.first_name, confirmRemoveCp.last_name].filter(Boolean).join(' ') || confirmRemoveCp.name}</strong> wird von diesem Objekt entfernt.</>}
+          confirmLabel="Entfernen"
+          cancelLabel="Abbrechen"
+          destructive
+          onCancel={() => setConfirmRemoveCp(null)}
+          onConfirm={async () => { await removeObjCp(confirmRemoveCp.id); setConfirmRemoveCp(null); setSelectedObjContact(null) }}
+        />
+      )}
+
       {/* ── Kontakt-Detail Bottom Sheet ── */}
       {selectedObjContact && (() => {
         const cp = selectedObjContact
@@ -2777,7 +2802,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
                       style={{ flex:1, padding:'11px', borderRadius:12, border:'1.5px solid var(--pri)', background:'var(--pri-xl)', color:'var(--pri)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
                       <span className="material-symbols-outlined icon-sm">edit</span>Bearbeiten
                     </button>
-                    <button onClick={async()=>{ if(!window.confirm(`${dn} wirklich entfernen?`)) return; await removeObjCp(cp.id); setSelectedObjContact(null) }}
+                    <button onClick={() => setConfirmRemoveCp(cp)}
                       style={{ padding:'11px 14px', borderRadius:12, border:'none', background:'#fde8e8', color:'var(--err-dot)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
                       <span className="material-symbols-outlined icon-sm">delete</span>
                     </button>
@@ -3079,6 +3104,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
   const [showNewObj, setShowNewObj] = useState(false)
   const [dueDate, setDueDate]     = useState(localToday())
   const [endDate, setEndDate]     = useState('')
+  const [startDateOverride, setStartDateOverride] = useState('')
   const [selectedWeekday, setSelectedWeekday] = useState<number>(1)  // 1=Mo..6=Sa
   const [dayOfMonth, setDayOfMonth]             = useState<number>(1)
   const [monthlyMode, setMonthlyMode]           = useState<'day'|'weekday'>('weekday')
@@ -3108,12 +3134,14 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
 
     // Startdatum ermitteln
     let startDate = dueDate
-    if (interval === 'wöchentlich') {
-      startDate = getNextWeekdayDate(selectedWeekday)
+    if (interval === 'wöchentlich' || interval === 'zweiwöchentlich') {
+      startDate = startDateOverride || getNextWeekdayDate(selectedWeekday)
     } else if (interval === 'monatlich') {
-      startDate = monthlyMode === 'weekday'
+      startDate = startDateOverride || (monthlyMode === 'weekday'
         ? getNextWeekdayInMonth(monthlyWeek, monthlyWeekday)
-        : getNextDayOfMonth(dayOfMonth)
+        : getNextDayOfMonth(dayOfMonth))
+    } else if (interval === 'täglich') {
+      startDate = startDateOverride || localToday()
     }
 
     // 1. Task anlegen
@@ -3388,8 +3416,8 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
               </div>
             )}
 
-            {/* Wöchentlich: Wochentag-Auswahl */}
-            {interval === 'wöchentlich' && (
+            {/* Wöchentlich / Zweiwöchentlich: Wochentag-Auswahl */}
+            {(interval === 'wöchentlich' || interval === 'zweiwöchentlich') && (
               <div style={{ marginBottom:20 }}>
                 <label style={s.fieldLabel}>Wochentag *</label>
                 <div style={{ display:'flex', gap:6 }}>
@@ -3407,9 +3435,17 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
                     </button>
                   ))}
                 </div>
-                <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:8, display:'flex', alignItems:'center', gap:4 }}>
-                  <span className="material-symbols-outlined icon-sm">info</span>
-                  Erster Termin: {getNextWeekdayDate(selectedWeekday) ? new Date(getNextWeekdayDate(selectedWeekday) + 'T12:00').toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' }) : '–'}
+                <div style={{ marginTop:12 }}>
+                  <label style={s.fieldLabel}>Startdatum</label>
+                  <div className="iw" style={s.inputWrap}>
+                    <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>event</span>
+                    <input type="date" value={startDateOverride || getNextWeekdayDate(selectedWeekday)}
+                      onChange={e => setStartDateOverride(e.target.value)}
+                      style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }}/>
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:5 }}>
+                    Erster Termin: {(() => { const d = startDateOverride || getNextWeekdayDate(selectedWeekday); return d ? new Date(d+'T12:00').toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}) : '–' })()}
+                  </div>
                 </div>
               </div>
             )}
@@ -3480,6 +3516,22 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
                     </div>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* Startdatum für monatlich/täglich */}
+            {(interval === 'monatlich' || interval === 'täglich') && (
+              <div style={{ marginBottom:20 }}>
+                <label style={s.fieldLabel}>Startdatum</label>
+                <div className="iw" style={s.inputWrap}>
+                  <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>event</span>
+                  <input type="date"
+                    value={startDateOverride || (interval === 'monatlich'
+                      ? (monthlyMode === 'weekday' ? getNextWeekdayInMonth(monthlyWeek, monthlyWeekday) : getNextDayOfMonth(dayOfMonth))
+                      : localToday())}
+                    onChange={e => setStartDateOverride(e.target.value)}
+                    style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }}/>
+                </div>
               </div>
             )}
 
@@ -3681,7 +3733,7 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
           <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>repeat</span>
             <select value={interval} onChange={e=>setInterval(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
-              {['täglich','wöchentlich','monatlich','quartalsweise','einmalig'].map(iv=>(
+              {['täglich','wöchentlich','zweiwöchentlich','monatlich','quartalsweise','einmalig'].map(iv=>(
                 <option key={iv} value={iv}>{iv.charAt(0).toUpperCase()+iv.slice(1)}</option>
               ))}
             </select>
@@ -5253,7 +5305,11 @@ function KundenList({ customers, objects, loading, onSelect }: {
     }
 
     const rows = customers.map(c => {
-      const objCount = objects.filter(o => o.customer_id === c.id).length
+      const objCount = objects.filter(o => {
+        if (o.customer_id === c.id) return true
+        const oc = customers.find(cu => cu.id === o.customer_id)
+        return oc?.hausverwaltung_id === c.id
+      }).length
       const contactName = c.customer_type === 'firma'
         ? [c.contact_first_name, c.contact_last_name].filter(Boolean).join(' ') || c.contact_person || ''
         : ''
@@ -6243,6 +6299,7 @@ function generateAssignmentDates(
     'einmalig':      0,
     'täglich':       90,
     'wöchentlich':   365,
+    'zweiwöchentlich':365,
     'monatlich':     730,
     'quartalsweise': 1095,
   }
@@ -6276,6 +6333,7 @@ function generateAssignmentDates(
     dates.push(localDateStr(current))
     if (interval === 'täglich')            current.setDate(current.getDate() + 1)
     else if (interval === 'wöchentlich')   current.setDate(current.getDate() + 7)
+    else if (interval === 'zweiwöchentlich') current.setDate(current.getDate() + 14)
     else if (interval === 'monatlich')     current.setMonth(current.getMonth() + 1)
     else if (interval === 'quartalsweise') current.setMonth(current.getMonth() + 3)
     else break
@@ -6327,6 +6385,7 @@ function ProblemDetailOverlay({ problem, objects, team, onClose, onResolved, onG
   const intervalLabel: Record<string, string> = {
     täglich: 'Täglich',
     wöchentlich: 'Wöchentlich',
+    zweiwöchentlich: 'Zweiwöchentlich',
     monatlich: 'Monatlich',
     quartalsweise: 'Quartalsweise',
     einmalig: 'Einmalig',
@@ -7556,8 +7615,8 @@ function TodayTasksOverlay({ tasks, assignments, team, today, onClose, onEditTas
   const totalItems = hasAssignments ? todayAssignments.length : todayTasks.length
   const doneCount = hasAssignments ? todayAssignments.filter((a:any) => a.status === 'erledigt').length : 0
 
-  const INTERVAL_COLOR: Record<string,string> = { täglich:'var(--pri)', wöchentlich:'#0369a1', monatlich:'#7c3aed', quartalsweise:'#0f766e', einmalig:'#92400e' }
-  const INTERVAL_BG: Record<string,string>    = { täglich:'var(--pri-xl)', wöchentlich:'#e0f2fe', monatlich:'#f3e8ff', quartalsweise:'#ccfbf1', einmalig:'#fff8e6' }
+  const INTERVAL_COLOR: Record<string,string> = { täglich:'var(--pri)', wöchentlich:'#0369a1', zweiwöchentlich:'#0369a1', monatlich:'#7c3aed', quartalsweise:'#0f766e', einmalig:'#92400e' }
+  const INTERVAL_BG: Record<string,string>    = { täglich:'var(--pri-xl)', wöchentlich:'#e0f2fe', zweiwöchentlich:'#e0f2fe', monatlich:'#f3e8ff', quartalsweise:'#ccfbf1', einmalig:'#fff8e6' }
 
   return (
     <div style={{ position:'fixed', inset:0, zIndex:1000, display:'flex', flexDirection:'column', background:'var(--bg)' }}>
