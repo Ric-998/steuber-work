@@ -1186,7 +1186,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                       </div>
                       <button onClick={async()=>{
                         if (!confirm('Sperre entfernen?')) return
-                        await supabase.from('vacation_blackouts').delete().eq('id', b.id)
+                        const { error: blErr } = await supabase.from('vacation_blackouts').delete().eq('id', b.id); if (blErr) { showToast('⚠ Löschen fehlgeschlagen', 'warn'); return }
                         setBlackouts(prev => prev.filter((x:any) => x.id !== b.id))
                       }} style={{ width:32, height:32, borderRadius:9, border:'1px solid #fca5a5', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#dc2626', flexShrink:0 }}>
                         <span className="material-symbols-outlined" style={{ fontSize:16 }}>delete</span>
@@ -2654,17 +2654,22 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
                     if (objAssigns && objAssigns.length > 0) {
                       const assignIds = objAssigns.map((a: any) => a.id)
                       // 3. Task-Reports löschen (FK auf assignment_id)
-                      await supabase.from('task_reports').delete().in('assignment_id', assignIds)
+                      const { error: e1 } = await supabase.from('task_reports').delete().in('assignment_id', assignIds)
+                      if (e1) throw e1
                       // 4. Task-Assignments löschen
-                      await supabase.from('task_assignments').delete().in('id', assignIds)
+                      const { error: e2 } = await supabase.from('task_assignments').delete().in('id', assignIds)
+                      if (e2) throw e2
                     }
                     // 5. Tasks löschen
-                    await supabase.from('tasks').delete().in('id', taskIds)
+                    const { error: e3 } = await supabase.from('tasks').delete().in('id', taskIds)
+                    if (e3) throw e3
                   }
                   // 5. Ansprechpartner (contact_persons mit object_id) löschen
-                  await supabase.from('contact_persons').delete().eq('object_id', obj.id)
+                  const { error: e4 } = await supabase.from('contact_persons').delete().eq('object_id', obj.id)
+                  if (e4) throw e4
                   // 6. Leistungen löschen
-                  await supabase.from('object_services').delete().eq('object_id', obj.id)
+                  const { error: e5 } = await supabase.from('object_services').delete().eq('object_id', obj.id)
+                  if (e5) throw e5
                   // 7. Objekt löschen
                   const { error: delErr } = await supabase.from('objects').delete().eq('id', obj.id)
                   if (delErr) throw delErr
@@ -3570,13 +3575,21 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
   // Stornieren: Task deaktivieren + alle offenen zukünftigen Assignments löschen
   const cancelTask = async () => {
     setActionLoading(true)
-    const today = new Date().toISOString().split('T')[0]
-    await supabase.from('task_assignments')
-      .delete()
-      .eq('task_id', task.id)
-      .eq('status', 'offen')
-      .gte('due_date', today)
-    await supabase.from('tasks').update({ is_active: false }).eq('id', task.id)
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const { error: e1 } = await supabase.from('task_assignments')
+        .delete()
+        .eq('task_id', task.id)
+        .eq('status', 'offen')
+        .gte('due_date', today)
+      if (e1) throw e1
+      const { error: e2 } = await supabase.from('tasks').update({ is_active: false }).eq('id', task.id)
+      if (e2) throw e2
+    } catch (err: any) {
+      alert('Fehler beim Stornieren: ' + (err?.message || 'Unbekannter Fehler'))
+      setActionLoading(false)
+      return
+    }
     setActionLoading(false)
     onSaved()
   }
@@ -3584,13 +3597,22 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
   // Löschen: alles entfernen inkl. Historie
   const deleteTask = async () => {
     setActionLoading(true)
-    const { data: reports } = await supabase
-      .from('task_assignments').select('id').eq('task_id', task.id)
-    if (reports && reports.length > 0) {
-      await supabase.from('task_reports').delete().in('assignment_id', reports.map((r:any)=>r.id))
+    try {
+      const { data: reports } = await supabase
+        .from('task_assignments').select('id').eq('task_id', task.id)
+      if (reports && reports.length > 0) {
+        const { error: e1 } = await supabase.from('task_reports').delete().in('assignment_id', reports.map((r:any)=>r.id))
+        if (e1) throw e1
+      }
+      const { error: e2 } = await supabase.from('task_assignments').delete().eq('task_id', task.id)
+      if (e2) throw e2
+      const { error: e3 } = await supabase.from('tasks').delete().eq('id', task.id)
+      if (e3) throw e3
+    } catch (err: any) {
+      alert('Fehler beim Löschen: ' + (err?.message || 'Unbekannter Fehler'))
+      setActionLoading(false)
+      return
     }
-    await supabase.from('task_assignments').delete().eq('task_id', task.id)
-    await supabase.from('tasks').delete().eq('id', task.id)
     setActionLoading(false)
     onSaved()
   }
@@ -5593,7 +5615,7 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
             </div>
             <div style={{ display:'flex', gap:10 }}>
               <button onClick={() => setShowDeleteConfirm(false)} style={{ flex:1, padding:'14px', borderRadius:14, border:'1.5px solid var(--outline)', background:'var(--bg)', fontSize:14, fontWeight:700, cursor:'pointer' }}>Abbrechen</button>
-              <button disabled={deleting} onClick={async () => { setDeleting(true); await supabase.from('customers').delete().eq('id', customer.id); setDeleting(false); setShowDeleteConfirm(false); onDeleted() }}
+              <button disabled={deleting} onClick={async () => { setDeleting(true); const { error: delErr } = await supabase.from('customers').delete().eq('id', customer.id); setDeleting(false); if (delErr) { alert('Fehler beim Löschen: ' + delErr.message); return; } setShowDeleteConfirm(false); onDeleted() }}
                 style={{ flex:1, padding:'14px', borderRadius:14, border:'none', background:'var(--err)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
                 {deleting ? 'Wird gelöscht…' : 'Endgültig löschen'}
               </button>
@@ -5635,9 +5657,11 @@ function ContactPersonOverlay({ customerId, existing, onClose, onSaved }: {
     if (!name.trim()) { setError('Name ist Pflichtfeld.'); return }
     setSaving(true); setError('')
     if (existing) {
-      await supabase.from('contact_persons').update({ name:name.trim(), role:role.trim()||null, phone:phone.trim()||null, email:email.trim()||null }).eq('id', existing.id)
+      const { error: e } = await supabase.from('contact_persons').update({ name:name.trim(), role:role.trim()||null, phone:phone.trim()||null, email:email.trim()||null }).eq('id', existing.id)
+      if (e) { setError('Fehler: ' + e.message); setSaving(false); return }
     } else {
-      await supabase.from('contact_persons').insert({ customer_id:customerId, name:name.trim(), role:role.trim()||null, phone:phone.trim()||null, email:email.trim()||null })
+      const { error: e } = await supabase.from('contact_persons').insert({ customer_id:customerId, name:name.trim(), role:role.trim()||null, phone:phone.trim()||null, email:email.trim()||null })
+      if (e) { setError('Fehler: ' + e.message); setSaving(false); return }
     }
     setSaving(false); onSaved()
   }
@@ -5683,7 +5707,7 @@ function ContactPersonOverlay({ customerId, existing, onClose, onSaved }: {
               <div style={{ fontSize:13, color:'var(--txt-muted)', marginBottom:20 }}><strong>{existing?.name}</strong> wird entfernt.</div>
               <div style={{ display:'flex', gap:10 }}>
                 <button onClick={() => setShowDelete(false)} style={{ flex:1, padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--bg)', fontWeight:700, cursor:'pointer' }}>Abbrechen</button>
-                <button disabled={deleting} onClick={async () => { setDeleting(true); await supabase.from('contact_persons').delete().eq('id', existing!.id); setDeleting(false); onSaved() }}
+                <button disabled={deleting} onClick={async () => { setDeleting(true); const { error: delErr } = await supabase.from('contact_persons').delete().eq('id', existing!.id); setDeleting(false); if (delErr) { setError('Löschen fehlgeschlagen: ' + delErr.message); setShowDelete(false); return; } onSaved() }}
                   style={{ flex:1, padding:'12px', borderRadius:12, border:'none', background:'var(--err)', color:'#fff', fontWeight:700, cursor:'pointer' }}>
                   {deleting ? '…' : 'Löschen'}
                 </button>
