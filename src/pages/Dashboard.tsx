@@ -300,7 +300,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name').limit(200),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
       supabase.from('vacation_blackouts').select('*').order('from_date',{ascending:true}),
-      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)').not('object_id','is',null).order('last_name').order('name').limit(300),
+      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)').order('last_name').order('name').limit(300),
     ])
     if (stRes.data) setStats(stRes.data)
     if (prRes.data) setProblems((prRes.data || []) as unknown as Problem[])
@@ -4133,6 +4133,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
     setSaving(true); setError('')
 
     let customerId: string
+    let pendingContacts: {first_name:string;last_name:string;role:string;phone:string;email:string}[] = []
 
     if (selectedCust) {
       // Bestehenden Kunden verwenden
@@ -4181,22 +4182,8 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       }).select('id').single()
       if (e || !cust) { setError(e?.message || 'Kunde konnte nicht angelegt werden'); setSaving(false); return }
       customerId = cust.id
-      // Alle Typen: Ansprechpartner speichern (inkl. offenes Formular auto-commiten)
-      const allContacts = [...newContacts, ...(cpFn.trim() || cpLn.trim() ? [{ first_name: cpFn.trim(), last_name: cpLn.trim(), role: cpRl.trim(), phone: cpPh.trim(), email: cpEm.trim() }] : [])]
-      if (allContacts.length > 0) {
-        for (const cp of allContacts) {
-          const { error: cpErr } = await supabase.from('contact_persons').insert({
-            customer_id: cust.id,
-            name: `${cp.first_name} ${cp.last_name}`.trim(),
-            first_name: cp.first_name || null,
-            last_name: cp.last_name || null,
-            role: cp.role || null,
-            phone: cp.phone || null,
-            email: cp.email || null,
-          })
-          if (cpErr) console.error('contact_persons insert error:', cpErr)
-        }
-      }
+      // Ansprechpartner werden nach Objekt-Insert gespeichert (damit object_id mitgesetzt werden kann)
+      pendingContacts = [...newContacts, ...(cpFn.trim() || cpLn.trim() ? [{ first_name: cpFn.trim(), last_name: cpLn.trim(), role: cpRl.trim(), phone: cpPh.trim(), email: cpEm.trim() }] : [])]
 
       // WEG / MV: Hausverwaltung anlegen oder verwenden, dann co_contact setzen
       if (newCustType === 'weg-verwaltung' || newCustType === 'mietverwaltung') {
@@ -4266,6 +4253,21 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
     }).select('id').single()
 
     if (objErr) { setError(objErr.message); setSaving(false); return }
+
+    // Jetzt Ansprechpartner mit object_id anlegen
+    for (const cp of pendingContacts) {
+      await supabase.from('contact_persons').insert({
+        customer_id: customerId,
+        object_id: obj.id,
+        name: `${cp.first_name} ${cp.last_name}`.trim(),
+        first_name: cp.first_name || null,
+        last_name: cp.last_name || null,
+        role: cp.role || null,
+        phone: cp.phone || null,
+        email: cp.email || null,
+      })
+    }
+
     onSaved(obj.id)
   }
 
@@ -8173,7 +8175,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
       const { data } = await supabase
         .from('contact_persons')
         .select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)')
-        .not('object_id', 'is', null)
+
         .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,name.ilike.%${q}%,role.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
         .limit(100)
       setDbResults(data || [])
