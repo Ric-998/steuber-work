@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
+import { compressImage } from '../lib/imageCompression'
 import { OnboardingTour, InstallGuide, useOnboarding, resetTour } from '../components/OnboardingTour'
 import { WasIstNeu } from '../components/WasIstNeu'
 import { PWAInstallBanner } from '../components/PWAInstallBanner'
@@ -76,6 +77,7 @@ interface VertretungItem {
 export default function TaskList({ userId, userName, onLogout }: Props) {
   const [assignments, setAssignments] = useState<TaskAssignment[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [activeTab, setActiveTab] = useState<'start'|'tasks'|'zeit'|'chat'|'profile'>('start')
   const [selectedDay, setSelectedDay] = useState(new Date())
   const [weekOffset, setWeekOffset] = useState(0)
@@ -90,6 +92,15 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   const [photoUploading, setPhotoUploading] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [toast, setToast] = useState<{msg:string;type:'ok'|'warn'}|null>(null)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+
+  useEffect(() => {
+    const on  = () => setIsOnline(true)
+    const off = () => setIsOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off) }
+  }, [])
 
   // Zeiterfassung & Routing
   const [travelMinutes, setTravelMinutes] = useState<number>(0)
@@ -221,6 +232,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       }
     } catch (err) {
       console.error('fetchAssignments failed:', err)
+      setLoadError(true)
       showToast('Aufgaben konnten nicht geladen werden', 'warn')
     } finally {
       setLoading(false)
@@ -287,11 +299,11 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       // Upload all selected photos
       const photoUrls: string[] = []
       for (const file of photoFiles) {
-        const ext = file.name.split('.').pop()
-        const path = `${sheetTask.id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}.${ext}`
+        const compressed = await compressImage(file).catch(() => file)
+        const path = `${sheetTask.id}/${Date.now()}-${Math.random().toString(36).slice(2,7)}.jpg`
         const { error: upErr } = await supabase.storage
           .from('task-photos')
-          .upload(path, file, { upsert: true })
+          .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' })
         if (!upErr) {
           const { data } = supabase.storage.from('task-photos').getPublicUrl(path)
           if (data.publicUrl) photoUrls.push(data.publicUrl)
@@ -489,6 +501,20 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
   return (
     <div style={s.shell}>
+      {/* ── Offline-Banner ── */}
+      {!isOnline && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:9999, background:'#7f1d1d', color:'#fee2e2', display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 16px', fontSize:13, fontWeight:600 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:17 }}>wifi_off</span>
+          Keine Verbindung – Änderungen werden nicht gespeichert
+        </div>
+      )}
+      {loadError && isOnline && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:9999, background:'#78350f', color:'#fef3c7', display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 16px', fontSize:13, fontWeight:600 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:17 }}>error</span>
+          Laden fehlgeschlagen –
+          <button onClick={() => { setLoadError(false); fetchAssignments() }} style={{ background:'none', border:'none', color:'#fef3c7', fontWeight:800, fontSize:13, cursor:'pointer', textDecoration:'underline', padding:0 }}>Erneut versuchen</button>
+        </div>
+      )}
       {/* Konfetti overlay */}
       {showKonfetti && <Konfetti />}
       {/* ── TOP BAR: teal, only name + date + bell ── */}
@@ -883,7 +909,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
           )
         })()}
 
-        {activeTab === 'zeit' && <ZeitTab userId={userId} myLeaves={myLeaves} vacationDaysPerYear={vacationDaysPerYear} assignments={assignments} onLeavesChanged={fetchMyLeaves} availableVertretungen={availableVertretungen} ownVertretungen={ownVertretungen} onTakeOver={takeOverVertretung} onCancelVertretung={cancelVertretung} takingOver={takingOver} cancellingVertretung={cancellingVertretung} />}
+        {activeTab === 'zeit' && <ZeitTab userId={userId} loading={loading} myLeaves={myLeaves} vacationDaysPerYear={vacationDaysPerYear} assignments={assignments} onLeavesChanged={fetchMyLeaves} availableVertretungen={availableVertretungen} ownVertretungen={ownVertretungen} onTakeOver={takeOverVertretung} onCancelVertretung={cancelVertretung} takingOver={takingOver} cancellingVertretung={cancellingVertretung} />}
         {activeTab === 'chat' && <ChatTab currentUserName={userName} currentUserId={userId} />}
         {activeTab === 'profile' && <ProfileTab userName={userName} initials={initials} onLogout={onLogout} userId={userId} pushEnabled={pushEnabled} pushSupported={pushSupported} onTogglePush={togglePush} onBugReport={()=>setShowBugReport(true)} onFeedback={()=>setShowFeedback(true)} />}
       </div>
@@ -1833,8 +1859,9 @@ function MonthSheet({ open, anchorDate, assignments, myLeaves, onClose, onSelect
   )
 }
 
-function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesChanged, availableVertretungen, ownVertretungen, onTakeOver, onCancelVertretung, takingOver, cancellingVertretung }: {
+function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, onLeavesChanged, availableVertretungen, ownVertretungen, onTakeOver, onCancelVertretung, takingOver, cancellingVertretung }: {
   userId: string
+  loading?: boolean
   myLeaves: any[]
   vacationDaysPerYear: number
   assignments: any[]
@@ -1985,6 +2012,16 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
 
   return (
     <div style={{ paddingBottom: 16 }}>
+
+      {/* ── Lade-Zustand ── */}
+      {loading && (
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'60px 0', gap:14 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:40, color:'var(--pri)', opacity:0.4, animation:'spin 1.2s linear infinite' }}>progress_activity</span>
+          <div style={{ fontSize:13, color:'var(--txt-muted)', fontWeight:600 }}>Wird geladen…</div>
+        </div>
+      )}
+
+      {!loading && <>
 
       {/* ── Urlaubskonto-Card ── */}
       <div style={{ background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', borderRadius:22, padding:'20px 20px 18px', marginBottom:16, color:'#fff', position:'relative', overflow:'hidden' }}>
@@ -2321,6 +2358,8 @@ function ZeitTab({ userId, myLeaves, vacationDaysPerYear, assignments, onLeavesC
           </div>
         </div>
       )}
+
+      </>}
 
       {/* ══ Antrag-Edit-Sheet ══ */}
       {editReq && (
