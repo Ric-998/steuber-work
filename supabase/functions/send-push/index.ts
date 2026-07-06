@@ -1,7 +1,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-const VAPID_PUBLIC_KEY  = 'BIVxcSSeFZEXfg82j5-GQR6x4nOZxgiFVaPbRxkBarjj8oP2y7auEww2-aWuj_PpOcBuXXzrBbqU_D8eNqTEZik'
-const VAPID_PRIVATE_KEY = 'IdNS0z8rH8kaN346LqlVlDkn50UlRSrRS3JC1wNsZUk'
+// Public key is intentionally public — embedded in browser push subscriptions.
+// Private key is loaded from Supabase Secret (VAPID_PRIVATE_KEY env var).
+const VAPID_PUBLIC_KEY  = 'UlXNFsI0L9CeN619a0hnXS1tXTUUXeIzaaek9H4ydN4f9kWUw_RlvrdvB3ZzIUOVUGuSP5HdiVpUesT92r-n2Q'
+const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY')!
 const VAPID_SUBJECT     = 'mailto:info@steuber-dienstleistungen.de'
 
 const cors = {
