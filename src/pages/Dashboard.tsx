@@ -996,7 +996,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     const typeIcon = OBJ_TYPE_ICON[obj.object_type ?? 'mehrfamilienhaus'] ?? 'apartment'
                     return (
                       <div key={obj.id} onClick={()=>setSelectedObject(obj)}
-                        style={{ ...s.taskCard, cursor:'pointer', marginBottom:10 }}>
+                        style={{ ...s.taskCard, cursor:'pointer', marginBottom:8, boxShadow:'none', border:'0.5px solid var(--outline)' }}>
                         <div style={{ width:46, height:46, borderRadius:14, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 10px rgba(9,106,112,0.2)' }}>
                           <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:22 }}>{typeIcon}</span>
                         </div>
@@ -1018,8 +1018,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
                           </div>
                           {/* Zeile 3: Kunde */}
                           {obj.customers?.name && (
-                            <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
-                              <span className="material-symbols-outlined icon-sm">business</span>{obj.customers.name}
+                            <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600 }}>
+                              {obj.customers.name}
                             </div>
                           )}
                         </div>
@@ -5524,7 +5524,7 @@ function KundenList({ customers, objects, loading, onSelect }: {
                 const objCount = objects.filter(o => o.customer_id === c.id).length
                 return (
                   <div key={c.id} onClick={() => onSelect(c)}
-                    style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, boxShadow:'0 1px 6px rgba(9,106,112,0.06)', cursor:'pointer' }}>
+                    style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, border:'0.5px solid var(--outline)', cursor:'pointer' }}>
                     {/* Icon */}
                     <div style={{ width:46, height:46, borderRadius:14, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 10px rgba(9,106,112,0.2)' }}>
                       <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:22 }}>{c.is_hausverwaltung ? 'domain' : CUST_ICON[c.customer_type]}</span>
@@ -5676,9 +5676,9 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
       {objects.length === 0 ? (
         <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'14px', textAlign:'center', color:'var(--txt-muted)', fontSize:13 }}>Keine Objekte zugeordnet</div>
       ) : objects.map(obj => (
-        <div key={obj.id} onClick={() => onObjectClick(obj)} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, border:'1px solid var(--outline)', background:'var(--surf-card)', marginBottom:8, cursor:'pointer' }}>
-          <div style={{ width:38, height:38, borderRadius:12, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--pri)' }}>{OBJ_TYPE_ICON[obj.object_type??'mehrfamilienhaus']??'apartment'}</span>
+        <div key={obj.id} onClick={() => onObjectClick(obj)} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, border:'0.5px solid var(--outline)', background:'var(--surf-card)', marginBottom:8, cursor:'pointer' }}>
+          <div style={{ width:38, height:38, borderRadius:12, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <span className="material-symbols-outlined icon-sm" style={{ color:'#fff' }}>{OBJ_TYPE_ICON[obj.object_type??'mehrfamilienhaus']??'apartment'}</span>
           </div>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{obj.address}, {obj.postal_code} {obj.city}</div>
@@ -8395,7 +8395,7 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
                 const isPrivat = cp._isCust === true
                 const hasRole = cp.role && cp.role !== 'Privatperson'
                 return (
-                  <div key={cp.id} onClick={() => setSelectedContact(cp)} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, boxShadow:'0 1px 6px rgba(9,106,112,0.06)', borderLeft: '3px solid transparent', cursor:'pointer' }}>
+                  <div key={cp.id} onClick={() => setSelectedContact(cp)} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, border:'0.5px solid var(--outline)', cursor:'pointer' }}>
                     {/* Avatar */}
                     <div style={{ width:44, height:44, borderRadius:14, background: 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: '0 4px 10px rgba(9,106,112,0.2)' }}>
                       {initials}
@@ -8579,23 +8579,36 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
                         </div>
                       </div>
                     )}
-                    {/* Objekt-Karte */}
+                    {/* Alle verknüpften Objekte */}
                     {(() => {
-                      const linkedObj = cp.object_id ? objects.find((o:any) => o.id === cp.object_id) : null
-                      if (!linkedObj) return null
+                      if (cp._isCust) return null
+                      const matchIds = new Set<string>()
+                      contacts.forEach((c: any) => {
+                        if (c.object_id && c.first_name === cp.first_name && c.last_name === (cp.last_name || cp.name))
+                          matchIds.add(c.object_id)
+                      })
+                      if (cp.object_id) matchIds.add(cp.object_id)
+                      const linkedObjs = objects.filter((o: any) => matchIds.has(o.id))
+                      if (linkedObjs.length === 0) return null
                       return (
-                        <button onClick={() => { setSelectedContact(null); onNavigateToObject?.(linkedObj) }}
-                          style={{ width:'100%', background:'var(--surf-card)', borderRadius:16, border:'1px solid var(--outline)', padding:'14px 16px', display:'flex', alignItems:'center', gap:14, cursor:'pointer', textAlign:'left' }}>
-                          <div style={{ width:38, height:38, borderRadius:12, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize:20, color:'#fff' }}>apartment</span>
+                        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                          <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
+                            {linkedObjs.length === 1 ? 'Objekt' : 'Objekte'} ({linkedObjs.length})
                           </div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>Objekt</div>
-                            <div style={{ fontSize:15, fontWeight:700, color:'var(--pri)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{linkedObj.address}, {linkedObj.city}</div>
-                            {linkedObj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginTop:1 }}>{linkedObj.object_number}</div>}
-                          </div>
-                          <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
-                        </button>
+                          {linkedObjs.map((linkedObj: any) => (
+                            <button key={linkedObj.id} onClick={() => { setSelectedContact(null); onNavigateToObject?.(linkedObj) }}
+                              style={{ width:'100%', background:'var(--surf-card)', borderRadius:14, border:'0.5px solid var(--outline)', padding:'12px 14px', display:'flex', alignItems:'center', gap:12, cursor:'pointer', textAlign:'left' }}>
+                              <div style={{ width:36, height:36, borderRadius:11, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize:18, color:'#fff' }}>apartment</span>
+                              </div>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontSize:14, fontWeight:700, color:'var(--pri)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{linkedObj.address}, {linkedObj.city}</div>
+                                {linkedObj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginTop:1 }}>{linkedObj.object_number}</div>}
+                              </div>
+                              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
+                            </button>
+                          ))}
+                        </div>
                       )
                     })()}
                   </div>
