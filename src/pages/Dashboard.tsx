@@ -4671,7 +4671,6 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
                     <div>
                       <label style={s.fieldLabel}>Vorname 2 *</label>
                       <div className="iw" style={s.inputWrap}>
-                        <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
                         <input value={newVorname2} onChange={e => setNewVorname2(e.target.value)} placeholder="Maria" style={s.input}/>
                       </div>
                     </div>
