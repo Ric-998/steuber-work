@@ -5584,126 +5584,151 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting]               = useState(false)
 
-
-  const OBJ_TYPE_ICON: Record<string, string> = {
-    einfamilienhaus: 'house', mehrfamilienhaus: 'apartment',
-    firmengelaende: 'business', grundstueck: 'landscape',
+  const OBJ_TYPE_ICON: Record<string,string> = {
+    einfamilienhaus:'house', mehrfamilienhaus:'apartment',
+    firmengelaende:'business', grundstueck:'landscape',
   }
+  const custIcon = customer.is_hausverwaltung ? 'domain' : (CUST_ICON[customer.customer_type] || 'person')
+
+  const hasStamm = !!(customer.street || customer.postal_code || customer.notes || customer.hausverwaltung || customer.co_contact || customer.hausverwaltung_objekt_id)
+
+  const rowBorder = '0.5px solid var(--outline)'
 
   return (
-    <div style={{ paddingBottom: 100 }}>
-      {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 0 12px' }}>
+    <div style={{ paddingBottom:100 }}>
+
+      {/* Navigation Row */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'16px 0 20px' }}>
         <button onClick={onBack} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:12, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
           <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--txt-muted)' }}>arrow_back</span>
         </button>
         <div style={{ flex:1, minWidth:0 }}>
-          <h1 style={{ fontSize:19, fontWeight:800, fontFamily:'var(--font-head)', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{customer.name}</h1>
-          <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{CUST_LABEL[customer.customer_type]}{customer.contract_type ? ` · ${customer.contract_type==='jahresvertrag'?'Jahresvertrag':'Einmalig'}` : ''}</div>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>Kunden</div>
+          <h1 style={{ fontSize:22, fontWeight:800, fontFamily:'var(--font-head)', letterSpacing:'-0.02em', marginBottom:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{customer.name}</h1>
         </div>
-        <button onClick={() => setShowEdit(true)} style={{ background:'var(--pri)', border:'none', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+        <button onClick={() => setShowEdit(true)} style={{ background:'var(--pri)', border:'none', borderRadius:10, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
           <span className="material-symbols-outlined icon-sm" style={{ color:'#fff' }}>edit</span>
         </button>
       </div>
 
-      {/* Stammdaten */}
-      <div style={{ background:'var(--surf-card)', borderRadius:16, padding:'16px', marginBottom:16, border:'1px solid var(--outline)' }}>
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {(customer.street || customer.postal_code) && (
-            <Row icon="home" label="Adresse">{customer.street}{customer.postal_code ? `, ${customer.postal_code} ${customer.city}` : ''}</Row>
-          )}
-          {(customer.phone || customer.email) && (
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {customer.phone && (
-                <a href={`tel:${customer.phone}`} style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:12, background:'var(--ok-bg)', color:'#2e7d32', textDecoration:'none', fontSize:13, fontWeight:700 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:18 }}>phone</span>
-                  {customer.phone}
-                </a>
-              )}
-              {customer.email && (
-                <a href={`mailto:${customer.email}`} style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:12, background:'#e3f2fd', color:'#1565c0', textDecoration:'none', fontSize:13, fontWeight:700 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:18 }}>mail</span>
-                  {customer.email}
-                </a>
-              )}
-            </div>
-          )}
-          {customer.notes && <Row icon="notes" label="Notizen"><span style={{ color:'var(--txt-sec)', lineHeight:1.5 }}>{customer.notes}</span></Row>}
-          {/* WEG-spezifisch: Hausverwaltung + c/o */}
-          {customer.customer_type === 'weg-verwaltung' && customer.hausverwaltung && (
-            <Row icon="domain" label="Hausverwaltung">
-              <span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span>
-            </Row>
-          )}
-          {customer.customer_type === 'weg-verwaltung' && customer.co_contact && (
-            <Row icon="contact_phone" label="c/o Kontakt">
-              <span style={{ fontWeight:600 }}>{customer.co_contact.name}</span>
-              {customer.co_contact.role && <span style={{ color:'var(--txt-muted)' }}> · {customer.co_contact.role}</span>}
-              {customer.co_contact.phone && <><br/><a href={`tel:${customer.co_contact.phone}`} style={{ color:'var(--pri)', textDecoration:'none', fontSize:12 }}>{customer.co_contact.phone}</a></>}
-            </Row>
-          )}
-          {customer.customer_type === 'weg-verwaltung' && customer.hausverwaltung_objekt_id && (
-            <Row icon="tag" label="Objekt-ID HV">
-              <span style={{ fontFamily:'monospace', fontSize:13 }}>{customer.hausverwaltung_objekt_id}</span>
-            </Row>
-          )}
-          {/* Mietverwaltung: Verwaltungsgesellschaft + c/o + Objekt-ID */}
-          {customer.customer_type === 'mietverwaltung' && customer.hausverwaltung && (
-            <Row icon="home_work" label="Verwaltung">
-              <span style={{ color:'var(--pri)', fontWeight:700 }}>{customer.hausverwaltung.name}</span>
-            </Row>
-          )}
-          {customer.customer_type === 'mietverwaltung' && customer.co_contact && (
-            <Row icon="contact_phone" label="c/o Kontakt">
-              <span style={{ fontWeight:600 }}>{customer.co_contact.name}</span>
-              {customer.co_contact.role && <span style={{ color:'var(--txt-muted)' }}> · {customer.co_contact.role}</span>}
-              {customer.co_contact.phone && <><br/><a href={`tel:${customer.co_contact.phone}`} style={{ color:'var(--pri)', textDecoration:'none', fontSize:12 }}>{customer.co_contact.phone}</a></>}
-            </Row>
-          )}
-          {customer.customer_type === 'mietverwaltung' && customer.hausverwaltung_objekt_id && (
-            <Row icon="tag" label="Objekt-ID Verwaltung">
-              <span style={{ fontFamily:'monospace', fontSize:13 }}>{customer.hausverwaltung_objekt_id}</span>
-            </Row>
-          )}
-          {!customer.street && !customer.phone && !customer.email && !customer.notes && !customer.hausverwaltung && !customer.co_contact && (
-            <div style={{ fontSize:13, color:'var(--txt-muted)', textAlign:'center', padding:'4px 0' }}>Keine weiteren Stammdaten</div>
+      {/* Hero Card */}
+      <div style={{ background:'var(--surf-card)', borderRadius:18, padding:'16px', marginBottom:12, border:'0.5px solid var(--outline)', display:'flex', alignItems:'center', gap:14 }}>
+        <div style={{ width:52, height:52, borderRadius:16, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 12px rgba(9,106,112,0.22)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize:26, color:'#fff' }}>{custIcon}</span>
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{customer.name}</div>
+          <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{CUST_LABEL[customer.customer_type]}</div>
+          {customer.contract_type && (
+            <span style={{ display:'inline-block', marginTop:5, fontSize:10, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:99, padding:'2px 8px', letterSpacing:'0.04em' }}>
+              {customer.contract_type === 'jahresvertrag' ? 'Jahresvertrag' : 'Einmalig'}
+            </span>
           )}
         </div>
       </div>
 
-      {/* Hinweis: Ansprechpartner werden am Objekt verwaltet */}
+      {/* Contact Actions */}
+      {(customer.phone || customer.email) && (
+        <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
+          {customer.phone && (
+            <a href={`tel:${customer.phone}`} style={{ flex:1, minWidth:140, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 14px', borderRadius:14, background:'var(--ok-bg)', color:'#2e7d32', textDecoration:'none', fontSize:13, fontWeight:700 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:17 }}>phone</span>
+              {customer.phone}
+            </a>
+          )}
+          {customer.email && (
+            <a href={`mailto:${customer.email}`} style={{ flex:1, minWidth:100, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 14px', borderRadius:14, background:'#e3f2fd', color:'#1565c0', textDecoration:'none', fontSize:13, fontWeight:700 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:17 }}>mail</span>
+              E-Mail
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Stammdaten */}
+      {hasStamm && (
+        <div style={{ background:'var(--surf-card)', borderRadius:16, marginBottom:16, border:'0.5px solid var(--outline)', overflow:'hidden' }}>
+          {(customer.street || customer.postal_code) && (
+            <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', borderBottom: (customer.hausverwaltung || customer.co_contact || customer.hausverwaltung_objekt_id || customer.notes) ? rowBorder : 'none' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>home</span>
+              <div style={{ fontSize:13, fontWeight:600, color:'var(--txt)' }}>
+                {customer.street}{customer.postal_code ? `, ${customer.postal_code} ${customer.city}` : ''}
+              </div>
+            </div>
+          )}
+          {customer.hausverwaltung && (
+            <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', borderBottom: (customer.co_contact || customer.hausverwaltung_objekt_id || customer.notes) ? rowBorder : 'none' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>domain</span>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:1 }}>
+                  {customer.customer_type === 'mietverwaltung' ? 'Verwaltungsgesellschaft' : 'Hausverwaltung'}
+                </div>
+                <div style={{ fontSize:13, fontWeight:700, color:'var(--pri)' }}>{customer.hausverwaltung.name}</div>
+              </div>
+            </div>
+          )}
+          {customer.co_contact && (
+            <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', borderBottom: (customer.hausverwaltung_objekt_id || customer.notes) ? rowBorder : 'none' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>contact_phone</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:1 }}>c/o Kontakt</div>
+                <div style={{ fontSize:13, fontWeight:700 }}>
+                  {customer.co_contact.name}
+                  {customer.co_contact.role && <span style={{ color:'var(--txt-muted)', fontWeight:400 }}> · {customer.co_contact.role}</span>}
+                </div>
+                {customer.co_contact.phone && (
+                  <a href={`tel:${customer.co_contact.phone}`} style={{ fontSize:12, color:'var(--pri)', textDecoration:'none', marginTop:2, display:'block' }}>{customer.co_contact.phone}</a>
+                )}
+              </div>
+            </div>
+          )}
+          {customer.hausverwaltung_objekt_id && (
+            <div style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', borderBottom: customer.notes ? rowBorder : 'none' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>tag</span>
+              <div>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:1 }}>Objekt-ID</div>
+                <div style={{ fontSize:13, fontFamily:'monospace', fontWeight:600 }}>{customer.hausverwaltung_objekt_id}</div>
+              </div>
+            </div>
+          )}
+          {customer.notes && (
+            <div style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'13px 16px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0, marginTop:1 }}>notes</span>
+              <div style={{ fontSize:13, color:'var(--txt-sec)', lineHeight:1.6 }}>{customer.notes}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Objekte */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
         <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)' }}>Objekte</h3>
-        <span style={{ fontSize:12, color:'var(--txt-muted)' }}>{objects.length} gesamt</span>
+        {objects.length > 0 && <span style={{ fontSize:12, color:'var(--txt-muted)', fontWeight:600 }}>{objects.length}</span>}
       </div>
       {objects.length === 0 ? (
-        <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'14px', textAlign:'center', color:'var(--txt-muted)', fontSize:13 }}>Keine Objekte zugeordnet</div>
-      ) : objects.map(obj => (
-        <div key={obj.id} onClick={() => onObjectClick(obj)} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, border:'0.5px solid var(--outline)', background:'var(--surf-card)', marginBottom:8, cursor:'pointer' }}>
-          <div style={{ width:38, height:38, borderRadius:12, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'#fff' }}>{OBJ_TYPE_ICON[obj.object_type??'mehrfamilienhaus']??'apartment'}</span>
+        <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'20px', textAlign:'center', color:'var(--txt-muted)', fontSize:13 }}>Keine Objekte zugeordnet</div>
+      ) : objects.map(obj => {
+        const typeIcon = OBJ_TYPE_ICON[obj.object_type ?? 'mehrfamilienhaus'] ?? 'apartment'
+        return (
+          <div key={obj.id} onClick={() => onObjectClick(obj)}
+            style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:14, padding:'13px 14px', marginBottom:8, border:'0.5px solid var(--outline)', cursor:'pointer', transition:'background 0.12s' }}
+            onMouseEnter={e=>(e.currentTarget.style.background='var(--pri-xl)')}
+            onMouseLeave={e=>(e.currentTarget.style.background='var(--surf-card)')}>
+            <div style={{ width:40, height:40, borderRadius:13, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:20, color:'#fff' }}>{typeIcon}</span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{obj.address}, {obj.postal_code} {obj.city}</div>
+              {obj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginTop:2 }}>{obj.object_number}</div>}
+            </div>
+            <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:18, flexShrink:0 }}>chevron_right</span>
           </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{obj.address}, {obj.postal_code} {obj.city}</div>
-            {obj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{obj.object_number}</div>}
-          </div>
-          <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:18 }}>chevron_right</span>
-        </div>
-      ))}
+        )
+      })}
 
-
-
-      {/* Edit Customer */}
+      {/* Edit Overlay */}
       {showEdit && (
-        <EditCustomerOverlay
-          customer={customer}
-          onClose={() => setShowEdit(false)}
-          onSaved={c => { setShowEdit(false); onUpdated(c) }}
-          onDelete={() => { setShowEdit(false); setShowDeleteConfirm(true) }}
-          isDesktop={isDesktop}
-        />
+        <EditCustomerOverlay customer={customer} onClose={() => setShowEdit(false)} onSaved={c => { setShowEdit(false); onUpdated(c) }} onDelete={() => { setShowEdit(false); setShowDeleteConfirm(true) }} isDesktop={isDesktop} />
       )}
 
       {/* Delete Confirmation */}
@@ -5716,8 +5741,7 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
               </div>
               <div style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', marginBottom:6 }}>Kunden löschen?</div>
               <div style={{ fontSize:13, color:'var(--txt-muted)', lineHeight:1.5 }}>
-                <strong>{customer.name}</strong><br/>
-                Diese Aktion kann nicht rückgängig gemacht werden.
+                <strong>{customer.name}</strong><br/>Diese Aktion kann nicht rückgängig gemacht werden.
               </div>
             </div>
             <div style={{ display:'flex', gap:10 }}>
@@ -5730,19 +5754,6 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// Hilfsfunktion für Info-Zeilen
-function Row({ icon, label, children }: { icon: string; label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
-      <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)', marginTop:1, flexShrink:0 }}>{icon}</span>
-      <div>
-        <div style={{ fontSize:10, color:'var(--txt-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em' }}>{label}</div>
-        <div style={{ fontSize:13, fontWeight:600 }}>{children}</div>
-      </div>
     </div>
   )
 }
