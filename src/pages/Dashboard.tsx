@@ -300,7 +300,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name').limit(200),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
       supabase.from('vacation_blackouts').select('*').order('from_date',{ascending:true}),
-      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)').order('last_name').order('name').limit(300),
+      supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,object_id').order('last_name').order('name').limit(300),
     ])
     if (stRes.data) setStats(stRes.data)
     if (prRes.data) setProblems((prRes.data || []) as unknown as Problem[])
@@ -311,6 +311,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     if (custRes?.data) setCustomers(custRes.data as unknown as CustomerItem[])
     if (lvRes?.data) setLeaveRequests(lvRes.data as unknown as LeaveRequest[])
     if (bkRes?.data) setBlackouts(bkRes.data)
+    if (cpRes?.error) console.error('[loadAll] contact_persons error:', cpRes.error)
     if (cpRes?.data) setContactPersons(cpRes.data)
 
     // Live: Wer ist gerade in_arbeit?
@@ -8174,8 +8175,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
       const q = v.trim()
       const { data } = await supabase
         .from('contact_persons')
-        .select('id,name,first_name,last_name,role,phone,email,customer_id,object_id,customers(id,name,customer_type)')
-
+        .select('id,name,first_name,last_name,role,phone,email,customer_id,object_id')
         .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,name.ilike.%${q}%,role.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`)
         .limit(100)
       setDbResults(data || [])
@@ -8264,11 +8264,13 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
   const q = search.trim().toLowerCase()
   const filtered = (dbResults !== null)
     ? baseContacts.filter(cp => {
-        const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, cp.customers?.name].filter(Boolean).join(' ').toLowerCase()
+        const custName = customers?.find((c:any) => c.id === cp.customer_id)?.name || cp.customers?.name || ''
+      const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, custName].filter(Boolean).join(' ').toLowerCase()
         return !q || q.split(' ').filter(Boolean).every((w: string) => hay.includes(w))
       })
     : q ? allContacts.filter(cp => {
-        const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, cp.customers?.name].filter(Boolean).join(' ').toLowerCase()
+        const custName = customers?.find((c:any) => c.id === cp.customer_id)?.name || cp.customers?.name || ''
+      const hay = [cp.first_name, cp.last_name, cp.name, cp.role, cp.phone, cp.email, custName].filter(Boolean).join(' ').toLowerCase()
         return q.split(' ').filter(Boolean).every((w: string) => hay.includes(w))
       }) : allContacts
 
