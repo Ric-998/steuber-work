@@ -8347,16 +8347,16 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                 const isPrivat = cp._isCust === true
                 const hasRole = cp.role && cp.role !== 'Privatperson'
                 return (
-                  <div key={cp.id} onClick={() => setSelectedContact(cp)} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, boxShadow:'0 1px 6px rgba(9,106,112,0.06)', borderLeft: isPrivat ? '3px solid var(--pri-xl)' : '3px solid transparent', cursor:'pointer' }}>
+                  <div key={cp.id} onClick={() => setSelectedContact(cp)} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, boxShadow:'0 1px 6px rgba(9,106,112,0.06)', borderLeft: '3px solid transparent', cursor:'pointer' }}>
                     {/* Avatar */}
-                    <div style={{ width:44, height:44, borderRadius:14, background: isPrivat ? 'var(--pri-xl)' : 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: isPrivat ? 'var(--pri)' : '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: isPrivat ? 'none' : '0 4px 10px rgba(9,106,112,0.2)' }}>
+                    <div style={{ width:44, height:44, borderRadius:14, background: 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: '0 4px 10px rgba(9,106,112,0.2)' }}>
                       {initials}
                     </div>
                     {/* Content */}
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom: hasRole || cp.phone || cp.email ? 3 : 0 }}>
                         <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{displayName}</div>
-                        {isPrivat && <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 6px', flexShrink:0 }}>Privat</span>}
+
                       </div>
                       {hasRole && (
                         <div style={{ fontSize:12, color:'var(--txt-sec)', fontWeight:600, marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
