@@ -985,9 +985,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
               return (<>{groupKeys.map(groupKey => (
                 <div key={groupKey}>
                   {objGroup !== 'none' && (
-                    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'14px 0 8px' }}>
-                      <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', letterSpacing:'0.08em', textTransform:'uppercase', flexShrink:0 }}>{groupKey} ({grouped[groupKey].length})</span>
-                      <div style={{ flex:1, height:'0.5px', background:'var(--outline)' }} />
+                    <div style={{ margin:'16px 0 6px' }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', letterSpacing:'0.1em', textTransform:'uppercase' }}>{groupKey} ({grouped[groupKey].length})</span>
                     </div>
                   )}
                   {grouped[groupKey].map(obj => {
@@ -5521,9 +5520,8 @@ function KundenList({ customers, objects, loading, onSelect }: {
         <>
           {letters.map(letter => (
             <div key={letter}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, margin:'14px 0 8px' }}>
-                <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', letterSpacing:'0.08em', textTransform:'uppercase', flexShrink:0 }}>{letter}</span>
-                <div style={{ flex:1, height:'0.5px', background:'var(--outline)' }} />
+              <div style={{ margin:'16px 0 6px' }}>
+                <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', letterSpacing:'0.1em', textTransform:'uppercase' }}>{letter}</span>
               </div>
               {grouped[letter].map(c => {
                 const objCount = objects.filter(o => o.customer_id === c.id).length
@@ -8201,6 +8199,46 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
   )
 }
 
+// ─── ObjekteListe (collapsible, used in AP-Detail) ───────────────────────────
+function ObjekteListe({ objs, onNav }: { objs: any[], onNav: (o: any) => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const LIMIT = 3
+  const shown = expanded ? objs : objs.slice(0, LIMIT)
+  const rest = objs.length - LIMIT
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+      <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
+        {objs.length === 1 ? 'Objekt' : 'Objekte'} ({objs.length})
+      </div>
+      {shown.map((linkedObj: any) => (
+        <button key={linkedObj.id} onClick={() => onNav(linkedObj)}
+          style={{ width:'100%', background:'var(--surf-card)', borderRadius:14, border:'0.5px solid var(--outline)', padding:'12px 14px', display:'flex', alignItems:'center', gap:12, cursor:'pointer', textAlign:'left' }}>
+          <div style={{ width:36, height:36, borderRadius:11, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18, color:'#fff' }}>apartment</span>
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:'var(--pri)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{linkedObj.address}, {linkedObj.city}</div>
+            {linkedObj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginTop:1 }}>{linkedObj.object_number}</div>}
+          </div>
+          <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
+        </button>
+      ))}
+      {!expanded && rest > 0 && (
+        <button onClick={() => setExpanded(true)}
+          style={{ background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:700, color:'var(--pri)', padding:'6px 0', textAlign:'left' }}>
+          + {rest} weitere anzeigen
+        </button>
+      )}
+      {expanded && objs.length > LIMIT && (
+        <button onClick={() => setExpanded(false)}
+          style={{ background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:700, color:'var(--txt-muted)', padding:'6px 0', textAlign:'left' }}>
+          Weniger anzeigen
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── AnsprechpartnerList ──────────────────────────────────────────────────────
 function AnsprechpartnerList({ contacts, customers, objects, search, onSearchChange, onRefresh, onNavigateToObject }: {
   contacts: any[]
@@ -8393,9 +8431,8 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
         <>
           {letters.map(letter => (
             <div key={letter}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, margin:'14px 0 8px' }}>
-                <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', letterSpacing:'0.08em', textTransform:'uppercase', flexShrink:0 }}>{letter}</span>
-                <div style={{ flex:1, height:'0.5px', background:'var(--outline)' }} />
+              <div style={{ margin:'16px 0 6px' }}>
+                <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', letterSpacing:'0.1em', textTransform:'uppercase' }}>{letter}</span>
               </div>
               {grouped[letter].map((cp: any) => {
                 const initials = ((cp.first_name?.[0]||'') + (cp.last_name?.[0]||cp.name?.[0]||'')).toUpperCase() || '?'
@@ -8591,7 +8628,7 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
                         </div>
                       </div>
                     )}
-                    {/* Alle verknüpften Objekte */}
+                    {/* Alle verknüpften Objekte mit Collapse */}
                     {(() => {
                       if (cp._isCust) return null
                       const matchIds = new Set<string>()
@@ -8602,26 +8639,7 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
                       if (cp.object_id) matchIds.add(cp.object_id)
                       const linkedObjs = objects.filter((o: any) => matchIds.has(o.id))
                       if (linkedObjs.length === 0) return null
-                      return (
-                        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                          <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>
-                            {linkedObjs.length === 1 ? 'Objekt' : 'Objekte'} ({linkedObjs.length})
-                          </div>
-                          {linkedObjs.map((linkedObj: any) => (
-                            <button key={linkedObj.id} onClick={() => { setSelectedContact(null); onNavigateToObject?.(linkedObj) }}
-                              style={{ width:'100%', background:'var(--surf-card)', borderRadius:14, border:'0.5px solid var(--outline)', padding:'12px 14px', display:'flex', alignItems:'center', gap:12, cursor:'pointer', textAlign:'left' }}>
-                              <div style={{ width:36, height:36, borderRadius:11, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize:18, color:'#fff' }}>apartment</span>
-                              </div>
-                              <div style={{ flex:1, minWidth:0 }}>
-                                <div style={{ fontSize:14, fontWeight:700, color:'var(--pri)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{linkedObj.address}, {linkedObj.city}</div>
-                                {linkedObj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginTop:1 }}>{linkedObj.object_number}</div>}
-                              </div>
-                              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
-                            </button>
-                          ))}
-                        </div>
-                      )
+                      return <ObjekteListe objs={linkedObjs} onNav={(o:any) => { setSelectedContact(null); onNavigateToObject?.(o) }} />
                     })()}
                   </div>
                   {/* Schließen */}
