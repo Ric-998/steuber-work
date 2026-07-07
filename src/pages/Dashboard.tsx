@@ -995,23 +995,31 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     return (
                       <div key={obj.id} onClick={()=>setSelectedObject(obj)}
                         style={{ ...s.taskCard, cursor:'pointer', marginBottom:10 }}>
-                        <div style={{ width:46, height:46, borderRadius:14, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                          <span className="material-symbols-outlined" style={{ color:'var(--pri)', fontSize:22 }}>{typeIcon}</span>
+                        <div style={{ width:46, height:46, borderRadius:14, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 10px rgba(9,106,112,0.2)' }}>
+                          <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:22 }}>{typeIcon}</span>
                         </div>
                         <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:2 }}>
-                            {obj.address}, {obj.postal_code} {obj.city}
+                          {/* Zeile 1: Adresse + Aufgaben-Pill */}
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+                            <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              {obj.address}, {obj.postal_code} {obj.city}
+                            </div>
+                            {activeTasks > 0 && (
+                              <span style={{ flexShrink:0, fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:99, padding:'2px 8px', display:'flex', alignItems:'center', gap:3 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize:12 }}>task_alt</span>{activeTasks}
+                              </span>
+                            )}
                           </div>
-                          {obj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:2 }}>{obj.object_number}</div>}
+                          {/* Zeile 2: OBJ-Nummer – immer feste Position */}
+                          <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginBottom:3 }}>
+                            {obj.object_number || '–'}{!obj.is_active && <span style={{ marginLeft:6, fontFamily:'var(--font-sans)', fontWeight:600 }}>· Inaktiv</span>}
+                          </div>
+                          {/* Zeile 3: Kunde */}
                           {obj.customers?.name && (
-                            <div style={{ fontSize:11, color:'var(--pri)', marginTop:2, fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
+                            <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
                               <span className="material-symbols-outlined icon-sm">business</span>{obj.customers.name}
                             </div>
                           )}
-                          <div style={{ display:'flex', gap:6, marginTop:6 }}>
-                            {activeTasks > 0 && <span style={{ ...s.chip, background:'var(--pri-xl)', color:'var(--pri)', fontSize:10 }}><span className="material-symbols-outlined icon-sm">task_alt</span>{activeTasks} Aufgabe{activeTasks !== 1 ? 'n' : ''}</span>}
-                            {!obj.is_active && <span style={{ ...s.chip, background:'var(--surf-high)', color:'var(--txt-muted)', fontSize:10 }}>Inaktiv</span>}
-                          </div>
                         </div>
                         <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:20, flexShrink:0 }}>chevron_right</span>
                       </div>
@@ -1081,6 +1089,16 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
 
         {/* ── ANSPRECHPARTNER ── */}
+        {tab === 'ansprechpartner' && (
+          <>
+            <section style={{ padding:'20px 0 12px', display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
+              <div>
+                <h1 style={s.h1}>Ansprechpartner</h1>
+                <p style={s.sub}>{contactPersons.length} Kontakte</p>
+              </div>
+            </section>
+          </>
+        )}
         {tab === 'ansprechpartner' && (
           <AnsprechpartnerList
             contacts={contactPersons}
@@ -8363,18 +8381,19 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                           {cp.role}
                         </div>
                       )}
-                      <div style={{ display:'flex', gap:14, flexWrap:'wrap' }}>
-                        {cp.phone && (
-                          <a href={'tel:' + cp.phone} style={{ fontSize:12, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--pri)' }}>phone</span>{cp.phone}
-                          </a>
-                        )}
-                        {cp.email && (
-                          <a href={'mailto:' + cp.email} style={{ fontSize:12, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
-                            <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--pri)' }}>mail</span>{cp.email}
-                          </a>
-                        )}
                       </div>
+                    {/* Icon-Buttons phone/mail */}
+                    <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                      {cp.phone && (
+                        <a href={'tel:' + cp.phone} onClick={e => e.stopPropagation()} style={{ width:34, height:34, borderRadius:10, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--pri)', textDecoration:'none', flexShrink:0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:17 }}>phone</span>
+                        </a>
+                      )}
+                      {cp.email && (
+                        <a href={'mailto:' + cp.email} onClick={e => e.stopPropagation()} style={{ width:34, height:34, borderRadius:10, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--pri)', textDecoration:'none', flexShrink:0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:17 }}>mail</span>
+                        </a>
+                      )}
                     </div>
                     <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
                   </div>
