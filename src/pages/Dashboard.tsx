@@ -1093,9 +1093,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
           <AnsprechpartnerList
             contacts={contactPersons}
             customers={customers}
+            objects={objects}
             search={cpSearch}
             onSearchChange={setCpSearch}
             onRefresh={loadAll}
+            onNavigateToObject={obj => { setSelectedObject(obj); setTab('objekte') }}
           />
         )}
 
@@ -1105,8 +1107,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
             {/* Header mit Einladen-Button */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:20, marginBottom:16 }}>
               <div>
-                <h1 style={{ ...s.h1, fontSize:20, marginBottom:2 }}>Team</h1>
-                <p style={{ fontSize:13, color:'var(--txt-muted)', margin:0 }}>{team.filter(m=>m.is_active).length} aktiv · {team.length} gesamt</p>
+                <h1 style={s.h1}>Team</h1>
+                <p style={s.sub}>{team.filter(m=>m.is_active).length} aktiv · {team.length} gesamt</p>
               </div>
               <button onClick={() => setShowInviteOverlay(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 12px rgba(9,106,112,0.25)', flexShrink:0 }}>
                 <span className="material-symbols-outlined" style={{ fontSize:18 }}>person_add</span>
@@ -1320,8 +1322,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
               <div style={{ paddingTop:20, marginBottom:16 }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
                   <div>
-                    <h1 style={{ ...s.h1, fontSize:20, marginBottom:2 }}>Tagesbericht</h1>
-                    <p style={{ fontSize:13, color:'var(--txt-muted)', margin:0 }}>
+                    <h1 style={s.h1}>Tagesbericht</h1>
+                    <p style={s.sub}>
                       {new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'})}
                       {genAt && <> · Stand {genAt}</>}
                     </p>
@@ -8155,12 +8157,14 @@ function MonthOverlay({ onClose, isDesktop }: { onClose: () => void; isDesktop: 
 }
 
 // ─── AnsprechpartnerList ──────────────────────────────────────────────────────
-function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRefresh }: {
+function AnsprechpartnerList({ contacts, customers, objects, search, onSearchChange, onRefresh, onNavigateToObject }: {
   contacts: any[]
   customers: any[]
+  objects: any[]
   search: string
   onSearchChange: (v: string) => void
   onRefresh?: () => void
+  onNavigateToObject?: (obj: any) => void
 }) {
   const [showExport, setShowExport] = useState(false)
   const [selectedContact, setSelectedContact] = useState<any>(null)
@@ -8314,7 +8318,7 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
   return (
     <>
       {/* Header */}
-      <div style={{ paddingTop:8, paddingBottom:12 }}>
+      <div style={{ paddingTop:20, paddingBottom:12 }}>
         <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:12 }}>
           <div>
             <h1 style={s.h1}>Ansprechpartner</h1>
@@ -8537,6 +8541,25 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
                         </div>
                       </div>
                     )}
+                    {/* Objekt-Karte */}
+                    {(() => {
+                      const linkedObj = cp.object_id ? objects.find((o:any) => o.id === cp.object_id) : null
+                      if (!linkedObj) return null
+                      return (
+                        <button onClick={() => { setSelectedContact(null); onNavigateToObject?.(linkedObj) }}
+                          style={{ width:'100%', background:'var(--surf-card)', borderRadius:16, border:'1px solid var(--outline)', padding:'14px 16px', display:'flex', alignItems:'center', gap:14, cursor:'pointer', textAlign:'left' }}>
+                          <div style={{ width:38, height:38, borderRadius:12, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:20, color:'#fff' }}>apartment</span>
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:11, color:'var(--txt-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:2 }}>Objekt</div>
+                            <div style={{ fontSize:15, fontWeight:700, color:'var(--pri)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{linkedObj.address}, {linkedObj.city}</div>
+                            {linkedObj.object_number && <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginTop:1 }}>{linkedObj.object_number}</div>}
+                          </div>
+                          <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
+                        </button>
+                      )
+                    })()}
                   </div>
                   {/* Schließen */}
                   <div style={{ padding:'0 16px 16px' }}>
