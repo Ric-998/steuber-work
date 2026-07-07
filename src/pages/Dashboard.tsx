@@ -120,7 +120,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
   })
   const [showMoreSheet, setShowMoreSheet] = useState(false)
   const [objSearch, setObjSearch] = useState('')
-  const [objGroup, setObjGroup] = useState<'none'|'city'|'kunde'>('none')
+  const [objGroup, setObjGroup] = useState<'none'|'city'|'kunde'>('city')
+  const [objTypeFilter, setObjTypeFilter] = useState<string>('alle')
   const [objSearchResults, setObjSearchResults] = useState<ObjectItem[]|null>(null)
   const [objSearching, setObjSearching] = useState(false)
   const objSearchTimer = useRef<ReturnType<typeof setTimeout>|null>(null)
@@ -952,12 +953,42 @@ export default function Dashboard({ userName, onLogout }: Props) {
               )}
             </div>
 
+            {/* Typ-Filter Chips */}
+            {(() => {
+              const TYPES = [
+                { key:'alle', label:'Alle', icon:'apps' },
+                { key:'mehrfamilienhaus', label:'Mehrfamilienhaus', icon:'apartment' },
+                { key:'einfamilienhaus', label:'Einfamilienhaus', icon:'house' },
+                { key:'firmengelaende', label:'Gewerbe', icon:'business' },
+                { key:'grundstueck', label:'Grundstück', icon:'landscape' },
+              ]
+              // nur Typen zeigen die tatsächlich vorkommen (+ Alle)
+              const usedTypes = new Set(objects.map((o:any) => o.object_type))
+              const visible = TYPES.filter(t => t.key === 'alle' || usedTypes.has(t.key))
+              if (visible.length <= 2) return null
+              return (
+                <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:2, marginBottom:14, scrollbarWidth:'none' }}>
+                  {visible.map(t => {
+                    const active = objTypeFilter === t.key
+                    return (
+                      <button key={t.key} onClick={() => setObjTypeFilter(t.key)}
+                        style={{ display:'flex', alignItems:'center', gap:5, padding:'7px 13px', borderRadius:99, border: active ? 'none' : '0.5px solid var(--outline)', background: active ? 'var(--pri)' : 'var(--surf-card)', color: active ? '#fff' : 'var(--txt-muted)', fontSize:12, fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0, transition:'background 0.12s, color 0.12s' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:14 }}>{t.icon}</span>
+                        {t.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+
             {loading ? <Loader/> : (() => {
               // Wenn DB-Suche aktiv → DB-Ergebnisse nutzen, sonst lokale Liste (bis 200)
-              const filtered: ObjectItem[] = objSearchResults !== null ? objSearchResults
+              const preFilter: ObjectItem[] = objSearchResults !== null ? objSearchResults
                 : objSearch.trim().length >= 2
                   ? [] // warte auf DB
                   : objects
+              const filtered: ObjectItem[] = objTypeFilter === 'alle' ? preFilter : preFilter.filter((o:any) => o.object_type === objTypeFilter)
               if (objects.length === 0) return (
                 <div style={s.emptyState}>
                   <span className="material-symbols-outlined" style={{ fontSize:48, color:'var(--txt-muted)', opacity:0.3 }}>apartment</span>
