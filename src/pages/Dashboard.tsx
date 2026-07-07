@@ -1090,16 +1090,6 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
         {/* ── ANSPRECHPARTNER ── */}
         {tab === 'ansprechpartner' && (
-          <>
-            <section style={{ padding:'20px 0 12px', display:'flex', justifyContent:'space-between', alignItems:'flex-end' }}>
-              <div>
-                <h1 style={s.h1}>Ansprechpartner</h1>
-                <p style={s.sub}>{contactPersons.length} Kontakte</p>
-              </div>
-            </section>
-          </>
-        )}
-        {tab === 'ansprechpartner' && (
           <AnsprechpartnerList
             contacts={contactPersons}
             customers={customers}
@@ -5397,8 +5387,8 @@ function KundenList({ customers, objects, loading, onSelect }: {
       <section style={{ paddingTop:20, paddingBottom:10 }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
           <div>
-            <h1 style={{ ...s.h1, fontSize:20, marginBottom:2 }}>Kunden</h1>
-            <p style={{ ...s.sub }}>{customers.length} gesamt</p>
+            <h1 style={s.h1}>Kunden</h1>
+            <p style={s.sub}>{customers.length} Kunden</p>
           </div>
           <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
             <span className="material-symbols-outlined icon-sm">download</span>
@@ -5494,37 +5484,33 @@ function KundenList({ customers, objects, loading, onSelect }: {
                 const objCount = objects.filter(o => o.customer_id === c.id).length
                 return (
                   <div key={c.id} onClick={() => onSelect(c)}
-                    style={{ display:'flex', alignItems:'center', gap:12, padding:'14px 0', borderBottom:'1px solid var(--outline)', cursor:'pointer' }}>
-                    <div style={{ width:40, height:40, borderRadius:12, background: c.is_hausverwaltung ? 'var(--pri)' : 'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <span className="material-symbols-outlined icon-sm" style={{ color: c.is_hausverwaltung ? '#fff' : 'var(--pri)' }}>{c.is_hausverwaltung ? 'domain' : CUST_ICON[c.customer_type]}</span>
+                    style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, boxShadow:'0 1px 6px rgba(9,106,112,0.06)', cursor:'pointer' }}>
+                    {/* Icon */}
+                    <div style={{ width:46, height:46, borderRadius:14, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 10px rgba(9,106,112,0.2)' }}>
+                      <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:22 }}>{c.is_hausverwaltung ? 'domain' : CUST_ICON[c.customer_type]}</span>
                     </div>
                     <div style={{ flex:1, minWidth:0 }}>
-                      {/* Name + Typ-Badge */}
-                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
-                        <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.name}</div>
-                        {c.is_hausverwaltung && <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:6, padding:'2px 6px', flexShrink:0 }}>HV</span>}
+                      {/* Zeile 1: Name + HV-Badge + Objekt-Pill */}
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:2 }}>
+                        <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, minWidth:0 }}>{c.name}</div>
+                        {c.is_hausverwaltung && <span style={{ fontSize:10, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:99, padding:'2px 7px', flexShrink:0 }}>HV</span>}
+                        {objCount > 0 && <span style={{ fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:99, padding:'2px 8px', display:'flex', alignItems:'center', gap:3, flexShrink:0 }}><span className="material-symbols-outlined" style={{ fontSize:12 }}>apartment</span>{objCount}</span>}
                       </div>
-                      {/* Kundentyp */}
-                      <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom: (c.hausverwaltung || c.contact_first_name || c.contact_last_name || c.contact_person) ? 2 : 0, display:'flex', alignItems:'center', gap:6 }}>
-                        <span>{CUST_LABEL[c.customer_type]}</span>
-                        {objCount > 0 && <span style={{ color:'var(--pri)', fontWeight:600 }}>{objCount} Objekt{objCount!==1?'e':''}</span>}
-                      </div>
-                      {/* Hausverwaltung (separate Zeile) */}
-                      {(c.customer_type==='weg-verwaltung'||c.customer_type==='mietverwaltung') && c.hausverwaltung && (
-                        <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600, display:'flex', alignItems:'center', gap:3, marginBottom:1 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize:12 }}>domain</span>
-                          {c.hausverwaltung.name}
+                      {/* Zeile 2: Typ – immer feste Position */}
+                      <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginBottom:3 }}>{CUST_LABEL[c.customer_type]}</div>
+                      {/* Zeile 3: Hausverwaltung oder Ansprechpartner */}
+                      {(c.customer_type==='weg-verwaltung'||c.customer_type==='mietverwaltung') && c.hausverwaltung ? (
+                        <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
+                          <span className="material-symbols-outlined icon-sm">domain</span>{c.hausverwaltung.name}
                         </div>
-                      )}
-                      {/* Ansprechpartner (separate Zeile) */}
-                      {(c.customer_type==='firma'||c.customer_type==='mietverwaltung') && (c.contact_first_name||c.contact_last_name||c.contact_person) && (
-                        <div style={{ fontSize:11, color:'var(--txt-sec)', display:'flex', alignItems:'center', gap:3 }}>
-                          <span className="material-symbols-outlined" style={{ fontSize:12 }}>person</span>
+                      ) : (c.customer_type==='firma'||c.customer_type==='mietverwaltung') && (c.contact_first_name||c.contact_last_name||c.contact_person) ? (
+                        <div style={{ fontSize:11, color:'var(--txt-sec)', display:'flex', alignItems:'center', gap:4 }}>
+                          <span className="material-symbols-outlined icon-sm">person</span>
                           {[c.contact_first_name, c.contact_last_name].filter(Boolean).join(' ') || c.contact_person}
                         </div>
-                      )}
+                      ) : null}
                     </div>
-                    <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:18 }}>chevron_right</span>
+                    <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:20, flexShrink:0 }}>chevron_right</span>
                   </div>
                 )
               })}
@@ -8329,9 +8315,12 @@ function AnsprechpartnerList({ contacts, customers, search, onSearchChange, onRe
     <>
       {/* Header */}
       <div style={{ paddingTop:8, paddingBottom:12 }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-          <p style={{ fontSize:13, color:'var(--txt-muted)', margin:0 }}>{sorted.length} Personen</p>
-          <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+        <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:12 }}>
+          <div>
+            <h1 style={s.h1}>Ansprechpartner</h1>
+            <p style={s.sub}>{sorted.length} Kontakte</p>
+          </div>
+          <button onClick={() => setShowExport(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-sec)', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
             <span className="material-symbols-outlined icon-sm">download</span> Export
           </button>
         </div>
