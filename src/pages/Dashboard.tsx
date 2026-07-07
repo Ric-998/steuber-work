@@ -554,7 +554,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
             <button onClick={onLogout} style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:12, border:'none', background:'transparent', fontSize:13, fontWeight:600, cursor:'pointer', transition:'background 0.15s' }}
               onMouseEnter={e=>(e.currentTarget.style.background='var(--err-bg)')}
               onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--err-dot)' }}>logout</span>
+              <div style={{ width:34, height:34, borderRadius:10, background:'var(--err-bg)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--err-dot)' }}>logout</span>
+              </div>
               <span style={{ color:'var(--err-dot)' }}>Abmelden</span>
             </button>
           </div>
@@ -3124,6 +3126,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
   const [contractId, setContractId] = useState('')
   const [objectContracts, setObjectContracts] = useState<ContractItem[]>([])
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [objSearch, setObjSearch] = useState('')
 
   const loadContractsForObject = async (objId: string) => {
     setContractId('')
@@ -3215,31 +3218,66 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
         {step === 1 && (
           <>
             <h2 style={{ ...s.h1, fontSize:20, marginBottom:4 }}>Objekt wählen</h2>
-            <p style={{ ...s.sub, marginBottom:20 }}>Für welches Gebäude soll die Aufgabe angelegt werden?</p>
+            <p style={{ ...s.sub, marginBottom:14 }}>Für welches Gebäude soll die Aufgabe angelegt werden?</p>
+
+            {/* Suchfeld */}
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 13px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', marginBottom:12 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>search</span>
+              <input
+                value={objSearch}
+                onChange={e => setObjSearch(e.target.value)}
+                placeholder="Adresse, PLZ, OBJ-Nummer, Kunde …"
+                style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}
+                autoFocus={objects.length > 4}
+              />
+              {objSearch && <button onClick={() => setObjSearch('')} style={{ background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', color:'var(--txt-muted)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:18 }}>close</span>
+              </button>}
+            </div>
 
             {objects.length === 0 ? (
               <div style={s.emptyState}>
                 <span className="material-symbols-outlined" style={{ fontSize:40, color:'var(--txt-muted)', opacity:0.3 }}>apartment</span>
                 <p style={{ fontSize:13, color:'var(--txt-muted)', textAlign:'center' }}>Noch keine Objekte vorhanden</p>
               </div>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
-                {objects.map(o=>(
-                  <div key={o.id} onClick={()=>{ setObjectId(o.id); loadContractsForObject(o.id) }} style={{ ...s.selectCard, borderColor:objectId===o.id?'var(--pri)':'var(--outline)', background:objectId===o.id?'var(--pri-xl)':'var(--surf-card)' }}>
-                    <div style={{ width:40, height:40, borderRadius:12, background:objectId===o.id?'var(--pri)':'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <span className="material-symbols-outlined icon-sm" style={{ color:objectId===o.id?'#fff':'var(--txt-muted)' }}>apartment</span>
-                    </div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:14, fontWeight:700, color:objectId===o.id?'var(--pri)':'var(--txt)' }}>{o.name}</div>
-                      <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>{o.address}, {o.city}</div>
-                      {o.customers?.name && <div style={{ fontSize:11, color:'var(--pri)', marginTop:2, fontWeight:600 }}>{o.customers.name}</div>}
-                    </div>
-                    {objectId===o.id && <span className="material-symbols-outlined icon-fill" style={{ color:'var(--pri)', flexShrink:0 }}>check_circle</span>}
+            ) : (() => {
+              const q = objSearch.trim().toLowerCase()
+              const filtered = q
+                ? objects.filter(o => {
+                    const hay = [o.address, o.postal_code, o.city, o.object_number, o.customers?.name]
+                      .filter(Boolean).join(' ').toLowerCase()
+                    return q.split(' ').filter(Boolean).every(w => hay.includes(w))
+                  })
+                : objects
+              return (
+                <>
+                  {filtered.length === 0 && (
+                    <div style={{ textAlign:'center', padding:'24px 0', color:'var(--txt-muted)', fontSize:13 }}>Kein Objekt gefunden</div>
+                  )}
+                  <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+                    {filtered.map(o => {
+                      const sel = objectId === o.id
+                      return (
+                        <div key={o.id} onClick={() => { setObjectId(o.id); loadContractsForObject(o.id) }}
+                          style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, border:`1.5px solid ${sel ? 'var(--pri)' : 'var(--outline)'}`, background: sel ? 'var(--pri-xl)' : 'var(--surf-card)', cursor:'pointer', transition:'all 0.12s' }}>
+                          <div style={{ width:40, height:40, borderRadius:12, background: sel ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-low)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow: sel ? '0 3px 8px rgba(9,106,112,0.25)' : 'none' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:20, color: sel ? '#fff' : 'var(--txt-muted)' }}>apartment</span>
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:14, fontWeight:700, color: sel ? 'var(--pri)' : 'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                              {o.address}, {o.postal_code} {o.city}
+                            </div>
+                            <div style={{ fontSize:11, color:'var(--txt-muted)', fontFamily:'monospace', marginTop:2 }}>{o.object_number || '–'}</div>
+                            {o.customers?.name && <div style={{ fontSize:11, color:'var(--pri)', fontWeight:600, marginTop:1 }}>{o.customers.name}</div>}
+                          </div>
+                          {sel && <span className="material-symbols-outlined" style={{ color:'var(--pri)', flexShrink:0, fontSize:20 }}>check_circle</span>}
+                        </div>
+                      )
+                    })}
                   </div>
-                ))}
-              </div>
-            )}
-
+                </>
+              )
+            })()}
           </>
         )}
 
