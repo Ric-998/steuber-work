@@ -985,9 +985,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
               return (<>{groupKeys.map(groupKey => (
                 <div key={groupKey}>
                   {objGroup !== 'none' && (
-                    <div style={{ fontSize:11, fontWeight:800, color:'var(--txt-muted)', letterSpacing:'0.08em', padding:'10px 0 5px', borderBottom:'1px solid var(--outline)', marginBottom:8, display:'flex', alignItems:'center', gap:6, textTransform:'uppercase' }}>
-                      <span>{groupKey}</span>
-                      <span style={{ fontWeight:500, fontSize:10 }}>({grouped[groupKey].length})</span>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, margin:'14px 0 8px' }}>
+                      <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', letterSpacing:'0.08em', textTransform:'uppercase', flexShrink:0 }}>{groupKey} ({grouped[groupKey].length})</span>
+                      <div style={{ flex:1, height:'0.5px', background:'var(--outline)' }} />
                     </div>
                   )}
                   {grouped[groupKey].map(obj => {
@@ -996,7 +996,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     const typeIcon = OBJ_TYPE_ICON[obj.object_type ?? 'mehrfamilienhaus'] ?? 'apartment'
                     return (
                       <div key={obj.id} onClick={()=>setSelectedObject(obj)}
-                        style={{ ...s.taskCard, cursor:'pointer', marginBottom:8, boxShadow:'none', border:'0.5px solid var(--outline)' }}>
+                        style={{ ...s.taskCard, cursor:'pointer', marginBottom:8, boxShadow:'none', border:'0.5px solid var(--outline)', transition:'background 0.12s' }}
+                        onMouseEnter={e=>(e.currentTarget.style.background='var(--pri-xl)')}
+                        onMouseLeave={e=>(e.currentTarget.style.background='var(--surf-card)')}>
                         <div style={{ width:46, height:46, borderRadius:14, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 10px rgba(9,106,112,0.2)' }}>
                           <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:22 }}>{typeIcon}</span>
                         </div>
@@ -5519,12 +5521,17 @@ function KundenList({ customers, objects, loading, onSelect }: {
         <>
           {letters.map(letter => (
             <div key={letter}>
-              <div style={{ fontSize:11, fontWeight:800, color:'var(--txt-muted)', letterSpacing:'0.1em', padding:'12px 0 6px', borderBottom:'1px solid var(--outline)' }}>{letter}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, margin:'14px 0 8px' }}>
+                <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', letterSpacing:'0.08em', textTransform:'uppercase', flexShrink:0 }}>{letter}</span>
+                <div style={{ flex:1, height:'0.5px', background:'var(--outline)' }} />
+              </div>
               {grouped[letter].map(c => {
                 const objCount = objects.filter(o => o.customer_id === c.id).length
                 return (
                   <div key={c.id} onClick={() => onSelect(c)}
-                    style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, border:'0.5px solid var(--outline)', cursor:'pointer' }}>
+                    style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, border:'0.5px solid var(--outline)', cursor:'pointer', transition:'background 0.12s' }}
+                    onMouseEnter={e=>(e.currentTarget.style.background='var(--pri-xl)')}
+                    onMouseLeave={e=>(e.currentTarget.style.background='var(--surf-card)')}>
                     {/* Icon */}
                     <div style={{ width:46, height:46, borderRadius:14, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 10px rgba(9,106,112,0.2)' }}>
                       <span className="material-symbols-outlined" style={{ color:'#fff', fontSize:22 }}>{c.is_hausverwaltung ? 'domain' : CUST_ICON[c.customer_type]}</span>
@@ -8386,7 +8393,10 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
         <>
           {letters.map(letter => (
             <div key={letter}>
-              <div style={{ fontSize:11, fontWeight:800, color:'var(--txt-muted)', paddingTop:16, paddingBottom:6, letterSpacing:'0.08em', textTransform:'uppercase', borderBottom:'1px solid var(--outline)', marginBottom:8 }}>{letter}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, margin:'14px 0 8px' }}>
+                <span style={{ fontSize:10, fontWeight:600, color:'var(--txt-muted)', letterSpacing:'0.08em', textTransform:'uppercase', flexShrink:0 }}>{letter}</span>
+                <div style={{ flex:1, height:'0.5px', background:'var(--outline)' }} />
+              </div>
               {grouped[letter].map((cp: any) => {
                 const initials = ((cp.first_name?.[0]||'') + (cp.last_name?.[0]||cp.name?.[0]||'')).toUpperCase() || '?'
                 const displayName = cp.first_name || cp.last_name
@@ -8395,7 +8405,9 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
                 const isPrivat = cp._isCust === true
                 const hasRole = cp.role && cp.role !== 'Privatperson'
                 return (
-                  <div key={cp.id} onClick={() => setSelectedContact(cp)} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, border:'0.5px solid var(--outline)', cursor:'pointer' }}>
+                  <div key={cp.id} onClick={() => setSelectedContact(cp)} style={{ display:'flex', alignItems:'center', gap:14, background:'var(--surf-card)', borderRadius:16, padding:'14px 16px', marginBottom:8, border:'0.5px solid var(--outline)', cursor:'pointer', transition:'background 0.12s' }}
+                    onMouseEnter={e=>(e.currentTarget.style.background='var(--pri-xl)')}
+                    onMouseLeave={e=>(e.currentTarget.style.background='var(--surf-card)')}>
                     {/* Avatar */}
                     <div style={{ width:44, height:44, borderRadius:14, background: 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color: '#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', flexShrink:0, boxShadow: '0 4px 10px rgba(9,106,112,0.2)' }}>
                       {initials}
