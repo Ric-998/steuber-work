@@ -965,9 +965,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
               // nur Typen zeigen die tatsächlich vorkommen (+ Alle)
               const usedTypes = new Set(objects.map((o:any) => o.object_type))
               const visible = TYPES.filter(t => t.key === 'alle' || usedTypes.has(t.key))
-              if (visible.length <= 2) return null
+              if (visible.length <= 1) return null
               return (
-                <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:2, marginBottom:14, scrollbarWidth:'none' }}>
+                <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:14, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, marginLeft:-18, marginRight:-18, paddingLeft:18, paddingRight:18 }}>
                   {visible.map(t => {
                     const active = objTypeFilter === t.key
                     return (
@@ -1013,10 +1013,10 @@ export default function Dashboard({ userName, onLogout }: Props) {
               }
               const groupKeys = Object.keys(grouped).sort()
               const OBJ_TYPE_ICON: Record<string, string> = { einfamilienhaus:'house', mehrfamilienhaus:'apartment', firmengelaende:'business', grundstueck:'landscape' }
-              return (<>{groupKeys.map(groupKey => (
+              return (<>{groupKeys.map((groupKey, gi) => (
                 <div key={groupKey}>
                   {objGroup !== 'none' && (
-                    <div style={{ margin:'16px 0 6px' }}>
+                    <div style={{ margin: gi === 0 ? '4px 0 6px' : '16px 0 6px' }}>
                       <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', letterSpacing:'0.1em', textTransform:'uppercase' }}>{groupKey} ({grouped[groupKey].length})</span>
                     </div>
                   )}
@@ -5520,7 +5520,7 @@ function KundenList({ customers, objects, loading, onSelect }: {
           {search && <button onClick={() => setSearch('')} style={{ background:'none', border:'none', cursor:'pointer', display:'flex', color:'var(--txt-muted)' }}><span className="material-symbols-outlined icon-sm">close</span></button>}
         </div>
         {/* Filter Chips */}
-        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, scrollbarWidth:'none' }}>
+        <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:4, marginBottom:12, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, marginLeft:-18, marginRight:-18, paddingLeft:18, paddingRight:18 }}>
           {([
             { id:'alle',          label:'Alle',          count: customers.length },
             { id:'privatperson',  label:'Privatperson',  count: customers.filter(c=>c.customer_type==='privatperson').length },
@@ -5549,9 +5549,9 @@ function KundenList({ customers, objects, loading, onSelect }: {
         </div>
       ) : (
         <>
-          {letters.map(letter => (
+          {letters.map((letter, li) => (
             <div key={letter}>
-              <div style={{ margin:'16px 0 6px' }}>
+              <div style={{ margin: li === 0 ? '4px 0 6px' : '16px 0 6px' }}>
                 <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', letterSpacing:'0.1em', textTransform:'uppercase' }}>{letter}</span>
               </div>
               {grouped[letter].map(c => {
@@ -5662,13 +5662,13 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
       {(customer.phone || customer.email) && (
         <div style={{ display:'flex', gap:8, marginBottom:12, flexWrap:'wrap' }}>
           {customer.phone && (
-            <a href={`tel:${customer.phone}`} style={{ flex:1, minWidth:140, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 14px', borderRadius:14, background:'var(--ok-bg)', color:'#2e7d32', textDecoration:'none', fontSize:13, fontWeight:700 }}>
+            <a href={`tel:${customer.phone}`} style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'12px 14px', borderRadius:14, background:'var(--ok-bg)', color:'#2e7d32', textDecoration:'none', fontSize:13, fontWeight:700, minHeight:44 }}>
               <span className="material-symbols-outlined" style={{ fontSize:17 }}>phone</span>
               {customer.phone}
             </a>
           )}
           {customer.email && (
-            <a href={`mailto:${customer.email}`} style={{ flex:1, minWidth:100, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'11px 14px', borderRadius:14, background:'#e3f2fd', color:'#1565c0', textDecoration:'none', fontSize:13, fontWeight:700 }}>
+            <a href={`mailto:${customer.email}`} style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'12px 14px', borderRadius:14, background:'#e3f2fd', color:'#1565c0', textDecoration:'none', fontSize:13, fontWeight:700, minHeight:44 }}>
               <span className="material-symbols-outlined" style={{ fontSize:17 }}>mail</span>
               E-Mail
             </a>
@@ -8267,13 +8267,13 @@ function ObjekteListe({ objs, onNav }: { objs: any[], onNav: (o: any) => void })
       ))}
       {!expanded && rest > 0 && (
         <button onClick={() => setExpanded(true)}
-          style={{ background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:700, color:'var(--pri)', padding:'6px 0', textAlign:'left' }}>
+          style={{ background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:700, color:'var(--pri)', padding:'12px 0', textAlign:'left', minHeight:44 }}>
           + {rest} weitere anzeigen
         </button>
       )}
       {expanded && objs.length > LIMIT && (
         <button onClick={() => setExpanded(false)}
-          style={{ background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:700, color:'var(--txt-muted)', padding:'6px 0', textAlign:'left' }}>
+          style={{ background:'none', border:'none', cursor:'pointer', fontSize:13, fontWeight:700, color:'var(--txt-muted)', padding:'12px 0', textAlign:'left', minHeight:44 }}>
           Weniger anzeigen
         </button>
       )}
@@ -8471,9 +8471,9 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
         </div>
       ) : (
         <>
-          {letters.map(letter => (
+          {letters.map((letter, li) => (
             <div key={letter}>
-              <div style={{ margin:'16px 0 6px' }}>
+              <div style={{ margin: li === 0 ? '4px 0 6px' : '16px 0 6px' }}>
                 <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', letterSpacing:'0.1em', textTransform:'uppercase' }}>{letter}</span>
               </div>
               {grouped[letter].map((cp: any) => {
