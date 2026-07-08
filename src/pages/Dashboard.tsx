@@ -230,7 +230,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     supabase.auth.getUser().then(({data})=>{ if(data.user) setCurrentUserId(data.user.id) })
   }, [])
 
-  useEffect(() => { loadAll(); loadDailyReport() }, [])
+  useEffect(() => { loadAll(); triggerGenerate(); loadDailyReport() }, [])
 
   // Sync navigation state → URL hash (enables F5 restore)
   useEffect(() => {
@@ -358,6 +358,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const triggerGenerate = () => {
+    // Fire-and-forget: Assignments für heute sicherstellen
+    supabase.functions.invoke('generate-assignments').catch(() => {})
   }
 
   const loadDailyReport = async () => {
@@ -675,7 +680,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                       <div>
                         <div style={s.bentoLabel}>Tagesstatus</div>
-                        <h2 style={s.bentoNum}>{tasks.filter(t=>{const ts=today.toISOString().split('T')[0];return t.is_active&&(t.due_date??'')<=ts&&(!t.end_date||t.end_date>=ts)}).length} Aufträge heute</h2>
+                        <h2 style={s.bentoNum}>{(dailyReport?.assignments??[]).length} Aufgaben heute</h2>
                       </div>
                       <span className="material-symbols-outlined" style={{ color:'rgba(255,255,255,0.25)', fontSize:36 }}>assignment</span>
                     </div>
@@ -1363,7 +1368,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     </p>
                   </div>
                   <button
-                    onClick={loadDailyReport}
+                    onClick={async () => { triggerGenerate(); await new Promise(r => setTimeout(r, 800)); loadDailyReport() }}
                     disabled={reportLoading}
                     style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:12, border:'1px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:13, fontWeight:600, cursor:'pointer', opacity: reportLoading ? 0.6 : 1 }}
                   >
@@ -1489,6 +1494,18 @@ export default function Dashboard({ userName, onLogout }: Props) {
               )}
 
               {/* Per-Employee Breakdown */}
+              {/* Hinweis falls Assignments noch nicht generiert */}
+              {!reportLoading && dailyReport && todayAssigns.length === 0 && tasks.filter(t=>{const ts=new Date().toISOString().split('T')[0];return t.is_active&&(t.due_date??'')<=ts&&(!t.end_date||t.end_date>=ts)}).length > 0 && (
+                <div style={{ background:'#fff8e6', border:'1px solid #f59e0b', borderRadius:14, padding:'14px 16px', marginBottom:16, display:'flex', gap:12, alignItems:'flex-start' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:20, color:'#b45309', flexShrink:0, marginTop:1 }}>info</span>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#92400e', marginBottom:2 }}>Aufgaben ohne Mitarbeiter</div>
+                    <div style={{ fontSize:12, color:'#b45309', lineHeight:1.5 }}>
+                      Es gibt aktive Aufgaben, die keinem Mitarbeiter zugewiesen sind. Öffne die Aufgabe und weise einen Standardmitarbeiter zu.
+                    </div>
+                  </div>
+                </div>
+              )}
               {reportLoading && !dailyReport ? (
                 <Loader />
               ) : userStats.length === 0 ? (
