@@ -373,7 +373,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     // All today's assignments with user + task + object info
     const { data: all } = await supabase
       .from('task_assignments')
-      .select('id,status,started_at,completed_at,travel_minutes,due_date,user_id,tasks(title,categories(emoji,name),objects(name,address)),users(id,full_name)')
+      .select('id,status,started_at,completed_at,travel_minutes,due_date,user_id,tasks(title,categories(emoji,name),objects(name,address)),users!user_id(id,full_name)')
       .eq('due_date', todayStr)
       .order('status')
     // Active leave requests today
