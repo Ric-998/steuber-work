@@ -678,7 +678,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             {loading ? <Loader/> : (
               <>
                 <div style={s.bento}>
-                  <div style={s.bentoMain}>
+                  <div style={{ ...s.bentoMain, cursor:'pointer' }} onClick={() => setTab('bericht')}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                       <div>
                         <div style={s.bentoLabel}>Tagesstatus</div>
@@ -691,7 +691,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                       <span style={{ ...s.bentoPill, background:'rgba(255,255,255,0.1)' }}><span style={{ ...s.bentoDot, background:'#a8ece8' }}/>{(dailyReport?.assignments??[]).filter((a:any)=>a.status==='offen').length} Offen</span>
                     </div>
                   </div>
-                  <div style={s.bentoSide}>
+                  <div style={{ ...s.bentoSide, cursor:'pointer' }} onClick={() => setTab('bericht')}>
                     <div style={s.bentoSideLabel}>Erledigt</div>
                     <div style={{ display:'flex', alignItems:'center', gap:4 }}>
                       <div style={s.bentoSideNum}>{stats?.diese_woche_done??0}</div>
@@ -710,7 +710,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
                 <div style={s.statsRow}>
                   {/* Probleme-Kachel: gesamt + heute-Subline */}
-                  <div onClick={() => setShowProblemsSheet(true)}
+                  <div onClick={() => document.getElementById('problems-section')?.scrollIntoView({behavior:'smooth', block:'start'})}
                     style={{ ...s.statChip, background:'#ffdad6', cursor:'pointer', position:'relative' }}
                     onMouseEnter={e=>(e.currentTarget.style.filter='brightness(0.95)')}
                     onMouseLeave={e=>(e.currentTarget.style.filter='none')}
@@ -860,6 +860,36 @@ export default function Dashboard({ userName, onLogout }: Props) {
                       )
                     })}
                   </>
+                )}
+
+                {/* ── Aktuelle Probleme (direkt sichtbar) ── */}
+                {problems.length > 0 && (
+                  <div id="problems-section" style={{ marginBottom:20 }}>
+                    <div style={{ ...s.secHead, marginBottom:10 }}>
+                      <h3 style={{ ...s.secTitle, color:'#93000a' }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span className="material-symbols-outlined icon-fill" style={{ fontSize:18, color:'#93000a' }}>error</span>
+                          Offene Probleme
+                        </span>
+                      </h3>
+                      <span style={{ fontSize:12, fontWeight:700, color:'#93000a', background:'#ffdad6', padding:'2px 8px', borderRadius:99 }}>{problems.length}</span>
+                    </div>
+                    {problems.map(p => (
+                      <div key={p.id} onClick={() => setSelectedProblem(p)}
+                        style={{ display:'flex', gap:10, alignItems:'center', background:'#ffdad6', border:'1px solid #fecaca', borderRadius:14, padding:'12px 14px', marginBottom:8, cursor:'pointer', transition:'filter 0.15s' }}
+                        onMouseEnter={e=>(e.currentTarget.style.filter='brightness(0.95)')}
+                        onMouseLeave={e=>(e.currentTarget.style.filter='none')}>
+                        <span className="material-symbols-outlined icon-fill" style={{ color:'#93000a', flexShrink:0, fontSize:20 }}>error</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'#93000a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.tasks?.title||'–'}</div>
+                          <div style={{ fontSize:11, color:'#ba1a1a', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {p.tasks?.objects?.address}, {p.tasks?.objects?.city} · {p.users?.full_name||'–'} · {new Date(p.due_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}
+                          </div>
+                        </div>
+                        <span className="material-symbols-outlined" style={{ fontSize:18, color:'#93000a', flexShrink:0 }}>chevron_right</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
 
                 {/* ── Heutige Abschlüsse mit Fotos ── */}
@@ -1953,50 +1983,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
       {/* ── PROBLEM DETAIL OVERLAY ── */}
       {/* ── Problems Bottom Sheet ── */}
-      {showProblemsSheet && (
-        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(13,31,34,0.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}
-          onClick={() => setShowProblemsSheet(false)}>
-          <div onClick={e=>e.stopPropagation()} style={{ width:'100%', maxWidth:560, background:'var(--surf-card)', borderRadius:24, maxHeight:'80dvh', display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:'0 24px 80px rgba(0,0,0,0.25)' }}>
-            {/* Spacer statt Handle */}
-            <div style={{ height:4 }}/>
-            {/* Header */}
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 20px 14px' }}>
-              <div>
-                <div style={{ fontSize:18, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)' }}>Aktuelle Probleme</div>
-                <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{problems.length} {problems.length===1?'offenes Problem':'offene Probleme'}</div>
-              </div>
-              <button onClick={() => setShowProblemsSheet(false)} style={{ background:'var(--surf-low)', border:'none', borderRadius:10, width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>close</span>
-              </button>
-            </div>
-            {/* List */}
-            <div style={{ overflowY:'auto', padding:'0 16px 32px', display:'flex', flexDirection:'column', gap:8 }}>
-              {problems.length === 0
-                ? <div style={{ display:'flex', alignItems:'center', gap:10, background:'var(--ok-bg)', borderRadius:14, padding:'14px 16px' }}>
-                    <span className="material-symbols-outlined icon-fill" style={{ color:'var(--ok)' }}>check_circle</span>
-                    <span style={{ fontSize:14, fontWeight:700, color:'var(--ok)' }}>Keine offenen Probleme</span>
-                  </div>
-                : problems.map(p => (
-                  <div key={p.id} onClick={() => { setSelectedProblem(p); setShowProblemsSheet(false) }}
-                    style={{ display:'flex', gap:10, alignItems:'flex-start', background:'#ffdad6', border:'1px solid #fecaca', borderRadius:14, padding:'13px 16px', cursor:'pointer', transition:'filter 0.15s' }}
-                    onMouseEnter={e=>(e.currentTarget.style.filter='brightness(0.95)')}
-                    onMouseLeave={e=>(e.currentTarget.style.filter='none')}>
-                    <span className="material-symbols-outlined icon-fill" style={{ color:'#93000a', flexShrink:0 }}>error</span>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:'#93000a', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.tasks?.title||'–'}</div>
-                      <div style={{ fontSize:11, color:'#ba1a1a', marginTop:2 }}>{p.tasks?.objects?.address}, {p.tasks?.objects?.city} · {p.users?.full_name||'–'}</div>
-                    </div>
-                    <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                      <div style={{ fontSize:11, color:'#93000a' }}>{new Date(p.due_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})}</div>
-                      <span className="material-symbols-outlined icon-sm" style={{ color:'#93000a' }}>chevron_right</span>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {selectedProblem && (
         <ProblemDetailOverlay
