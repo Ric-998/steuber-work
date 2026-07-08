@@ -233,7 +233,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
   useEffect(() => { loadAll(); triggerGenerate(); loadDailyReport() }, [])
 
   // Sync navigation state → URL hash (enables F5 restore)
+  // Guard: während des initialen Ladens Hash nicht überschreiben (würde #kunden/UUID → #kunden kürzen)
   useEffect(() => {
+    if (loading) return
     if (selectedObject) {
       window.location.hash = `objekte/${selectedObject.id}`
     } else if (selectedCustomer) {
@@ -241,7 +243,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     } else {
       window.location.hash = tab
     }
-  }, [tab, selectedObject, selectedCustomer])
+  }, [tab, selectedObject, selectedCustomer, loading])
 
   // Restore selectedObject / selectedCustomer from hash after data loads
   useEffect(() => {
@@ -1118,10 +1120,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
               const oc = customers.find(c => c.id === o.customer_id)
               return oc?.hausverwaltung_id === selectedCustomer.id
             })}
+            contacts={contactPersons.filter(cp => cp.customer_id === selectedCustomer.id && !cp.object_id)}
             onBack={() => setSelectedCustomer(null)}
             onUpdated={c => { setCustomers(prev => prev.map(x => x.id===c.id?c:x)); setSelectedCustomer(c); showToast('✔ Kunde gespeichert', 'ok') }}
             onDeleted={() => { setCustomers(prev => prev.filter(x => x.id!==selectedCustomer.id)); setSelectedCustomer(null) }}
             onObjectClick={obj => { setTab('objekte'); setSelectedObject(obj) }}
+            onRefreshContacts={loadAll}
             isDesktop={isDesktop}
           />
         )}
@@ -5619,18 +5623,154 @@ function KundenList({ customers, objects, loading, onSelect }: {
 }
 
 // ─── Kunde Detail ─────────────────────────────────────────────────────────────
-function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObjectClick, isDesktop }: {
+// ─── KundenContactSheet ───────────────────────────────────────────────────────
+function KundenContactSheet({ customerId, existing, onClose, onSaved }: {
+  customerId: string
+  existing: any | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [firstName, setFirstName] = useState(existing?.first_name || '')
+  const [lastName,  setLastName]  = useState(existing?.last_name  || existing?.name?.split(' ').slice(1).join(' ') || '')
+  const [role,      setRole]      = useState(existing?.role  || '')
+  const [phone,     setPhone]     = useState(existing?.phone || '')
+  const [email,     setEmail]     = useState(existing?.email || '')
+  const [saving,    setSaving]    = useState(false)
+  const [deleting,  setDeleting]  = useState(false)
+  const [showDel,   setShowDel]   = useState(false)
+  const [error,     setError]     = useState('')
+
+  const save = async () => {
+    if (!firstName.trim() && !lastName.trim()) { setError('Vor- oder Nachname ist Pflicht.'); return }
+    setSaving(true); setError('')
+    const payload = {
+      first_name:  firstName.trim() || null,
+      last_name:   lastName.trim()  || null,
+      name:        [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || null,
+      role:        role.trim()  || null,
+      phone:       phone.trim() || null,
+      email:       email.trim() || null,
+      customer_id: customerId,
+    }
+    const { error: e } = existing
+      ? await supabase.from('contact_persons').update(payload).eq('id', existing.id)
+      : await supabase.from('contact_persons').insert(payload)
+    setSaving(false)
+    if (e) { setError(e.message); return }
+    onSaved()
+  }
+
+  const del = async () => {
+    setDeleting(true)
+    await supabase.from('contact_persons').delete().eq('id', existing.id)
+    setDeleting(false)
+    onSaved()
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000, display:'flex', flexDirection:'column', justifyContent:'flex-end' }}>
+      <div style={{ background:'var(--bg)', borderRadius:'24px 24px 0 0', paddingBottom:40, maxHeight:'92vh', overflowY:'auto' }}>
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, padding:'20px 20px 16px', borderBottom:'1px solid var(--outline)', position:'sticky', top:0, background:'var(--bg)', zIndex:1 }}>
+          <button onClick={onClose} style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, width:34, height:34, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+            <span className="material-symbols-outlined icon-sm">close</span>
+          </button>
+          <div style={{ flex:1, fontSize:15, fontWeight:800, fontFamily:'var(--font-head)' }}>
+            {existing ? 'Ansprechpartner bearbeiten' : 'Ansprechpartner hinzufügen'}
+          </div>
+          {existing && (
+            <button onClick={() => setShowDel(true)} style={{ background:'var(--err-bg)', border:'none', borderRadius:10, padding:'8px 10px', cursor:'pointer', display:'flex', alignItems:'center', gap:4, color:'var(--err)', fontSize:12, fontWeight:700 }}>
+              <span className="material-symbols-outlined icon-sm">delete</span>
+            </button>
+          )}
+        </div>
+
+        {/* Form */}
+        <div style={{ padding:'20px' }}>
+          {error && <div style={{ background:'var(--err-bg)', color:'var(--err)', borderRadius:10, padding:'10px 14px', fontSize:13, marginBottom:14 }}>{error}</div>}
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14 }}>
+            <div>
+              <label style={s.fieldLabel}>Vorname *</label>
+              <div className="iw" style={s.inputWrap}>
+                <input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Max" style={s.input} autoFocus />
+              </div>
+            </div>
+            <div>
+              <label style={s.fieldLabel}>Nachname *</label>
+              <div className="iw" style={s.inputWrap}>
+                <input value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Mustermann" style={s.input} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom:14 }}>
+            <label style={s.fieldLabel}>Funktion / Rolle</label>
+            <div className="iw" style={s.inputWrap}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>badge</span>
+              <input value={role} onChange={e=>setRole(e.target.value)} placeholder="z.B. Geschäftsführer" style={s.input} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom:14 }}>
+            <label style={s.fieldLabel}>Telefon</label>
+            <div className="iw" style={s.inputWrap}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>phone</span>
+              <input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" placeholder="+49 561 …" style={s.input} />
+            </div>
+          </div>
+
+          <div style={{ marginBottom:20 }}>
+            <label style={s.fieldLabel}>E-Mail</label>
+            <div className="iw" style={s.inputWrap}>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>mail</span>
+              <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="max@firma.de" style={s.input} />
+            </div>
+          </div>
+
+          <button onClick={save} disabled={saving}
+            style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer' }}>
+            {saving ? 'Wird gespeichert…' : existing ? 'Speichern' : 'Hinzufügen'}
+          </button>
+        </div>
+
+        {/* Delete Confirm */}
+        {showDel && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1010, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+            <div style={{ background:'var(--surf-card)', borderRadius:20, padding:24, width:'100%', maxWidth:360, textAlign:'center' }}>
+              <div style={{ fontSize:15, fontWeight:800, marginBottom:8 }}>Ansprechpartner löschen?</div>
+              <div style={{ fontSize:13, color:'var(--txt-muted)', marginBottom:20 }}>
+                <strong>{[firstName,lastName].filter(Boolean).join(' ')}</strong> wird entfernt.
+              </div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button onClick={()=>setShowDel(false)} style={{ flex:1, padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--bg)', fontWeight:700, cursor:'pointer' }}>Abbrechen</button>
+                <button onClick={del} disabled={deleting} style={{ flex:1, padding:'12px', borderRadius:12, border:'none', background:'var(--err)', color:'#fff', fontWeight:700, cursor:'pointer' }}>
+                  {deleting ? '…' : 'Löschen'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function KundeDetail({ customer, objects, contacts, onBack, onUpdated, onDeleted, onObjectClick, onRefreshContacts, isDesktop }: {
   customer: CustomerItem
   objects: ObjectItem[]
+  contacts: any[]
   onBack: () => void
   onUpdated: (c: CustomerItem) => void
   onDeleted: () => void
   onObjectClick: (o: ObjectItem) => void
+  onRefreshContacts?: () => void
   isDesktop?: boolean
 }) {
   const [showEdit, setShowEdit]                   = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting]                   = useState(false)
+  const [editContact, setEditContact]             = useState<any|null|'new'>(null)
 
   const OBJ_TYPE_ICON: Record<string,string> = {
     einfamilienhaus:'house', mehrfamilienhaus:'apartment',
@@ -5696,8 +5836,8 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
 
         {/* Info-Rows */}
         {infoRows.map((row, i) => (
-          <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'12px 16px', borderTop:'0.5px solid var(--outline)' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0, marginTop:1 }}>{row.icon}</span>
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderTop:'0.5px solid var(--outline)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>{row.icon}</span>
             <div style={{ fontSize:13, fontWeight:600, color:'var(--txt)', flex:1, minWidth:0 }}>{row.content}</div>
           </div>
         ))}
@@ -5709,6 +5849,41 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
           </div>
         )}
       </div>
+
+      {/* Ansprechpartner */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+        <h3 style={{ fontSize:14, fontWeight:800, fontFamily:'var(--font-head)' }}>Ansprechpartner</h3>
+        <button onClick={() => setEditContact('new')}
+          style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:10, border:'1px solid var(--outline)', background:'var(--surf-card)', color:'var(--pri)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+          <span className="material-symbols-outlined" style={{ fontSize:15 }}>add</span>Hinzufügen
+        </button>
+      </div>
+      {contacts.length === 0 ? (
+        <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'14px 16px', fontSize:13, color:'var(--txt-muted)', marginBottom:14 }}>Noch kein Ansprechpartner hinterlegt</div>
+      ) : (
+        <div style={{ background:'var(--surf-card)', borderRadius:16, border:'0.5px solid var(--outline)', overflow:'hidden', marginBottom:14 }}>
+          {contacts.map((cp: any, i: number) => {
+            const name = [cp.first_name, cp.last_name].filter(Boolean).join(' ') || cp.name || '–'
+            return (
+              <div key={cp.id} onClick={() => setEditContact(cp)}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderTop: i > 0 ? '0.5px solid var(--outline)' : 'none', cursor:'pointer' }}>
+                <div style={{ width:36, height:36, borderRadius:11, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:17, color:'#fff' }}>person</span>
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
+                  {cp.role && <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>{cp.role}</div>}
+                  <div style={{ display:'flex', gap:10, marginTop: cp.role ? 3 : 2, flexWrap:'wrap' }}>
+                    {cp.phone && <a href={`tel:${cp.phone}`} onClick={e=>e.stopPropagation()} style={{ fontSize:12, color:'var(--pri)', textDecoration:'none', fontWeight:600 }}>{cp.phone}</a>}
+                    {cp.email && <a href={`mailto:${cp.email}`} onClick={e=>e.stopPropagation()} style={{ fontSize:12, color:'var(--pri)', textDecoration:'none', fontWeight:600 }}>{cp.email}</a>}
+                  </div>
+                </div>
+                <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', flexShrink:0 }}>edit</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Objekte */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
@@ -5739,6 +5914,16 @@ function KundeDetail({ customer, objects, onBack, onUpdated, onDeleted, onObject
       {/* Edit Overlay */}
       {showEdit && (
         <EditCustomerOverlay customer={customer} onClose={() => setShowEdit(false)} onSaved={c => { setShowEdit(false); onUpdated(c) }} onDelete={() => { setShowEdit(false); setShowDeleteConfirm(true) }} isDesktop={isDesktop} />
+      )}
+
+      {/* Ansprechpartner Edit/Create */}
+      {editContact !== null && (
+        <KundenContactSheet
+          customerId={customer.id}
+          existing={editContact === 'new' ? null : editContact}
+          onClose={() => setEditContact(null)}
+          onSaved={() => { setEditContact(null); onRefreshContacts?.() }}
+        />
       )}
 
       {/* Delete Confirmation */}
