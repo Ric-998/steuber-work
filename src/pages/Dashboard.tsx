@@ -733,8 +733,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     )}
                   </div>
                   {[
-                    { icon:'today',        label:'Heute fällig', val: stats?.heute_faellig ?? 0, color:'#92400e', bg:'#fff8e6', onClick: () => setShowTodayOverlay(true) },
-                    { icon:'task_alt', label:'Heute erledigt', val: (dailyReport?.assignments??[]).filter((a:any)=>a.status==='erledigt').length, color:'var(--ok)', bg:'var(--ok-bg)', onClick: () => setShowTodayOverlay(true) },
+                    { icon:'today',    label:'Heute fällig',  val: stats?.heute_faellig ?? 0, color:'#92400e', bg:'#fff8e6', onClick: () => setTab('bericht') },
+                    { icon:'task_alt', label:'Heute erledigt', val: (dailyReport?.assignments??[]).filter((a:any)=>a.status==='erledigt').length, color:'var(--ok)', bg:'var(--ok-bg)', onClick: () => setTab('bericht') },
                   ].map(({icon,label,val,color,bg,onClick})=>(
                     <div key={label} onClick={onClick} style={{ ...s.statChip, background:bg, cursor:'pointer' }}
                       onMouseEnter={e=>(e.currentTarget.style.filter='brightness(0.95)')}
@@ -1499,17 +1499,38 @@ export default function Dashboard({ userName, onLogout }: Props) {
 
               {/* Per-Employee Breakdown */}
               {/* Hinweis falls Assignments noch nicht generiert */}
-              {!reportLoading && dailyReport && todayAssigns.length === 0 && tasks.filter(t=>{const ts=new Date().toISOString().split('T')[0];return t.is_active&&(t.due_date??'')<=ts&&(!t.end_date||t.end_date>=ts)}).length > 0 && (
-                <div style={{ background:'#fff8e6', border:'1px solid #f59e0b', borderRadius:14, padding:'14px 16px', marginBottom:16, display:'flex', gap:12, alignItems:'flex-start' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:20, color:'#b45309', flexShrink:0, marginTop:1 }}>info</span>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#92400e', marginBottom:2 }}>Aufgaben ohne Mitarbeiter</div>
-                    <div style={{ fontSize:12, color:'#b45309', lineHeight:1.5 }}>
-                      Es gibt aktive Aufgaben, die keinem Mitarbeiter zugewiesen sind. Öffne die Aufgabe und weise einen Standardmitarbeiter zu.
+              {!reportLoading && dailyReport && (() => {
+                const todayStr = new Date().toISOString().split('T')[0]
+                const unassigned = tasks.filter(t => t.is_active && !t.default_assignee_id && (t.due_date??'')<= todayStr && (!t.end_date || t.end_date >= todayStr))
+                if (unassigned.length === 0) return null
+                return (
+                  <div style={{ background:'#fff8e6', border:'1px solid #f59e0b', borderRadius:14, padding:'14px 16px', marginBottom:16 }}>
+                    <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom: unassigned.length > 0 ? 10 : 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:20, color:'#b45309', flexShrink:0 }}>warning</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>
+                          {unassigned.length === 1 ? '1 Aufgabe ohne Mitarbeiter' : `${unassigned.length} Aufgaben ohne Mitarbeiter`}
+                        </div>
+                        <div style={{ fontSize:11, color:'#b45309', marginTop:1 }}>Tippe auf eine Aufgabe um einen Mitarbeiter zuzuweisen</div>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {unassigned.map((t: any) => (
+                        <button key={t.id} onClick={() => setEditTask(t)}
+                          style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:'1px solid #f59e0b', background:'rgba(255,255,255,0.6)', cursor:'pointer', textAlign:'left' }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:17, color:'#b45309', flexShrink:0 }}>{t.categories?.emoji ? undefined : 'task'}</span>
+                          {t.categories?.emoji && <span style={{ fontSize:16, flexShrink:0 }}>{t.categories.emoji}</span>}
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:700, color:'#92400e', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</div>
+                            {t.objects?.address && <div style={{ fontSize:11, color:'#b45309', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.objects.address}</div>}
+                          </div>
+                          <span className="material-symbols-outlined" style={{ fontSize:16, color:'#b45309', flexShrink:0 }}>arrow_forward</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
               {reportLoading && !dailyReport ? (
                 <Loader />
               ) : userStats.length === 0 ? (
