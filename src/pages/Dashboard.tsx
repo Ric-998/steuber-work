@@ -3722,6 +3722,8 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
   const [error, setError]           = useState('')
   const [confirmAction, setConfirmAction] = useState<'cancel'|'delete'|null>(null)
   const [actionLoading, setActionLoading] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [templateSaved, setTemplateSaved] = useState(false)
 
   const save = async () => {
     if (!title.trim()) { setError('Titel ist Pflicht'); return }
@@ -3797,6 +3799,37 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
           <div style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)' }}>Aufgabe bearbeiten</div>
         </div>
         {isExpired && <span style={{ fontSize:11, fontWeight:700, color:'var(--err)', background:'var(--err-bg)', padding:'4px 10px', borderRadius:999 }}>Abgelaufen</span>}
+        {/* Drei-Punkte-Menü */}
+        <div style={{ position:'relative', flexShrink:0 }}>
+          <button onClick={()=>setShowMenu(v=>!v)}
+            style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--txt-muted)' }}>more_vert</span>
+          </button>
+          {showMenu && (
+            <>
+              <div style={{ position:'fixed', inset:0, zIndex:49 }} onClick={()=>setShowMenu(false)}/>
+              <div style={{ position:'absolute', right:0, top:44, zIndex:50, background:'var(--surf-card)', border:'1px solid var(--outline)', borderRadius:14, boxShadow:'0 8px 32px rgba(0,0,0,0.15)', minWidth:180, overflow:'hidden' }}>
+                <button onClick={async()=>{ setShowMenu(false); const { error } = await supabase.from('tasks').update({ is_template:true }).eq('id',task.id); setTemplateSaved(!error) }}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'none', border:'none', cursor:'pointer', fontSize:14, fontWeight:600, color:'var(--pri)', textAlign:'left' as const }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18 }}>auto_awesome</span>
+                  Als Vorlage speichern
+                </button>
+                <div style={{ height:'1px', background:'var(--outline)'}}/>
+                <button onClick={()=>{ setShowMenu(false); setConfirmAction('cancel') }} disabled={!task.is_active}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'none', border:'none', cursor: task.is_active?'pointer':'default', fontSize:14, fontWeight:600, color: task.is_active?'var(--txt-sec)':'var(--txt-muted)', textAlign:'left' as const, opacity: task.is_active?1:0.4 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18 }}>block</span>
+                  {task.is_active ? 'Stornieren' : 'Bereits inaktiv'}
+                </button>
+                <div style={{ height:'1px', background:'var(--outline)'}}/>
+                <button onClick={()=>{ setShowMenu(false); setConfirmAction('delete') }}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'none', border:'none', cursor:'pointer', fontSize:14, fontWeight:600, color:'var(--err-dot)', textAlign:'left' as const }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18 }}>delete</span>
+                  Löschen
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div style={{ height:0, flex:1, overflowY:'auto', padding:'16px 20px' }}>
@@ -3899,32 +3932,12 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
           <span className="material-symbols-outlined icon-sm">error</span>{error}
         </div>}
 
-        {/* Aktionen: dezent am Ende des Scroll-Bereichs */}
-        <div style={{ borderTop:'1px solid var(--outline)', marginTop:8, paddingTop:14, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <div style={{ display:'flex', gap:16 }}>
-            <button onClick={()=>setConfirmAction('cancel')} disabled={!task.is_active}
-              style={{ background:'none', border:'none', cursor: task.is_active ? 'pointer' : 'default', color: task.is_active ? 'var(--txt-muted)' : 'var(--outline)', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:4, padding:0, opacity: task.is_active ? 1 : 0.4 }}>
-              <span className="material-symbols-outlined icon-sm">block</span>
-              {task.is_active ? 'Stornieren' : 'Inaktiv'}
-            </button>
-            <button onClick={()=>setConfirmAction('delete')}
-              style={{ background:'none', border:'none', cursor:'pointer', color:'var(--err-dot)', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:4, padding:0 }}>
-              <span className="material-symbols-outlined icon-sm">delete</span>
-              Löschen
-            </button>
+        {/* Vorlage-Bestätigung */}
+        {templateSaved && (
+          <div style={{ background:'var(--ok-bg)', color:'var(--ok)', borderRadius:10, padding:'10px 14px', fontSize:13, marginBottom:12, display:'flex', gap:8, alignItems:'center' }}>
+            <span className="material-symbols-outlined icon-sm">check_circle</span>Als Vorlage gespeichert
           </div>
-          <button type="button"
-            onClick={async () => {
-              const { error } = await supabase.from('tasks').update({ is_template: true }).eq('id', task.id)
-              if (!error) setError('✅ Als Vorlage gespeichert!')
-              else setError(error.message)
-            }}
-            style={{ background:'none', border:'none', cursor:'pointer', color:'var(--pri)', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:4, padding:0 }}>
-            <span className="material-symbols-outlined icon-sm">auto_awesome</span>
-            Als Vorlage
-          </button>
-        </div>
-
+        )}
         <div style={{ height:8 }} />
       </div>
 
