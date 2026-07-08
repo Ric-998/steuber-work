@@ -3794,48 +3794,58 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
           <span className="material-symbols-outlined">close</span>
         </button>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:16, fontWeight:700, fontFamily:'var(--font-head)' }}>Aufgabe bearbeiten</div>
-          <div style={{ fontSize:11, color:'var(--txt-muted)' }}>Änderungen werden sofort übernommen</div>
+          <div style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)' }}>Aufgabe bearbeiten</div>
         </div>
         {isExpired && <span style={{ fontSize:11, fontWeight:700, color:'var(--err)', background:'var(--err-bg)', padding:'4px 10px', borderRadius:999 }}>Abgelaufen</span>}
       </div>
 
-      <div style={{ height:0, flex:1, overflowY:'auto', padding:20 }}>
+      <div style={{ height:0, flex:1, overflowY:'auto', padding:'16px 20px' }}>
 
         {/* Titel */}
-        <div style={{ marginBottom:16 }}>
+        <div style={{ marginBottom:12 }}>
           <label style={s.fieldLabel}>Titel *</label>
           <div className="iw" style={s.inputWrap}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>edit</span>
             <input value={title} onChange={e=>setTitle(e.target.value)} style={s.input} placeholder="Aufgabentitel"/>
           </div>
         </div>
 
         {/* Beschreibung */}
-        <div style={{ marginBottom:16 }}>
+        <div style={{ marginBottom:12 }}>
           <label style={s.fieldLabel}>Beschreibung</label>
-          <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3} placeholder="Was genau soll gemacht werden?" style={{ ...s.input, width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid var(--outline)', resize:'vertical', lineHeight:1.6 }}/>
+          <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={2} placeholder="Was genau soll gemacht werden?" style={{ ...s.input, width:'100%', padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', resize:'vertical', lineHeight:1.6, boxSizing:'border-box' as any }}/>
         </div>
 
-        {/* Kategorie */}
-        <div style={{ marginBottom:16 }}>
-          <label style={s.fieldLabel}>Kategorie</label>
-          <div className="iw" style={s.inputWrap}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>category</span>
-            <select value={categoryId} onChange={e=>setCategoryId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
-              <option value="">Keine Kategorie</option>
-              {categories.map(c=><option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
-            </select>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>expand_more</span>
+        {/* 2-Spalten: Kategorie + Intervall */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+          <div>
+            <label style={s.fieldLabel}>Kategorie</label>
+            <div className="iw" style={s.inputWrap}>
+              <select value={categoryId} onChange={e=>setCategoryId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
+                <option value="">Keine</option>
+                {categories.map(c=><option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
+              </select>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)', flexShrink:0 }}>expand_more</span>
+            </div>
+          </div>
+          <div>
+            <label style={s.fieldLabel}>Intervall</label>
+            <div className="iw" style={s.inputWrap}>
+              <select value={interval} onChange={e=>setInterval(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
+                {['täglich','wöchentlich','monatlich','quartalsweise','einmalig'].map(iv=>(
+                  <option key={iv} value={iv}>{iv.charAt(0).toUpperCase()+iv.slice(1)}</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)', flexShrink:0 }}>expand_more</span>
+            </div>
           </div>
         </div>
 
         {/* Objekt */}
-        <div style={{ marginBottom:16 }}>
+        <div style={{ marginBottom:12 }}>
           <label style={s.fieldLabel}>Objekt</label>
           <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>apartment</span>
-            <select value={objectId} onChange={e=>setObjectId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
+            <select value={objectId} onChange={e=>setObjectId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
               <option value="">Kein Objekt</option>
               {objects.map(o=><option key={o.id} value={o.id}>{o.address}, {o.city}</option>)}
             </select>
@@ -3843,103 +3853,85 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
           </div>
         </div>
 
-        {/* Intervall */}
-        <div style={{ marginBottom:16 }}>
-          <label style={s.fieldLabel}>Intervall</label>
-          <div className="iw" style={s.inputWrap}>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>repeat</span>
-            <select value={interval} onChange={e=>setInterval(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
-              {['täglich','wöchentlich','zweiwöchentlich','monatlich','quartalsweise','einmalig'].map(iv=>(
-                <option key={iv} value={iv}>{iv.charAt(0).toUpperCase()+iv.slice(1)}</option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>expand_more</span>
-          </div>
-        </div>
-
         {/* Mitarbeiter */}
-        <div style={{ marginBottom:16 }}>
-          <label style={s.fieldLabel}>Zuständiger Mitarbeiter</label>
+        <div style={{ marginBottom:12 }}>
+          <label style={s.fieldLabel}>Mitarbeiter</label>
           <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
-            <select value={assigneeId} onChange={e=>setAssigneeId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
+            <select value={assigneeId} onChange={e=>setAssigneeId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
               <option value="">Nicht zugewiesen</option>
               {team.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>expand_more</span>
           </div>
           {assigneeId !== (task.default_assignee_id||'') && (
-            <div style={{ fontSize:11, color:'var(--pri)', marginTop:6, display:'flex', alignItems:'center', gap:4 }}>
+            <div style={{ fontSize:11, color:'var(--pri)', marginTop:5, display:'flex', alignItems:'center', gap:4 }}>
               <span className="material-symbols-outlined icon-sm">info</span>
-              Neue Zuweisung gilt für zukünftige Assignments. Bestehende bleiben unverändert.
+              Gilt für zukünftige Assignments. Bestehende bleiben unverändert.
             </div>
           )}
         </div>
 
         {/* Datum */}
         {interval === 'einmalig' ? (
-          <div style={{ marginBottom:16 }}>
+          <div style={{ marginBottom:12 }}>
             <label style={s.fieldLabel}>Fälligkeitsdatum</label>
             <div className="iw" style={s.inputWrap}>
               <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>event</span>
-              <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }}/>
+              <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }}/>
             </div>
           </div>
         ) : (
-          <div style={{ marginBottom:16 }}>
+          <div style={{ marginBottom:12 }}>
             <label style={s.fieldLabel}>Vertragsende (optional)</label>
             <div className="iw" style={s.inputWrap}>
               <span className="material-symbols-outlined icon-sm" style={{ color: isExpired ? 'var(--err-dot)' : 'var(--txt-muted)' }}>event_busy</span>
-              <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color: isExpired ? 'var(--err-dot)' : 'var(--txt)' }}/>
+              <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color: isExpired ? 'var(--err-dot)' : 'var(--txt)' }}/>
               {endDate && <button onClick={()=>setEndDate('')} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex', alignItems:'center' }}>
                 <span className="material-symbols-outlined icon-sm">close</span>
               </button>}
             </div>
-            <div style={{ fontSize:11, color: isExpired ? 'var(--err-dot)' : 'var(--txt-muted)', marginTop:6 }}>
-              {isExpired ? '⚠ Dieser Auftrag ist abgelaufen und wurde deaktiviert.' : 'Ohne Enddatum läuft der Auftrag bis zur manuellen Deaktivierung.'}
-            </div>
+            {isExpired && <div style={{ fontSize:11, color:'var(--err-dot)', marginTop:5 }}>⚠ Abgelaufen — Task wurde deaktiviert.</div>}
           </div>
         )}
 
-        {error && <div style={{ background:'var(--err-bg)', color:'var(--err)', borderRadius:12, padding:'12px 14px', fontSize:13, marginBottom:14, display:'flex', gap:8 }}>
+        {error && <div style={{ background:'var(--err-bg)', color:'var(--err)', borderRadius:10, padding:'10px 14px', fontSize:13, marginBottom:12, display:'flex', gap:8, alignItems:'center' }}>
           <span className="material-symbols-outlined icon-sm">error</span>{error}
         </div>}
+
+        {/* Aktionen: dezent am Ende des Scroll-Bereichs */}
+        <div style={{ borderTop:'1px solid var(--outline)', marginTop:8, paddingTop:14, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ display:'flex', gap:16 }}>
+            <button onClick={()=>setConfirmAction('cancel')} disabled={!task.is_active}
+              style={{ background:'none', border:'none', cursor: task.is_active ? 'pointer' : 'default', color: task.is_active ? 'var(--txt-muted)' : 'var(--outline)', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:4, padding:0, opacity: task.is_active ? 1 : 0.4 }}>
+              <span className="material-symbols-outlined icon-sm">block</span>
+              {task.is_active ? 'Stornieren' : 'Inaktiv'}
+            </button>
+            <button onClick={()=>setConfirmAction('delete')}
+              style={{ background:'none', border:'none', cursor:'pointer', color:'var(--err-dot)', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:4, padding:0 }}>
+              <span className="material-symbols-outlined icon-sm">delete</span>
+              Löschen
+            </button>
+          </div>
+          <button type="button"
+            onClick={async () => {
+              const { error } = await supabase.from('tasks').update({ is_template: true }).eq('id', task.id)
+              if (!error) setError('✅ Als Vorlage gespeichert!')
+              else setError(error.message)
+            }}
+            style={{ background:'none', border:'none', cursor:'pointer', color:'var(--pri)', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:4, padding:0 }}>
+            <span className="material-symbols-outlined icon-sm">auto_awesome</span>
+            Als Vorlage
+          </button>
+        </div>
+
+        <div style={{ height:8 }} />
       </div>
 
-      {/* ── Gefahrenzone ── */}
-      <div style={{ padding:'0 20px 16px', borderTop:'1px solid var(--outline)', marginTop:4 }}>
-        <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10, marginTop:16 }}>
-          Aufgabe verwalten
-        </div>
-        <div style={{ display:'flex', gap:8 }}>
-          <button onClick={()=>setConfirmAction('cancel')} disabled={!task.is_active}
-            style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 0', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color: task.is_active ? 'var(--txt-sec)' : 'var(--txt-muted)', fontSize:12, fontWeight:700, cursor: task.is_active ? 'pointer' : 'not-allowed', opacity: task.is_active ? 1 : 0.5 }}>
-            <span className="material-symbols-outlined icon-sm">block</span>
-            {task.is_active ? 'Stornieren' : 'Bereits inaktiv'}
-          </button>
-          <button onClick={()=>setConfirmAction('delete')}
-            style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 0', borderRadius:12, border:'1.5px solid var(--err-dot)', background:'var(--err-bg)', color:'var(--err-dot)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
-            <span className="material-symbols-outlined icon-sm">delete</span>
-            Löschen
-          </button>
-        </div>
-      </div>
-
-      <div style={{ ...s.overlayFooter, flexDirection:'column', gap:8 }}>
+      <div style={s.overlayFooter}>
         <button onClick={save} disabled={saving||!title.trim()} style={{ ...s.btnPri, opacity:(!title.trim()||saving)?0.4:1 }}>
           <span className="material-symbols-outlined icon-sm">{saving?'hourglass_empty':'check'}</span>
-          {saving?'Wird gespeichert...':'Änderungen speichern'}
-        </button>
-        <button
-          type="button"
-          onClick={async () => {
-            const { error } = await supabase.from('tasks').update({ is_template: true }).eq('id', task.id)
-            if (!error) setError('✅ Als Vorlage gespeichert!')
-            else setError(error.message)
-          }}
-          style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px 0', borderRadius:12, border:'1.5px solid var(--pri)', background:'var(--pri-xl)', color:'var(--pri)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-          <span className="material-symbols-outlined" style={{ fontSize:16 }}>auto_awesome</span>
-          Als Vorlage speichern
+          {saving?'Wird gespeichert...':'Speichern'}
         </button>
       </div>
 
