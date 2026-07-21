@@ -74,6 +74,14 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
   const [objTasks, setObjTasks] = useState<any[]>([])
   const [objAssigns, setObjAssigns] = useState<any[]>([])
 
+  // Toast-Feedback
+  const [toast, setToast] = useState<string|null>(null)
+  const showToast = (msg:string) => { setToast(msg); setTimeout(()=>setToast(null), 2500) }
+
+  // Zuweisung entfernen
+  const [confirmUnassign, setConfirmUnassign] = useState<any>(null)
+  const [unassigning, setUnassigning] = useState(false)
+
   // Einteilen-Sheet
   const [editingAssign, setEditingAssign] = useState<any>(null)   // task object
   const [assignUser, setAssignUser] = useState('')
@@ -130,7 +138,7 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
       const objIds = objs.map((o: any) => o.id)
       const { data: tasksData } = await supabase
         .from('tasks')
-        .select('id,title,interval,object_id,is_active,category_id,default_assignee,categories(emoji,name),users!tasks_default_assignee_fkey(full_name)')
+        .select('id,title,interval,object_id,is_active,category_id,default_assignee_id,categories(emoji,name),users!tasks_default_assignee_id_fkey(full_name)')
         .in('object_id', objIds).eq('is_active', true).order('title')
       const tks = tasksData || []
       setTasks(tks)
@@ -193,7 +201,7 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     setSelectedObj(obj)
     const { data: tks } = await supabase
       .from('tasks')
-      .select('id,title,interval,is_active,category_id,default_assignee,categories(emoji,name),users!tasks_default_assignee_fkey(full_name)')
+      .select('id,title,interval,is_active,category_id,default_assignee_id,categories(emoji,name),users!tasks_default_assignee_id_fkey(full_name)')
       .eq('object_id', obj.id).eq('is_active', true).order('title')
     setObjTasks(tks || [])
     const taskIds = (tks || []).map((t: any) => t.id)
@@ -217,9 +225,24 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     } else {
       await supabase.from('task_assignments').insert({ task_id: editingAssign.id, user_id: assignUser, due_date: assignDate, status: 'offen' })
     }
+    const assignedName = allUsers.find((u:any)=>u.id===assignUser)?.full_name || 'Mitarbeiter'
+    const assignedDate = assignDate
     setSaving(false); setEditingAssign(null); setAssignUser('')
     if (selectedObj) loadObjectDetail(selectedObj)
     load()
+    showToast(`${assignedName} eingeteilt · ${fmtDate(assignedDate)}`)
+  }
+
+  const handleUnassign = async (assignment: any) => {
+    setUnassigning(true)
+    const { error } = await supabase.from('task_assignments').delete().eq('id', assignment.id)
+    setUnassigning(false)
+    setConfirmUnassign(null)
+    if (!error) {
+      if (selectedObj) loadObjectDetail(selectedObj)
+      load()
+      showToast('Zuweisung entfernt')
+    }
   }
 
   const handleSaveSubst = async () => {
@@ -228,9 +251,11 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     await supabase.from('task_assignments')
       .update({ substitute_id: substUser, status: 'vertretung' })
       .eq('id', substAssign.id)
+    const substName = allUsers.find((u:any)=>u.id===substUser)?.full_name || 'Mitarbeiter'
     setSubstSaving(false); setSubstAssign(null); setSubstUser('')
     if (selectedObj) loadObjectDetail(selectedObj)
     load()
+    showToast(`Vertretung gesetzt: ${substName}`)
   }
 
   const handlePwSave = async (e: React.FormEvent) => {
@@ -482,17 +507,27 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
                     {taskAssigns.length > 0 && (
                       <div style={{ borderTop:'1px solid var(--brd)' }}>
                         {taskAssigns.map((a:any) => (
-                          <div key={a.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderBottom:'1px solid var(--brd)', fontSize:12 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize:14, color:'#9ca3af', flexShrink:0 }}>event</span>
-                            <span style={{ color:'#6b7280', flexShrink:0 }}>{fmtDate(a.due_date)}</span>
+                          <div key={a.id} style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderBottom:'1px solid var(--brd)', fontSize:12 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:14, color: a.due_date===localToday() ? 'var(--pri)' : '#9ca3af', flexShrink:0 }}>event</span>
+                            <span style={{ color: a.due_date===localToday() ? 'var(--pri)' : '#6b7280', fontWeight: a.due_date===localToday() ? 700 : 400, flexShrink:0 }}>
+                              {a.due_date===localToday() ? 'Heute' : fmtDate(a.due_date)}
+                            </span>
                             <span style={{ flex:1, color:'var(--txt)', fontWeight:600, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{assigneeLabel(a)}</span>
                             <span style={s.statusChip(a.status)}>{STATUS_LABEL[a.status]||a.status}</span>
-                            {a.user_id && (
+                            {a.user_id && a.status==='offen' && (
                               <button
                                 onClick={()=>{ setSubstAssign(a); setSubstUser('') }}
                                 title="Vertretung setzen"
-                                style={{ padding:'4px 8px', borderRadius:6, border:'1px solid var(--brd)', background:'var(--surf)', color:'#7c3aed', fontSize:11, fontWeight:600, cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:3 }}>
-                                <span className="material-symbols-outlined" style={{ fontSize:13 }}>swap_horiz</span>Vertr.
+                                style={{ padding:'5px 6px', borderRadius:6, border:'1px solid var(--brd)', background:'var(--surf)', color:'#7c3aed', cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize:14 }}>swap_horiz</span>
+                              </button>
+                            )}
+                            {a.status==='offen' && (
+                              <button
+                                onClick={()=>setConfirmUnassign(a)}
+                                title="Zuweisung entfernen"
+                                style={{ padding:'5px 6px', borderRadius:6, border:'1px solid var(--brd)', background:'var(--surf)', color:'#dc2626', cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center' }}>
+                                <span className="material-symbols-outlined" style={{ fontSize:14 }}>close</span>
                               </button>
                             )}
                           </div>
@@ -796,6 +831,19 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     if (tab === 'profil')     return renderProfilTab()
   }
 
+  // Für das Einteilen-Sheet: bereits bestehende Zuweisung am gewählten Tag + sortierte Mitarbeiterliste (Standard zuerst)
+  const existingForAssignDate = editingAssign
+    ? [...upcomingAssigns, ...objAssigns].find((a:any)=>a.task_id===editingAssign.id && a.due_date===assignDate)
+    : null
+  const sortedAssignUsers = editingAssign
+    ? [...allUsers].sort((a:any,b:any) => {
+        const aDef = a.id === editingAssign.default_assignee_id ? 0 : 1
+        const bDef = b.id === editingAssign.default_assignee_id ? 0 : 1
+        if (aDef !== bDef) return aDef - bDef
+        return (a.full_name||'').localeCompare(b.full_name||'')
+      })
+    : allUsers
+
   return (
     <div style={s.root}>
       {/* Header */}
@@ -846,12 +894,38 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
           <div style={s.editSheet}>
             <div style={{ fontSize:16, fontWeight:700, color:'var(--txt)', marginBottom:4 }}>Mitarbeiter einteilen</div>
             <div style={{ fontSize:13, color:'#9ca3af', marginBottom:16 }}>{editingAssign.title}</div>
+
             <label style={{ fontSize:12, fontWeight:600, color:'var(--txt)', display:'block', marginBottom:6 }}>Datum</label>
+            <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+              {[{ label:'Heute', val:localToday() }, { label:'Morgen', val:addDaysISO(1) }].map(q => (
+                <button key={q.label} type="button" onClick={()=>setAssignDate(q.val)}
+                  style={{ padding:'6px 14px', borderRadius:8, border:`1.5px solid ${assignDate===q.val?'var(--pri)':'var(--brd)'}`, background:assignDate===q.val?'var(--pri-xl)':'var(--surf)', color:assignDate===q.val?'var(--pri)':'var(--txt-muted)', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                  {q.label}
+                </button>
+              ))}
+            </div>
             <input type="date" style={s.inputStyle} value={assignDate} onChange={e=>setAssignDate(e.target.value)} />
+
+            {existingForAssignDate && (
+              <div style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 12px', borderRadius:10, background:'var(--surf-low)', border:'1px dashed var(--brd)', fontSize:12, color:'var(--txt-muted)', marginBottom:12 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:15, flexShrink:0 }}>info</span>
+                Bereits zugewiesen: <strong style={{ color:'var(--txt)' }}>{(existingForAssignDate.users as any)?.full_name || '—'}</strong> — wird ersetzt
+              </div>
+            )}
+
             <label style={{ fontSize:12, fontWeight:600, color:'var(--txt)', display:'block', marginBottom:6 }}>Mitarbeiter</label>
+            {editingAssign.default_assignee_id && allUsers.some((u:any)=>u.id===editingAssign.default_assignee_id) && assignUser!==editingAssign.default_assignee_id && (
+              <button type="button" onClick={()=>setAssignUser(editingAssign.default_assignee_id)}
+                style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:8, border:'1.5px dashed var(--pri)', background:'var(--pri-xl)', color:'var(--pri)', fontSize:12, fontWeight:600, cursor:'pointer', marginBottom:8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:15 }}>star</span>
+                Standard: {(editingAssign.users as any)?.full_name}
+              </button>
+            )}
             <select style={s.inputStyle} value={assignUser} onChange={e=>setAssignUser(e.target.value)}>
               <option value="">Mitarbeiter wählen…</option>
-              {allUsers.map((u:any) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+              {sortedAssignUsers.map((u:any) => (
+                <option key={u.id} value={u.id}>{u.full_name}{u.id===editingAssign.default_assignee_id ? ' (Standard)' : ''}</option>
+              ))}
             </select>
             <button style={s.saveBtn} onClick={handleSaveAssign} disabled={!assignUser||saving}>
               {saving?'Wird gespeichert…':'Einteilen'}
@@ -878,6 +952,36 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
               {substSaving?'Wird gespeichert…':'Vertretung speichern'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Zuweisung entfernen: Bestätigung */}
+      {confirmUnassign && (
+        <div style={s.editOverlay} onClick={e=>{ if(e.target===e.currentTarget) setConfirmUnassign(null) }}>
+          <div style={s.editSheet}>
+            <div style={{ fontSize:16, fontWeight:700, color:'var(--txt)', marginBottom:4 }}>Zuweisung entfernen?</div>
+            <div style={{ fontSize:13, color:'#9ca3af', marginBottom:20 }}>
+              {(confirmUnassign.tasks as any)?.title} · {fmtDate(confirmUnassign.due_date)}
+              {(confirmUnassign.users as any)?.full_name ? ` · ${(confirmUnassign.users as any).full_name}` : ''}
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>setConfirmUnassign(null)}
+                style={{ flex:1, padding:'12px 0', borderRadius:12, border:'1.5px solid var(--brd)', background:'var(--surf)', color:'var(--txt)', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                Abbrechen
+              </button>
+              <button onClick={()=>handleUnassign(confirmUnassign)} disabled={unassigning}
+                style={{ flex:1, padding:'12px 0', borderRadius:12, border:'none', background:'#dc2626', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer' }}>
+                {unassigning?'Entferne…':'Entfernen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{ position:'fixed', left:'50%', transform:'translateX(-50%)', bottom: isDesktop ? 24 : 88, zIndex:300, background:'var(--txt)', color:'#fff', padding:'11px 20px', borderRadius:999, fontSize:13, fontWeight:600, boxShadow:'0 8px 24px rgba(0,0,0,0.25)', display:'flex', alignItems:'center', gap:8, whiteSpace:'nowrap' as const }}>
+          <span className="material-symbols-outlined" style={{ fontSize:16 }}>check_circle</span>{toast}
         </div>
       )}
 
