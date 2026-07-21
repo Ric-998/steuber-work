@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 const DEV_MODE = true
 const DEV_ACCOUNTS = [
   { label: '👔 Admin (Till)', email: 'till@steuber-dienstleistungen.de', password: 'Steuber2024' },
+  { label: '🧑‍🔧 Teamleiter (Test)', email: 'teamleiter@steuber-dienstleistungen.de', password: 'Steuber2024' },
+  { label: '👷 Mitarbeiter (Test)', email: 'mitarbeiter@steuber-dienstleistungen.de', password: 'Steuber2024' },
 ]
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -191,7 +193,7 @@ const s: Record<string, React.CSSProperties> = {
   btn:       { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, var(--pri) 0%, var(--pri-c) 100%)', color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-head)', boxShadow: '0 4px 16px rgba(8,93,104,0.25)', cursor: 'pointer' },
   devSection:{ marginTop: 20, padding: '14px', borderRadius: 14, border: '1.5px dashed #FF6B35', background: 'rgba(255,107,53,0.05)' },
   devLabel:  { fontSize: 11, fontWeight: 700, color: '#FF6B35', marginBottom: 10, textAlign: 'center', letterSpacing: '0.06em', textTransform: 'uppercase' },
-  devBtns:   { display: 'flex', gap: 8 },
+  devBtns:   { display: 'flex', flexDirection: 'column', gap: 8 },
   devBtn:    { flex: 1, padding: '10px 8px', borderRadius: 10, border: '1.5px solid #FF6B35', background: 'transparent', color: '#FF6B35', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   footer:    { textAlign: 'center', fontSize: 11, color: 'var(--txt-muted)', marginTop: 24 },
 }

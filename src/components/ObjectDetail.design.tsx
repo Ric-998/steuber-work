@@ -190,7 +190,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
         .select('id,full_name,role_id,roles(name)')
         .eq('is_active', true)
         .order('full_name')
-      const ols = (olData || []).filter((u: any) => u.roles?.name === 'objektleiter')
+      const ols = (olData || []).filter((u: any) => u.roles?.name === 'teamleiter')
       setOlList(ols.map((u: any) => ({ id: u.id, full_name: u.full_name })))
 
       // Contacts laden: object_id-Kontakte + Kundenkontakte (customer_id)
@@ -464,9 +464,9 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
 
           {/* ── Objektleiter ── */}
           <div style={{ padding:'14px 16px' }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Objektleiter</div>
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Teamleiter</div>
             {olList.length === 0 ? (
-              <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Noch keine Mitarbeiter mit Objektleiter-Rolle.</div>
+              <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Noch keine Mitarbeiter mit Teamleiter-Rolle.</div>
             ) : (
               <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
                 <div onClick={() => handleOlChange(null)}

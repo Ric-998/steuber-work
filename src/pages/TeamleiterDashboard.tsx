@@ -8,7 +8,7 @@ interface Props {
   onLogout: () => void
 }
 
-type Tab = 'heute' | 'objekte' | 'team' | 'profil'
+type Tab = 'uebersicht' | 'aufgaben' | 'objekte' | 'team' | 'profil'
 
 const STATUS_COLOR: Record<string, string> = {
   offen:'#6b7280', in_arbeit:'#d97706', erledigt:'#16a34a', problem:'#dc2626', vertretung:'#7c3aed',
@@ -19,10 +19,23 @@ const STATUS_BG: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   offen:'Offen', in_arbeit:'In Arbeit', erledigt:'Erledigt', problem:'Problem', vertretung:'Vertretung',
 }
+const LEAVE_LABEL: Record<string, string> = {
+  krankmeldung:'Krank', urlaub:'Urlaub',
+}
+const LEAVE_COLOR: Record<string, { c:string; bg:string }> = {
+  krankmeldung:{ c:'#dc2626', bg:'#fef2f2' }, urlaub:{ c:'#0369a1', bg:'#e0f2fe' },
+}
 
 function localToday() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+function addDaysISO(days: number) {
+  const d = new Date(); d.setDate(d.getDate()+days)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('de-DE',{ weekday:'short', day:'2-digit', month:'short' })
 }
 
 // ── Reusable Row component for ProfileTab ───────────────────────────
@@ -47,20 +60,30 @@ function Row({ icon, iconBg, label, sub, chevron, right, onClick, last }: {
   )
 }
 
-export default function ObjektleiterDashboard({ userId, userName, onLogout }: Props) {
-  const [tab, setTab] = useState<Tab>('heute')
+export default function TeamleiterDashboard({ userId, userName, onLogout }: Props) {
+  const [tab, setTab] = useState<Tab>('uebersicht')
   const [objects, setObjects] = useState<any[]>([])
+  const [tasks, setTasks] = useState<any[]>([])
   const [todayAssigns, setTodayAssigns] = useState<any[]>([])
+  const [upcomingAssigns, setUpcomingAssigns] = useState<any[]>([])
   const [team, setTeam] = useState<any[]>([])
+  const [leaves, setLeaves] = useState<any[]>([])
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedObj, setSelectedObj] = useState<any>(null)
   const [objTasks, setObjTasks] = useState<any[]>([])
   const [objAssigns, setObjAssigns] = useState<any[]>([])
-  const [editingAssign, setEditingAssign] = useState<any>(null)
+
+  // Einteilen-Sheet
+  const [editingAssign, setEditingAssign] = useState<any>(null)   // task object
   const [assignUser, setAssignUser] = useState('')
   const [assignDate, setAssignDate] = useState(localToday())
   const [saving, setSaving] = useState(false)
+
+  // Vertretung-Sheet
+  const [substAssign, setSubstAssign] = useState<any>(null)       // task_assignment object
+  const [substUser, setSubstUser] = useState('')
+  const [substSaving, setSubstSaving] = useState(false)
 
   // Profile state
   const [email, setEmailState] = useState('')
@@ -76,7 +99,6 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
   const [editPhone, setEditPhone] = useState('')
   const [dataSaving, setDataSaving] = useState(false)
   const [dataMsg, setDataMsg] = useState<{ok:boolean;text:string}|null>(null)
-  const [pushEnabled, setPushEnabled] = useState(false)
   const [showFeedback, setShowFeedback] = useState(false)
 
   const initials = userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -95,6 +117,7 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
   const load = useCallback(async () => {
     setLoading(true)
     const today = localToday()
+    const horizon = addDaysISO(14)
     const [objRes, usersRes] = await Promise.all([
       supabase.from('objects').select('*').eq('objektleiter_id', userId).eq('is_active', true).order('name'),
       supabase.from('users').select('id,full_name,is_active').eq('is_active', true).order('full_name'),
@@ -106,27 +129,50 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
     if (objs.length > 0) {
       const objIds = objs.map((o: any) => o.id)
       const { data: tasksData } = await supabase
-        .from('tasks').select('id,object_id').in('object_id', objIds).eq('is_active', true)
-      const taskIds = (tasksData || []).map((t: any) => t.id)
+        .from('tasks')
+        .select('id,title,interval,object_id,is_active,category_id,default_assignee,categories(emoji,name),users!tasks_default_assignee_fkey(full_name)')
+        .in('object_id', objIds).eq('is_active', true).order('title')
+      const tks = tasksData || []
+      setTasks(tks)
+      const taskIds = tks.map((t: any) => t.id)
 
       if (taskIds.length > 0) {
-        const [todayRes, teamRes] = await Promise.all([
+        const monthAgo = addDaysISO(-30)
+        const [todayRes, upcomingRes, teamRes] = await Promise.all([
           supabase.from('task_assignments')
-            .select('id,task_id,user_id,due_date,status,tasks(title,object_id,categories(emoji)),users!task_assignments_user_id_fkey(id,full_name)')
+            .select('id,task_id,user_id,substitute_id,due_date,status,travel_minutes,started_at,completed_at,tasks(title,object_id,categories(emoji)),users!task_assignments_user_id_fkey(id,full_name),substitute:users!task_assignments_substitute_id_fkey(id,full_name)')
             .in('task_id', taskIds).eq('due_date', today),
           supabase.from('task_assignments')
+            .select('id,task_id,user_id,substitute_id,due_date,status,tasks(title,object_id,categories(emoji)),users!task_assignments_user_id_fkey(id,full_name),substitute:users!task_assignments_substitute_id_fkey(id,full_name)')
+            .in('task_id', taskIds).gte('due_date', today).lte('due_date', horizon).order('due_date'),
+          supabase.from('task_assignments')
             .select('user_id,users!task_assignments_user_id_fkey(id,full_name)')
-            .in('task_id', taskIds)
-            .gte('due_date', (() => { const d = new Date(); d.setDate(d.getDate()-30); return d.toISOString().slice(0,10) })()),
+            .in('task_id', taskIds).gte('due_date', monthAgo),
         ])
         setTodayAssigns(todayRes.data || [])
+        setUpcomingAssigns(upcomingRes.data || [])
+
         const seen = new Set<string>()
         const uniqueTeam: any[] = []
         ;(teamRes.data || []).forEach((a: any) => {
           if (a.user_id && !seen.has(a.user_id)) { seen.add(a.user_id); uniqueTeam.push(a.users) }
         })
-        setTeam(uniqueTeam.filter(Boolean))
+        const teamMembers = uniqueTeam.filter(Boolean)
+        setTeam(teamMembers)
+
+        // Krankmeldungen / Urlaube des Teams (laufend + kommend)
+        const memberIds = teamMembers.map((m: any) => m.id)
+        if (memberIds.length > 0) {
+          const { data: leaveData } = await supabase.from('leave_requests')
+            .select('id,user_id,request_type,from_date,to_date,status,note,users!leave_requests_user_id_fkey(full_name)')
+            .in('user_id', memberIds).neq('status','abgelehnt').gte('to_date', monthAgo).order('from_date')
+          setLeaves(leaveData || [])
+        } else { setLeaves([]) }
+      } else {
+        setTodayAssigns([]); setUpcomingAssigns([]); setTeam([]); setLeaves([])
       }
+    } else {
+      setTasks([]); setTodayAssigns([]); setUpcomingAssigns([]); setTeam([]); setLeaves([])
     }
     setLoading(false)
   }, [userId])
@@ -145,18 +191,17 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
 
   const loadObjectDetail = async (obj: any) => {
     setSelectedObj(obj)
-    const { data: tasks } = await supabase
+    const { data: tks } = await supabase
       .from('tasks')
       .select('id,title,interval,is_active,category_id,default_assignee,categories(emoji,name),users!tasks_default_assignee_fkey(full_name)')
-      .eq('object_id', obj.id).order('title')
-    setObjTasks(tasks || [])
-    const taskIds = (tasks || []).map((t: any) => t.id)
+      .eq('object_id', obj.id).eq('is_active', true).order('title')
+    setObjTasks(tks || [])
+    const taskIds = (tks || []).map((t: any) => t.id)
     if (taskIds.length > 0) {
       const today = localToday()
-      const in14 = new Date(); in14.setDate(in14.getDate()+14)
       const { data: assigns } = await supabase
         .from('task_assignments')
-        .select('id,task_id,user_id,due_date,status,users!task_assignments_user_id_fkey(id,full_name)')
+        .select('id,task_id,user_id,substitute_id,due_date,status,users!task_assignments_user_id_fkey(id,full_name),substitute:users!task_assignments_substitute_id_fkey(id,full_name)')
         .in('task_id', taskIds).gte('due_date', today).order('due_date')
       setObjAssigns(assigns || [])
     } else { setObjAssigns([]) }
@@ -168,12 +213,24 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
     const { data: existing } = await supabase.from('task_assignments').select('id')
       .eq('task_id', editingAssign.id).eq('due_date', assignDate).maybeSingle()
     if (existing) {
-      await supabase.from('task_assignments').update({ user_id: assignUser }).eq('id', existing.id)
+      await supabase.from('task_assignments').update({ user_id: assignUser, substitute_id: null, status: 'offen' }).eq('id', existing.id)
     } else {
       await supabase.from('task_assignments').insert({ task_id: editingAssign.id, user_id: assignUser, due_date: assignDate, status: 'offen' })
     }
-    setSaving(false); setEditingAssign(null)
+    setSaving(false); setEditingAssign(null); setAssignUser('')
     if (selectedObj) loadObjectDetail(selectedObj)
+    load()
+  }
+
+  const handleSaveSubst = async () => {
+    if (!substAssign || !substUser) return
+    setSubstSaving(true)
+    await supabase.from('task_assignments')
+      .update({ substitute_id: substUser, status: 'vertretung' })
+      .eq('id', substAssign.id)
+    setSubstSaving(false); setSubstAssign(null); setSubstUser('')
+    if (selectedObj) loadObjectDetail(selectedObj)
+    load()
   }
 
   const handlePwSave = async (e: React.FormEvent) => {
@@ -242,7 +299,6 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
       display:'flex', alignItems:'center', justifyContent:'center',
       fontSize:14, fontWeight:700, color:'#fff', cursor:'pointer',
     },
-    // Desktop sidebar tabs
     desktopLayout: { display:'flex', minHeight:'calc(100dvh - 64px)' },
     sidebar: {
       width:220, borderRight:'1px solid var(--brd)', padding:'16px 12px',
@@ -257,7 +313,6 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
       fontSize:14, fontWeight:active?700:500, width:'100%', textAlign:'left' as const,
       transition:'all 0.15s',
     }),
-    // Mobile bottom nav
     bottomNav: {
       position:'fixed' as const, bottom:0, left:0, right:0, zIndex:100,
       background:'rgba(248,249,250,0.95)', backdropFilter:'blur(20px)',
@@ -270,7 +325,6 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
       color:active?'var(--pri)':'var(--txt-muted)',
     }),
     navLabel: (active:boolean) => ({ fontSize:10, fontWeight:active?700:500 }),
-    // Content
     content: { flex:1, padding:contentPad, maxWidth:maxW, margin:'0 auto', width:'100%' },
     kpiGrid: {
       display:'grid',
@@ -319,18 +373,24 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
   }
 
   const NAV_ITEMS: { key:Tab; icon:string; label:string }[] = [
-    { key:'heute',   icon:'today',           label:'Heute' },
-    { key:'objekte', icon:'apartment',        label:'Objekte' },
-    { key:'team',    icon:'group',            label:'Team' },
-    { key:'profil',  icon:'person',           label:'Profil' },
+    { key:'uebersicht', icon:'dashboard',  label:'Übersicht' },
+    { key:'aufgaben',   icon:'checklist',  label:'Aufgaben' },
+    { key:'objekte',    icon:'apartment',  label:'Objekte' },
+    { key:'team',       icon:'group',      label:'Team' },
+    { key:'profil',     icon:'person',     label:'Profil' },
   ]
 
-  // ── Tab Contents ─────────────────────────────────────────────────
-  const renderHeuteTab = () => (
+  const assigneeLabel = (a:any) =>
+    a.status==='vertretung' && a.substitute
+      ? `${(a.substitute as any).full_name} (Vertr.)`
+      : (a.users as any)?.full_name || 'Unzugewiesen'
+
+  // ── Tab: Übersicht ───────────────────────────────────────────────
+  const renderUebersichtTab = () => (
     <>
       <div style={s.kpiGrid}>
         {[
-          { label:'Aufgaben', val:stats.total, warn:false },
+          { label:'Aufgaben heute', val:stats.total, warn:false },
           { label:'In Arbeit', val:stats.inProgress, warn:false },
           { label:'Erledigt', val:stats.done, warn:false },
           { label:'Probleme', val:stats.problems, warn:stats.problems>0 },
@@ -350,7 +410,7 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
               {(a.tasks as any)?.categories?.emoji} {(a.tasks as any)?.title}
             </div>
             <div style={{ fontSize:12, color:'#6b7280', marginTop:4 }}>
-              {(a.users as any)?.full_name} · {objects.find((o:any)=>o.id===(a.tasks as any)?.object_id)?.address||''}
+              {assigneeLabel(a)} · {objects.find((o:any)=>o.id===(a.tasks as any)?.object_id)?.address||''}
             </div>
           </div>
         ))}
@@ -370,7 +430,7 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{(a.tasks as any)?.title}</div>
                 <div style={{ fontSize:12, color:'#9ca3af', marginTop:2 }}>
-                  {(a.users as any)?.full_name} · {objects.find((o:any)=>o.id===(a.tasks as any)?.object_id)?.address||''}
+                  {assigneeLabel(a)} · {objects.find((o:any)=>o.id===(a.tasks as any)?.object_id)?.address||''}
                 </div>
               </div>
               <span style={s.statusChip(a.status)}>{STATUS_LABEL[a.status]||a.status}</span>
@@ -381,6 +441,75 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
     </>
   )
 
+  // ── Tab: Aufgaben (zuweisen + Vertretung, gruppiert nach Objekt) ──
+  const renderAufgabenTab = () => {
+    if (objects.length === 0) return (
+      <div style={s.emptyState}>
+        <span className="material-symbols-outlined" style={{ fontSize:36, display:'block', marginBottom:8 }}>apartment</span>
+        Dir wurden noch keine Objekte zugewiesen
+      </div>
+    )
+    return (
+      <>
+        <div style={s.sectionLabel}>Aufgaben planen ({tasks.length})</div>
+        {objects.map((obj:any) => {
+          const objTasksList = tasks.filter((t:any)=>t.object_id===obj.id)
+          if (objTasksList.length === 0) return null
+          return (
+            <div key={obj.id} style={{ marginBottom:20 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>apartment</span>
+                <span style={{ fontSize:14, fontWeight:800, color:'var(--txt)' }}>{obj.name || obj.address}</span>
+              </div>
+              {objTasksList.map((task:any) => {
+                const taskAssigns = upcomingAssigns.filter((a:any)=>a.task_id===task.id)
+                return (
+                  <div key={task.id} style={{ background:'var(--surf)', borderRadius: isDesktop?14:12, border:'1px solid var(--brd)', marginBottom:10, overflow:'hidden' }}>
+                    <div style={{ padding: isDesktop?'14px 16px':'12px 14px', display:'flex', alignItems:'center', gap:10 }}>
+                      <span style={{ fontSize:20 }}>{task.categories?.emoji||'📋'}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{task.title}</div>
+                        <div style={{ fontSize:12, color:'#9ca3af' }}>
+                          {task.interval}{(task.users as any)?.full_name ? ` · Standard: ${(task.users as any).full_name}` : ''}
+                        </div>
+                      </div>
+                      <button
+                        onClick={()=>{ setEditingAssign(task); setAssignUser(''); setAssignDate(localToday()) }}
+                        style={{ padding:'7px 12px', borderRadius:8, border:'none', background:'var(--pri-xl)', color:'var(--pri)', fontSize:12, fontWeight:600, cursor:'pointer', flexShrink:0 }}>
+                        + Einteilen
+                      </button>
+                    </div>
+                    {taskAssigns.length > 0 && (
+                      <div style={{ borderTop:'1px solid var(--brd)' }}>
+                        {taskAssigns.map((a:any) => (
+                          <div key={a.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderBottom:'1px solid var(--brd)', fontSize:12 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize:14, color:'#9ca3af', flexShrink:0 }}>event</span>
+                            <span style={{ color:'#6b7280', flexShrink:0 }}>{fmtDate(a.due_date)}</span>
+                            <span style={{ flex:1, color:'var(--txt)', fontWeight:600, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{assigneeLabel(a)}</span>
+                            <span style={s.statusChip(a.status)}>{STATUS_LABEL[a.status]||a.status}</span>
+                            {a.user_id && (
+                              <button
+                                onClick={()=>{ setSubstAssign(a); setSubstUser('') }}
+                                title="Vertretung setzen"
+                                style={{ padding:'4px 8px', borderRadius:6, border:'1px solid var(--brd)', background:'var(--surf)', color:'#7c3aed', fontSize:11, fontWeight:600, cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:3 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize:13 }}>swap_horiz</span>Vertr.
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+
+  // ── Tab: Objekte (lesend) ────────────────────────────────────────
   const renderObjekteTab = () => (
     selectedObj ? (
       <>
@@ -393,7 +522,7 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
         </div>
         <div style={{ fontSize:13, color:'#9ca3af', marginBottom:20 }}>{selectedObj.address}, {selectedObj.city}</div>
 
-        <div style={s.sectionLabel}>Leistungen & Einteilung ({objTasks.length})</div>
+        <div style={s.sectionLabel}>Leistungen ({objTasks.length})</div>
         {objTasks.length === 0
           ? <div style={s.emptyState}>Keine Leistungen für dieses Objekt</div>
           : objTasks.map((task:any) => {
@@ -405,23 +534,17 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:14, fontWeight:700, color:'var(--txt)' }}>{task.title}</div>
                     <div style={{ fontSize:12, color:'#9ca3af' }}>
-                      {task.interval} {(task.users as any)?.full_name ? `· Standard: ${(task.users as any).full_name}` : ''}
+                      {task.interval}{(task.users as any)?.full_name ? ` · Standard: ${(task.users as any).full_name}` : ''}
                     </div>
                   </div>
-                  <button
-                    onClick={()=>{ setEditingAssign(task); setAssignUser(''); setAssignDate(localToday()) }}
-                    style={{ padding:'7px 12px', borderRadius:8, border:'none', background:'var(--pri-xl)', color:'var(--pri)', fontSize:12, fontWeight:600, cursor:'pointer', flexShrink:0 }}
-                  >
-                    + Einteilen
-                  </button>
                 </div>
                 {taskAssigns.length > 0 && (
                   <div style={{ borderTop:'1px solid var(--brd)' }}>
                     {taskAssigns.map((a:any) => (
                       <div key={a.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 14px', borderBottom:'1px solid var(--brd)', fontSize:12 }}>
                         <span className="material-symbols-outlined" style={{ fontSize:14, color:'#9ca3af' }}>event</span>
-                        <span style={{ color:'#6b7280', flexShrink:0 }}>{new Date(a.due_date).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'short'})}</span>
-                        <span style={{ flex:1, color:'var(--txt)', fontWeight:600 }}>{(a.users as any)?.full_name||'Unzugewiesen'}</span>
+                        <span style={{ color:'#6b7280', flexShrink:0 }}>{fmtDate(a.due_date)}</span>
+                        <span style={{ flex:1, color:'var(--txt)', fontWeight:600 }}>{assigneeLabel(a)}</span>
                         <span style={s.statusChip(a.status)}>{STATUS_LABEL[a.status]||a.status}</span>
                       </div>
                     ))}
@@ -470,49 +593,92 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
     )
   )
 
-  const renderTeamTab = () => (
-    <>
-      <div style={s.sectionLabel}>Mein Team ({team.length} Mitarbeiter)</div>
-      {team.length === 0
-        ? <div style={s.emptyState}>
-            <span className="material-symbols-outlined" style={{ fontSize:36, display:'block', marginBottom:8 }}>group</span>
-            Noch keine Mitarbeiter eingeteilt
-          </div>
-        : <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
-            {team.map((member:any) => {
-              if (!member) return null
-              const ini = (member.full_name||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
-              const mt = todayAssigns.filter((a:any)=>a.user_id===member.id)
-              const done = mt.filter((a:any)=>a.status==='erledigt').length
-              const hasProb = mt.some((a:any)=>a.status==='problem')
-              return (
-                <div key={member.id} style={s.teamCard}>
-                  <div style={s.memberAvatar}>{ini}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{member.full_name}</div>
-                    <div style={{ fontSize:12, color:'#9ca3af', marginTop:2 }}>
-                      {mt.length>0 ? `${done}/${mt.length} heute erledigt` : 'Heute keine Aufgaben'}
-                    </div>
+  // ── Tab: Team (Status + Krankmeldungen + Fahrzeit/Stunden) ───────
+  const renderTeamTab = () => {
+    const today = localToday()
+    const activeLeaves = leaves.filter((l:any)=> l.from_date <= today && l.to_date >= today)
+    const upcomingLeaves = leaves.filter((l:any)=> l.from_date > today)
+    return (
+      <>
+        {(activeLeaves.length > 0 || upcomingLeaves.length > 0) && <>
+          <div style={s.sectionLabel}>Abwesenheiten</div>
+          {[...activeLeaves, ...upcomingLeaves].map((l:any) => {
+            const col = LEAVE_COLOR[l.request_type] || { c:'#6b7280', bg:'#f3f4f6' }
+            const running = l.from_date <= today && l.to_date >= today
+            return (
+              <div key={l.id} style={{ ...s.card, display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${col.c}` }}>
+                <span style={{ padding:'2px 8px', borderRadius:6, fontSize:11, fontWeight:700, color:col.c, background:col.bg, flexShrink:0 }}>
+                  {LEAVE_LABEL[l.request_type]||l.request_type}
+                </span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{(l.users as any)?.full_name||'—'}</div>
+                  <div style={{ fontSize:12, color:'#9ca3af', marginTop:1 }}>
+                    {fmtDate(l.from_date)} – {fmtDate(l.to_date)}{l.status==='genehmigt' ? '' : ' · ausstehend'}
                   </div>
-                  {hasProb
-                    ? <span style={{ fontSize:11, fontWeight:600, color:'#dc2626', background:'#fef2f2', padding:'3px 8px', borderRadius:6 }}>Problem</span>
-                    : mt.length>0
-                      ? <span style={{ fontSize:11, fontWeight:600, color:done===mt.length?'#16a34a':'#d97706', background:done===mt.length?'#f0fdf4':'#fffbeb', padding:'3px 8px', borderRadius:6 }}>
-                          {done===mt.length?'Alles erledigt':'In Arbeit'}
-                        </span>
-                      : null
-                  }
                 </div>
-              )
-            })}
-          </div>
-      }
-    </>
-  )
+                {running && <span style={{ fontSize:11, fontWeight:700, color:col.c }}>läuft</span>}
+              </div>
+            )
+          })}
+          <div style={{ marginBottom:16 }} />
+        </>}
 
+        <div style={s.sectionLabel}>Mein Team ({team.length} Mitarbeiter)</div>
+        {team.length === 0
+          ? <div style={s.emptyState}>
+              <span className="material-symbols-outlined" style={{ fontSize:36, display:'block', marginBottom:8 }}>group</span>
+              Noch keine Mitarbeiter eingeteilt
+            </div>
+          : <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
+              {team.map((member:any) => {
+                if (!member) return null
+                const ini = (member.full_name||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
+                const mt = todayAssigns.filter((a:any)=>a.user_id===member.id || a.substitute_id===member.id)
+                const done = mt.filter((a:any)=>a.status==='erledigt').length
+                const hasProb = mt.some((a:any)=>a.status==='problem')
+                const travel = todayAssigns
+                  .filter((a:any)=>a.user_id===member.id)
+                  .reduce((sum:number,a:any)=> sum + (a.travel_minutes||0), 0)
+                const onLeave = activeLeaves.find((l:any)=>l.user_id===member.id)
+                return (
+                  <div key={member.id} style={s.teamCard}>
+                    <div style={s.memberAvatar}>{ini}</div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{member.full_name}</div>
+                      <div style={{ fontSize:12, color:'#9ca3af', marginTop:2 }}>
+                        {mt.length>0 ? `${done}/${mt.length} heute erledigt` : 'Heute keine Aufgaben'}
+                        {travel>0 ? ` · ${travel} Min Fahrzeit` : ''}
+                      </div>
+                    </div>
+                    {onLeave
+                      ? <span style={{ fontSize:11, fontWeight:700, color:(LEAVE_COLOR[onLeave.request_type]||{c:'#6b7280'}).c, background:(LEAVE_COLOR[onLeave.request_type]||{bg:'#f3f4f6'}).bg, padding:'3px 8px', borderRadius:6, flexShrink:0 }}>
+                          {LEAVE_LABEL[onLeave.request_type]||onLeave.request_type}
+                        </span>
+                      : hasProb
+                        ? <span style={{ fontSize:11, fontWeight:600, color:'#dc2626', background:'#fef2f2', padding:'3px 8px', borderRadius:6, flexShrink:0 }}>Problem</span>
+                        : mt.length>0
+                          ? <span style={{ fontSize:11, fontWeight:600, color:done===mt.length?'#16a34a':'#d97706', background:done===mt.length?'#f0fdf4':'#fffbeb', padding:'3px 8px', borderRadius:6, flexShrink:0 }}>
+                              {done===mt.length?'Fertig':'In Arbeit'}
+                            </span>
+                          : null
+                    }
+                  </div>
+                )
+              })}
+            </div>
+        }
+
+        <div style={{ marginTop:16, padding:'12px 14px', borderRadius:12, background:'var(--surf-low)', border:'1px dashed var(--outline)', fontSize:12, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:8 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:16 }}>schedule</span>
+          Arbeitsstunden werden künftig manuell erfasst und hier je Mitarbeiter angezeigt.
+        </div>
+      </>
+    )
+  }
+
+  // ── Tab: Profil ──────────────────────────────────────────────────
   const renderProfilTab = () => (
     <div style={{ paddingBottom:32, maxWidth: isDesktop?540:'100%' }}>
-      {/* Header */}
       <div style={{ display:'flex', alignItems:'center', gap:14, padding:'8px 4px 20px' }}>
         <div style={{ width:52, height:52, borderRadius:'50%', background:'linear-gradient(135deg,var(--pri),var(--pri-c))',
           display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800, color:'#fff', flexShrink:0 }}>
@@ -521,15 +687,13 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
         <div>
           <div style={{ fontSize:18, fontWeight:800, color:'var(--txt)', fontFamily:'var(--font-head)' }}>{userName}</div>
           <div style={{ fontSize:12, color:'var(--pri)', fontWeight:600, marginTop:2, background:'var(--pri-xl)', padding:'2px 8px', borderRadius:6, display:'inline-block' }}>
-            Objektleiter
+            Teamleiter
           </div>
         </div>
       </div>
 
-      {/* Konto */}
       <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:8 }}>Konto</div>
       <div style={{ background:'var(--surf-card)', borderRadius:18, overflow:'hidden', border:'1px solid var(--outline)', marginBottom:20 }}>
-        {/* E-Mail */}
         <div style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 16px', borderBottom:'1px solid var(--outline)' }}>
           <div style={{ width:34, height:34, borderRadius:10, background:'var(--pri-xl)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--pri)' }}>mail</span>
@@ -540,7 +704,6 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
           </div>
         </div>
 
-        {/* Meine Daten */}
         <div style={{ borderBottom:'1px solid var(--outline)' }}>
           <div onClick={()=>{setShowDataForm(f=>!f);setDataMsg(null)}}
             style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 16px', cursor:'pointer' }}>
@@ -579,7 +742,6 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
           )}
         </div>
 
-        {/* Passwort */}
         <div>
           <div onClick={()=>{setShowPwForm(f=>!f);setPwMsg(null)}}
             style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 16px', cursor:'pointer' }}>
@@ -611,14 +773,12 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
         </div>
       </div>
 
-      {/* Sonstiges */}
       <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:8 }}>Sonstiges</div>
       <div style={{ background:'var(--surf-card)', borderRadius:18, overflow:'hidden', border:'1px solid var(--outline)', marginBottom:20 }}>
         <Row icon="lightbulb" iconBg="rgba(217,119,6,0.08)" label="Feedback & Ideen"
           sub="Fehler melden, Feature-Wünsche, Vorschläge" chevron onClick={()=>setShowFeedback(true)} last />
       </div>
 
-      {/* Abmelden */}
       <button onClick={onLogout} style={{ width:'100%', padding:'14px', borderRadius:16, border:'none',
         background:'rgba(186,26,26,0.08)', color:'var(--err-dot)', fontSize:14, fontWeight:700,
         display:'flex', alignItems:'center', justifyContent:'center', gap:8, cursor:'pointer' }}>
@@ -629,10 +789,11 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
 
   const renderTabContent = () => {
     if (loading) return <div style={s.emptyState}>Lade…</div>
-    if (tab === 'heute')   return renderHeuteTab()
-    if (tab === 'objekte') return renderObjekteTab()
-    if (tab === 'team')    return renderTeamTab()
-    if (tab === 'profil')  return renderProfilTab()
+    if (tab === 'uebersicht') return renderUebersichtTab()
+    if (tab === 'aufgaben')   return renderAufgabenTab()
+    if (tab === 'objekte')    return renderObjekteTab()
+    if (tab === 'team')       return renderTeamTab()
+    if (tab === 'profil')     return renderProfilTab()
   }
 
   return (
@@ -644,13 +805,12 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
           <span style={s.logoLight}>WORK</span>
         </div>
         <div style={s.headerRight}>
-          {!isMobile && <span style={s.roleBadge}>Objektleiter</span>}
+          {!isMobile && <span style={s.roleBadge}>Teamleiter</span>}
           <div style={s.avatar} onClick={()=>setTab('profil')}>{initials}</div>
         </div>
       </div>
 
       {isDesktop ? (
-        /* Desktop: Sidebar layout */
         <div style={s.desktopLayout}>
           <nav style={s.sidebar}>
             {NAV_ITEMS.map(({ key, icon, label }) => (
@@ -665,7 +825,6 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
           </main>
         </div>
       ) : (
-        /* Mobile + Tablet: scrollable content + bottom nav */
         <>
           <main style={s.content}>
             {renderTabContent()}
@@ -681,7 +840,7 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
         </>
       )}
 
-      {/* Assign Sheet */}
+      {/* Einteilen Sheet */}
       {editingAssign && (
         <div style={s.editOverlay} onClick={e=>{ if(e.target===e.currentTarget) setEditingAssign(null) }}>
           <div style={s.editSheet}>
@@ -696,6 +855,27 @@ export default function ObjektleiterDashboard({ userId, userName, onLogout }: Pr
             </select>
             <button style={s.saveBtn} onClick={handleSaveAssign} disabled={!assignUser||saving}>
               {saving?'Wird gespeichert…':'Einteilen'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Vertretung Sheet */}
+      {substAssign && (
+        <div style={s.editOverlay} onClick={e=>{ if(e.target===e.currentTarget) setSubstAssign(null) }}>
+          <div style={s.editSheet}>
+            <div style={{ fontSize:16, fontWeight:700, color:'var(--txt)', marginBottom:4 }}>Vertretung setzen</div>
+            <div style={{ fontSize:13, color:'#9ca3af', marginBottom:16 }}>
+              {(substAssign.tasks as any)?.title} · {fmtDate(substAssign.due_date)}
+              {(substAssign.users as any)?.full_name ? ` · statt ${(substAssign.users as any).full_name}` : ''}
+            </div>
+            <label style={{ fontSize:12, fontWeight:600, color:'var(--txt)', display:'block', marginBottom:6 }}>Vertretung durch</label>
+            <select style={s.inputStyle} value={substUser} onChange={e=>setSubstUser(e.target.value)}>
+              <option value="">Mitarbeiter wählen…</option>
+              {allUsers.filter((u:any)=>u.id!==substAssign.user_id).map((u:any) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+            </select>
+            <button style={{ ...s.saveBtn, background:'#7c3aed' }} onClick={handleSaveSubst} disabled={!substUser||substSaving}>
+              {substSaving?'Wird gespeichert…':'Vertretung speichern'}
             </button>
           </div>
         </div>

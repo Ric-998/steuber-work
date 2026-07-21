@@ -63,6 +63,7 @@ Deno.serve(async (req) => {
     }
 
     // is_onboarded: true — Admin hat alle nötigen Daten bereits eingegeben
+    // must_change_password: true — Mitarbeiter muss Temp-PW beim ersten Login ändern
     // upsert statt insert, falls handle_new_user-Trigger bereits gefeuert hat
     const { error: upsertErr } = await adminClient.from('users').upsert({
       id: authData.user.id,
@@ -72,6 +73,7 @@ Deno.serve(async (req) => {
       role_id: roleData.id,
       is_active: true,
       is_onboarded: true,
+      must_change_password: true,
     }, { onConflict: 'id' })
 
     if (upsertErr) {

@@ -112,7 +112,7 @@ function VariantA() {
               <div style={{ fontSize: 14, fontWeight: 700, color: '#191c1d', marginTop: 5, fontFamily: 'monospace' }}>{CUSTOMER.hausverwaltung_objekt_id}</div>
             </div>
             <div style={{ flex: 1, minWidth: 0, borderLeft: '1px solid #f1f3f4', paddingLeft: 14 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objektleiter</div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa3a5', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Teamleiter</div>
               <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginTop: 3, maxWidth: '100%' }}>
                 <select value={ol} onChange={e => setOl(e.target.value)} style={{
                   appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',

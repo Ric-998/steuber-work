@@ -5,7 +5,7 @@ import TaskList from './pages/TaskList'
 import Dashboard from './pages/Dashboard'
 import RegisterPage from './pages/RegisterPage'
 import SupportDashboard from './pages/SupportDashboard'
-import ObjektleiterDashboard from './pages/ObjektleiterDashboard'
+import TeamleiterDashboard from './pages/TeamleiterDashboard'
 import './styles/global.css'
 import CustomerStatusPage from './pages/CustomerStatusPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -16,6 +16,7 @@ interface UserProfile {
   role_id: string
   role_name: string
   is_onboarded: boolean
+  must_change_password: boolean
 }
 
 // ─── DEV ONLY: View switcher ──────────────────────────────────────────────────
@@ -28,6 +29,7 @@ export default function App() {
   const [loading, setLoading]   = useState(true)
   const [devViewOverride, setDevViewOverride] = useState<'admin'|'mitarbeiter'|null>(null)
   const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(false)
 
   useEffect(() => {
     const handler = () => setUpdateAvailable(true)
@@ -47,10 +49,16 @@ export default function App() {
       else setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setNeedsPasswordChange(true)
+        setSession(session)
+        setLoading(false)
+        return
+      }
       setSession(session)
       if (session) loadProfile()
-      else { setProfile(null); setLoading(false) }
+      else { setProfile(null); setLoading(false); setNeedsPasswordChange(false) }
     })
 
     return () => subscription.unsubscribe()
@@ -110,13 +118,27 @@ export default function App() {
     return <SetupProfileOverlay session={session} onComplete={loadProfile} onLogout={handleLogout} />
   }
 
+  // ── Passwort-Reset (Password-Recovery-Link oder Temp-PW beim ersten Login) ───
+  if (needsPasswordChange || profile.must_change_password) {
+    return <ChangePasswordOverlay
+      onComplete={async () => {
+        // Clear must_change_password flag in DB
+        await supabase.from('users').update({ must_change_password: false }).eq('id', profile.id)
+        setNeedsPasswordChange(false)
+        await loadProfile()
+      }}
+      onLogout={handleLogout}
+      isFirstLogin={profile.must_change_password}
+    />
+  }
+
   const effectiveRole = devViewOverride || profile.role_name
   const isAdmin = effectiveRole === 'admin'
   const isSupport = effectiveRole === 'support'
 
   if (isSupport) return <SupportDashboard />
-  const isObjektleiter = effectiveRole === 'objektleiter'
-  if (isObjektleiter) return <ObjektleiterDashboard userId={profile.id} userName={profile.full_name} onLogout={handleLogout} />
+  const isTeamleiter = effectiveRole === 'teamleiter'
+  if (isTeamleiter) return <TeamleiterDashboard userId={profile.id} userName={profile.full_name} onLogout={handleLogout} />
 
   return (
     <div style={{ position:'relative' }}>
@@ -320,3 +342,130 @@ const labelStyle: React.CSSProperties = { display:'block', fontSize:11, fontWeig
 const wrapStyle:  React.CSSProperties = { display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }
 const iconStyle:  React.CSSProperties = { color:'var(--txt-muted)', fontSize:18, flexShrink:0 }
 const inputStyle: React.CSSProperties = { flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)' }
+
+
+// ─── ChangePasswordOverlay ─────────────────────────────────────────────────────
+// Erscheint nach Passwort-Reset-Link (PASSWORD_RECOVERY) oder erstem Login mit Temp-PW
+
+function ChangePasswordOverlay({ onComplete, onLogout, isFirstLogin }: {
+  onComplete: () => void
+  onLogout: () => void
+  isFirstLogin: boolean
+}) {
+  const [password, setPassword]       = useState('')
+  const [password2, setPassword2]     = useState('')
+  const [showPw, setShowPw]           = useState(false)
+  const [loading, setLoading]         = useState(false)
+  const [error, setError]             = useState('')
+  const [success, setSuccess]         = useState(false)
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (password.length < 8) { setError('Passwort muss mindestens 8 Zeichen haben.'); return }
+    if (password !== password2) { setError('Die Passwörter stimmen nicht überein.'); return }
+    setLoading(true)
+    setError('')
+    const { error: updateErr } = await supabase.auth.updateUser({ password })
+    if (updateErr) { setError(updateErr.message); setLoading(false); return }
+    setSuccess(true)
+    setTimeout(() => onComplete(), 1200)
+  }
+
+  return (
+    <div style={{ minHeight:'100dvh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', padding:'24px 20px' }}>
+      <div style={{ background:'var(--surf-card)', borderRadius:24, padding:'36px 28px 28px', width:'100%', maxWidth:400, boxShadow:'0 4px 32px rgba(8,93,104,0.08)' }}>
+
+        <div style={{ textAlign:'center', marginBottom:28 }}>
+          <div style={{ width:52, height:52, borderRadius:16, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px', boxShadow:'0 8px 24px rgba(8,93,104,0.25)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:26, color:'#fff' }}>lock_reset</span>
+          </div>
+          <h2 style={{ fontSize:20, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', margin:'0 0 8px' }}>
+            {isFirstLogin ? 'Passwort festlegen' : 'Neues Passwort'}
+          </h2>
+          <p style={{ fontSize:13.5, color:'var(--txt-muted)', lineHeight:1.55, margin:0 }}>
+            {isFirstLogin
+              ? 'Dein Konto wurde mit einem temporären Passwort erstellt. Bitte lege jetzt dein eigenes Passwort fest.'
+              : 'Gib dein neues Passwort ein. Du wirst danach automatisch eingeloggt.'}
+          </p>
+        </div>
+
+        {success ? (
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10, padding:'20px 0' }}>
+            <span className="material-symbols-outlined icon-fill" style={{ fontSize:44, color:'var(--ok)' }}>check_circle</span>
+            <div style={{ fontSize:15, fontWeight:700, color:'var(--ok)' }}>Passwort geändert!</div>
+          </div>
+        ) : (
+          <form onSubmit={handleSave} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div>
+              <label style={labelStyle}>Neues Passwort</label>
+              <div style={{ ...wrapStyle, justifyContent:'space-between' }}>
+                <span className="material-symbols-outlined" style={iconStyle}>lock</span>
+                <input
+                  style={{ ...inputStyle, flex:1 }}
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Mindestens 8 Zeichen"
+                  autoComplete="new-password"
+                  required
+                />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  style={{ background:'none', border:'none', cursor:'pointer', padding:0, color:'var(--txt-muted)', display:'flex' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18 }}>{showPw ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Passwort wiederholen</label>
+              <div style={wrapStyle}>
+                <span className="material-symbols-outlined" style={iconStyle}>lock</span>
+                <input
+                  style={{ ...inputStyle, flex:1 }}
+                  type={showPw ? 'text' : 'password'}
+                  value={password2}
+                  onChange={e => setPassword2(e.target.value)}
+                  placeholder="Passwort bestätigen"
+                  autoComplete="new-password"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Strength hints */}
+            {password.length > 0 && (
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {[
+                  { label:'8+ Zeichen', ok: password.length >= 8 },
+                  { label:'Großbuchstabe', ok: /[A-Z]/.test(password) },
+                  { label:'Zahl', ok: /[0-9]/.test(password) },
+                ].map(h => (
+                  <span key={h.label} style={{ fontSize:11, fontWeight:600, padding:'3px 8px', borderRadius:99, background: h.ok ? 'var(--ok-bg)' : 'var(--surf-low)', color: h.ok ? 'var(--ok)' : 'var(--txt-muted)' }}>
+                    {h.ok ? '✓' : '·'} {h.label}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {error && (
+              <div style={{ display:'flex', gap:8, background:'var(--err-bg)', color:'var(--err)', borderRadius:10, padding:'12px 14px', fontSize:13 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:16, flexShrink:0 }}>error</span>{error}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'var(--font-head)', boxShadow:'0 4px 16px rgba(8,93,104,0.25)', cursor:loading?'wait':'pointer', marginTop:4 }}>
+              {loading
+                ? <><span className="material-symbols-outlined" style={{ fontSize:18 }}>hourglass_empty</span> Speichern...</>
+                : <><span className="material-symbols-outlined" style={{ fontSize:18 }}>check_circle</span> Passwort speichern</>}
+            </button>
+
+            <button type="button" onClick={onLogout} style={{ background:'none', border:'none', color:'var(--txt-muted)', fontSize:13, cursor:'pointer', textDecoration:'underline', padding:'4px 0' }}>
+              Abmelden
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+

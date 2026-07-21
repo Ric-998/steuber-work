@@ -1,6 +1,6 @@
 export interface Role {
   id: string
-  name: 'admin' | 'mitarbeiter' | 'objektleiter' | 'support'
+  name: 'admin' | 'mitarbeiter' | 'teamleiter' | 'support'
   permissions: Record<string, unknown>
 }
 

@@ -83,7 +83,7 @@ interface Props { userName:string; onLogout:()=>void }
 const MONTHS = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
 const INTERVALS = ['täglich','wöchentlich','zweiwöchentlich','monatlich','quartalsweise','einmalig']
 const INTERVAL_ICONS: Record<string,string> = { täglich:'today', wöchentlich:'date_range', zweiwöchentlich:'date_range', monatlich:'calendar_month', quartalsweise:'event_repeat', einmalig:'looks_one' }
-const ROLE_LABELS: Record<string,string> = { admin:'Admin', mitarbeiter:'Mitarbeiter', objektleiter:'Objektleiter', support:'Support' }
+const ROLE_LABELS: Record<string,string> = { admin:'Admin', mitarbeiter:'Mitarbeiter', teamleiter:'Teamleiter', support:'Support' }
 const STATUS_META: Record<string,{label:string;icon:string;bg:string;color:string}> = {
   offen:     { label:'Offen',     icon:'radio_button_unchecked', bg:'#fff8e6', color:'#92400e' },
   in_arbeit: { label:'In Arbeit', icon:'pending',                bg:'#e0f4f6', color:'#096a70' },
@@ -298,7 +298,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.rpc('get_dashboard_problems'),
       supabase.from('users').select('id,full_name,phone,email,is_active,role_id,street,postal_code,city,created_at,employed_since,work_days,work_hours_per_week,work_hours_type,hourly_wage,admin_setup_done,is_onboarded,vacation_days_per_year').order('full_name'),
       supabase.from('tasks').select('id,title,description,interval,is_active,due_date,end_date,category_id,object_id,contract_id,default_assignee_id,categories(name,emoji),objects(name,address,city),contracts(id,type,start_date,end_date,object_id,customer_id),users!tasks_default_assignee_id_fkey(full_name)').order('created_at',{ascending:false}).limit(300),
-      supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)').order('address').limit(200),
+      supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,objektleiter_id,customers(id,name)').order('address').limit(200),
       supabase.from('categories').select('*').order('name'),
       supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name').limit(200),
       supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
@@ -972,7 +972,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                     const q = v.trim()
                     const { data } = await supabase
                       .from('objects')
-                      .select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)')
+                      .select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,objektleiter_id,customers(id,name)')
                       .or(`address.ilike.%${q}%,city.ilike.%${q}%,postal_code.ilike.%${q}%,object_number.ilike.%${q}%,notes.ilike.%${q}%`)
                       .limit(80)
                     setObjSearchResults((data as unknown as ObjectItem[]) || [])
@@ -1198,8 +1198,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
             ) : [...team].sort((a,b)=>a.full_name.localeCompare(b.full_name,'de')).map(m => {
               const role = m.role_name || 'mitarbeiter'
               const ini = m.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
-              const roleColor: Record<string,string> = { admin:'#7c3aed', objektleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
-              const roleBg: Record<string,string> = { admin:'#f3e8ff', objektleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
+              const roleColor: Record<string,string> = { admin:'#7c3aed', teamleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
+              const roleBg: Record<string,string> = { admin:'#f3e8ff', teamleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
               return (
                 <div key={m.id}
                   onClick={() => setSelectedMember(m)}
@@ -2167,13 +2167,13 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
       setCustomer(custRes.data)
       setUpcomingAssigns(assignRes.data || [])
 
-      // Load all users with objektleiter role for the dropdown
+      // Load all users with teamleiter role for the dropdown
       const { data: olData } = await supabase
         .from('users')
         .select('id,full_name,role_id,roles(name)')
         .eq('is_active', true)
         .order('full_name')
-      const ols = (olData || []).filter((u: any) => u.roles?.name === 'objektleiter')
+      const ols = (olData || []).filter((u: any) => u.roles?.name === 'teamleiter')
       setOlList(ols.map((u: any) => ({ id: u.id, full_name: u.full_name })))
 
       // Contacts laden: object_id-Kontakte + Kundenkontakte (customer_id)
@@ -2198,7 +2198,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
     if (!error) {
       setCurrentOl(newId)
       onObjectUpdated({ ...obj, objektleiter_id: newId })
-      setOlMsg('Objektleiter gespeichert')
+      setOlMsg('Teamleiter gespeichert')
       setTimeout(() => setOlMsg(null), 2500)
     }
     setOlSaving(false)
@@ -2295,7 +2295,7 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 13, color: '#6f797b' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#9aa3a5' }}>manage_accounts</span>
-          <span style={{ fontSize: 11.5, color: '#9aa3a5', fontWeight: 600 }}>Objektleiter:</span>
+          <span style={{ fontSize: 11.5, color: '#9aa3a5', fontWeight: 600 }}>Teamleiter:</span>
           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
             <select
               value={currentOl || ''}
@@ -2994,6 +2994,16 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
     setCustSearching(false)
   }
 
+  const [teamleiterId, setTeamleiterId] = useState<string>(obj.objektleiter_id ?? '')
+  const [tlOptions, setTlOptions] = useState<{id:string;full_name:string}[]>([])
+  useEffect(() => {
+    supabase.from('users').select('id,full_name,is_active,roles(name)').eq('is_active', true).order('full_name')
+      .then(({ data }) => {
+        const tls = (data || []).filter((u:any) => u.roles?.name === 'teamleiter')
+        setTlOptions(tls.map((u:any) => ({ id: u.id, full_name: u.full_name })))
+      })
+  }, [])
+
   const save = async () => {
     if (!street.trim() || !postal.trim() || !city.trim()) { setError('Straße, PLZ und Ort sind Pflichtfelder.'); return }
     setSaving(true); setError('')
@@ -3009,8 +3019,9 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
       parking_note: parkingNote.trim() || null,
       floor_info:   floorInfo.trim() || null,
       notes:        objNotes.trim() || null,
+      objektleiter_id: teamleiterId || null,
     }
-    const { data, error: e } = await supabase.from('objects').update(updates).eq('id', obj.id).select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,customers(id,name)').single()
+    const { data, error: e } = await supabase.from('objects').update(updates).eq('id', obj.id).select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,objektleiter_id,customers(id,name)').single()
     if (e || !data) { setError(e?.message || 'Fehler beim Speichern'); setSaving(false); return }
     onSaved(data as unknown as ObjectItem)
   }
@@ -3126,6 +3137,18 @@ function EditObjectOverlay({ obj, customer: initCustomer, onClose, onSaved, onDe
               ))}
             </div>
           )}
+
+          {/* Teamleiter */}
+          <label style={s.fieldLabel}>Teamleiter</label>
+          <div className="iw" style={{ ...s.inputWrap, marginBottom: tlOptions.length===0 ? 6 : 16 }}>
+            <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>manage_accounts</span>
+            <select value={teamleiterId} onChange={e => setTeamleiterId(e.target.value)}
+              style={{ ...s.input, background:'transparent', cursor:'pointer' }}>
+              <option value="">Kein Teamleiter</option>
+              {tlOptions.map(o => <option key={o.id} value={o.id}>{o.full_name}</option>)}
+            </select>
+          </div>
+          {tlOptions.length === 0 && <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:16 }}>Noch keine Nutzer mit Teamleiter-Rolle angelegt.</div>}
 
           {/* Objektinfos für MA-App */}
           <div style={{ marginTop:20, paddingTop:16, borderTop:'1px solid var(--outline)' }}>
@@ -4082,7 +4105,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
-  // Objektleiter-Auswahl
+  // Teamleiter-Auswahl
   const [olId, setOlId]         = useState<string>('')
   const [olOptions, setOlOptions] = useState<{id:string;full_name:string}[]>([])
   useEffect(() => {
@@ -4091,7 +4114,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
       .select('id,full_name,roles(name)')
       .eq('is_active', true)
       .then(({ data }) => {
-        const ols = (data || []).filter((u:any) => u.roles?.name === 'objektleiter')
+        const ols = (data || []).filter((u:any) => u.roles?.name === 'teamleiter')
         setOlOptions(ols.map((u:any) => ({ id: u.id, full_name: u.full_name })))
       })
   }, [])
@@ -4600,11 +4623,11 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
             </div>
           </div>
 
-          {/* Objektleiter (optional) */}
+          {/* Teamleiter (optional) */}
           <div style={{ marginBottom: 16 }}>
             <label style={s.fieldLabel}>
               <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>manage_accounts</span>
-              Objektleiter (optional)
+              Teamleiter (optional)
             </label>
             <div style={{ position:'relative' }}>
               <select
@@ -4619,7 +4642,7 @@ function CreateObjectOverlay({ onClose, onSaved, team, isDesktop }: { onClose: (
               <span className="material-symbols-outlined" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:18, color:'var(--txt-muted)', pointerEvents:'none' }}>expand_more</span>
             </div>
             {olOptions.length === 0 && (
-              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Noch keine Nutzer mit Objektleiter-Rolle angelegt.</div>
+              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4 }}>Noch keine Nutzer mit Teamleiter-Rolle angelegt.</div>
             )}
           </div>
 
@@ -7016,7 +7039,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
             <div>
               <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rolle</label>
               <div style={{ display:'flex', gap:8 }}>
-                {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'},{val:'admin',icon:'admin_panel_settings',label:'Admin'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
+                {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'teamleiter',icon:'manage_accounts',label:'Teamleiter'},{val:'admin',icon:'admin_panel_settings',label:'Admin'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
                   <div key={r.val} onClick={()=>setInviteRole(r.val)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 6px', borderRadius:12, border:`1.5px solid ${inviteRole===r.val?'var(--pri)':'var(--outline)'}`, background:inviteRole===r.val?'var(--pri-xl)':'var(--surf-low)', cursor:'pointer', transition:'all 0.15s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize:20, color:inviteRole===r.val?'var(--pri)':'var(--txt-muted)' }}>{r.icon}</span>
                     <span style={{ fontSize:11, fontWeight:700, color:inviteRole===r.val?'var(--pri)':'var(--txt-muted)', textAlign:'center' }}>{r.label}</span>
@@ -7044,7 +7067,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
             <div>
               <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rolle</label>
               <div style={{ display:'flex', gap:8 }}>
-                {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
+                {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'teamleiter',icon:'manage_accounts',label:'Teamleiter'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
                   <div key={r.val} onClick={()=>setLinkRole(r.val)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 6px', borderRadius:12, border:`1.5px solid ${linkRole===r.val?'var(--pri)':'var(--outline)'}`, background:linkRole===r.val?'var(--pri-xl)':'var(--surf-low)', cursor:'pointer', transition:'all 0.15s' }}>
                     <span className="material-symbols-outlined" style={{ fontSize:20, color:linkRole===r.val?'var(--pri)':'var(--txt-muted)' }}>{r.icon}</span>
                     <span style={{ fontSize:11, fontWeight:700, color:linkRole===r.val?'var(--pri)':'var(--txt-muted)' }}>{r.label}</span>
@@ -7166,7 +7189,7 @@ function InviteOverlay({ inviteMode, setInviteMode, inviteEmail, setInviteEmail,
                 <div>
                   <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Rolle *</label>
                   <div style={{ display:'flex', gap:8 }}>
-                    {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'objektleiter',icon:'manage_accounts',label:'Objektleiter'},{val:'admin',icon:'admin_panel_settings',label:'Admin'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
+                    {([{val:'mitarbeiter',icon:'person',label:'Mitarbeiter'},{val:'teamleiter',icon:'manage_accounts',label:'Teamleiter'},{val:'admin',icon:'admin_panel_settings',label:'Admin'},{val:'support',icon:'support_agent',label:'Support'}] as const).map(r=>(
                       <div key={r.val} onClick={()=>setManualRole(r.val)} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'10px 6px', borderRadius:12, border:`1.5px solid ${manualRole===r.val?'var(--pri)':'var(--outline)'}`, background:manualRole===r.val?'var(--pri-xl)':'var(--surf-low)', cursor:'pointer', transition:'all 0.15s' }}>
                         <span className="material-symbols-outlined" style={{ fontSize:20, color:manualRole===r.val?'var(--pri)':'var(--txt-muted)' }}>{r.icon}</span>
                         <span style={{ fontSize:11, fontWeight:700, color:manualRole===r.val?'var(--pri)':'var(--txt-muted)', textAlign:'center' }}>{r.label}</span>
@@ -7278,7 +7301,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
   const [roleChanging, setRoleChanging] = useState(false)
   const [roleMsg, setRoleMsg] = useState<{ok:boolean;text:string}|null>(null)
 
-  const handleRoleChange = async (newRole: 'admin'|'mitarbeiter'|'objektleiter'|'support') => {
+  const handleRoleChange = async (newRole: 'admin'|'mitarbeiter'|'teamleiter'|'support') => {
     if (newRole === currentRole) return
     setRoleChanging(true); setRoleMsg(null)
     const { data: roleRow } = await supabase.from('roles').select('id').eq('name', newRole).single()
@@ -7294,9 +7317,9 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
 
   const ini = member.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
   const role = member.role_name ?? 'mitarbeiter'
-  const roleLabel: Record<string,string> = { admin:'Administrator', objektleiter:'Objektleiter', mitarbeiter:'Mitarbeiter', support:'Support' }
-  const roleColor: Record<string,string> = { admin:'#7c3aed', objektleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
-  const roleBg: Record<string,string>    = { admin:'#f3e8ff', objektleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
+  const roleLabel: Record<string,string> = { admin:'Administrator', teamleiter:'Teamleiter', mitarbeiter:'Mitarbeiter', support:'Support' }
+  const roleColor: Record<string,string> = { admin:'#7c3aed', teamleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
+  const roleBg: Record<string,string>    = { admin:'#f3e8ff', teamleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
 
   const toggleDay = (key: string) =>
     setWorkDays(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key])
@@ -7790,7 +7813,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
             <div style={{ display:'flex', gap:8 }}>
               {([
                 {val:'mitarbeiter', label:'Mitarbeiter',  icon:'badge'},
-                {val:'objektleiter',label:'Objektleiter', icon:'manage_accounts'},
+                {val:'teamleiter',label:'Teamleiter', icon:'manage_accounts'},
                 {val:'admin',       label:'Administrator',icon:'admin_panel_settings'},
                 {val:'support',     label:'Support',      icon:'support_agent'},
               ] as const).map(r => {
