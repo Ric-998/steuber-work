@@ -139,6 +139,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [blackouts, setBlackouts] = useState<any[]>([])
   const [showBlackoutForm, setShowBlackoutForm] = useState(false)
+  const [showAssignPicker, setShowAssignPicker] = useState<string|undefined>(undefined)
   const [blackoutFrom, setBlackoutFrom] = useState('')
   const [blackoutTo, setBlackoutTo] = useState('')
   const [blackoutReason, setBlackoutReason] = useState('')
@@ -1179,48 +1180,52 @@ export default function Dashboard({ userName, onLogout }: Props) {
         {/* ── TEAM ── */}
         {tab === 'team' && (() => {
           const todayStr = new Date().toISOString().split('T')[0]
-          // Build leave status map for today
-          const leaveStatusMap: Record<string, 'urlaub'|'krankmeldung'> = {}
-          leaveRequests.forEach(r => {
+
+          // Leave-Map mit until-Datum
+          const leaveMap: Record<string, { type: 'urlaub'|'krankmeldung', to_date: string }> = {}
+          leaveRequests.forEach((r: any) => {
             if (r.status !== 'abgelehnt' && r.from_date <= todayStr && r.to_date >= todayStr) {
-              leaveStatusMap[r.user_id] = r.request_type === 'urlaub' ? 'urlaub' : 'krankmeldung'
+              leaveMap[r.user_id] = { type: r.request_type === 'urlaub' ? 'urlaub' : 'krankmeldung', to_date: r.to_date }
             }
           })
 
-          // Group team by teamleiter
+          // Teamleiter-Map + Gruppen
           const teamleiterMap: Record<string, TeamMember> = {}
           team.forEach(m => { if (m.role_name === 'teamleiter') teamleiterMap[m.id] = m })
-          const tlIds = Object.keys(teamleiterMap)
-          const grouped: { tlId: string|null; tlName: string; members: TeamMember[] }[] = []
-          tlIds.sort((a,b) => teamleiterMap[a].full_name.localeCompare(teamleiterMap[b].full_name,'de')).forEach(tlId => {
-            const members = team.filter(m => m.teamleiter_id === tlId && m.role_name !== 'teamleiter' && m.role_name !== 'admin')
-            grouped.push({ tlId, tlName: teamleiterMap[tlId].full_name, members })
-          })
+          const tlIds = Object.keys(teamleiterMap).sort((a,b) => teamleiterMap[a].full_name.localeCompare(teamleiterMap[b].full_name,'de'))
+          const grouped: { tlId: string|null; members: TeamMember[] }[] = tlIds.map(tlId => ({
+            tlId,
+            members: team.filter(m => m.teamleiter_id === tlId && m.role_name !== 'teamleiter' && m.role_name !== 'admin')
+          }))
           const unassigned = team.filter(m => !m.teamleiter_id && m.role_name === 'mitarbeiter')
-          if (unassigned.length > 0) grouped.push({ tlId: null, tlName: 'Nicht zugeordnet', members: unassigned })
+          if (unassigned.length > 0) grouped.push({ tlId: null, members: unassigned })
 
-          const MemberCard = ({ m }: { m: TeamMember }) => {
-            const role = m.role_name || 'mitarbeiter'
-            const ini = m.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
-            const roleColor: Record<string,string> = { admin:'#7c3aed', teamleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
-            const roleBg: Record<string,string> = { admin:'#f3e8ff', teamleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
-            const isActive = activeWorkerIds.has(m.id)
-            const leaveStatus = leaveStatusMap[m.id]
-            // Status dot: green=working, orange=sick, red=vacation, nothing otherwise
-            const dotColor = isActive ? '#22c55e' : leaveStatus === 'urlaub' ? '#dc2626' : leaveStatus === 'krankmeldung' ? '#f97316' : null
-            const dotTitle = isActive ? 'Gerade in Arbeit' : leaveStatus === 'urlaub' ? 'Im Urlaub' : leaveStatus === 'krankmeldung' ? 'Krank gemeldet' : ''
+          const fmtDate = (d: string) => new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})
+          const ini = (name: string) => name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
+
+          const getStatus = (m: TeamMember) => {
+            const isWorking = activeWorkerIds.has(m.id)
+            const leave = leaveMap[m.id]
+            const color = isWorking ? '#22c55e' : leave?.type === 'urlaub' ? '#dc2626' : leave?.type === 'krankmeldung' ? '#3b82f6' : '#f59e0b'
+            const title = isWorking ? 'Gerade in Arbeit' : leave?.type === 'urlaub' ? `Urlaub bis ${fmtDate(leave.to_date)}` : leave?.type === 'krankmeldung' ? `Krank bis ${fmtDate(leave.to_date)}` : 'Nicht aktiv'
+            const leaveTxt = leave ? ((leave.type === 'urlaub' ? 'Urlaub' : 'Krank') + ' bis ' + fmtDate(leave.to_date)) : null
+            return { color, title, leaveTxt, leaveColor: leave?.type === 'urlaub' ? '#dc2626' : '#3b82f6' }
+          }
+
+          const MemberCard = ({ m, lg = false }: { m: TeamMember, lg?: boolean }) => {
+            const st = getStatus(m)
+            const avSize = lg ? 38 : 34
+            const avRadius = lg ? 11 : 10
             return (
               <div onClick={() => setSelectedMember(m)}
-                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', opacity: m.is_active ? 1 : 0.5, cursor:'pointer', transition:'box-shadow 0.15s' }}
-                onMouseEnter={e=>(e.currentTarget.style.boxShadow='0 4px 14px rgba(9,106,112,0.10)')}
-                onMouseLeave={e=>(e.currentTarget.style.boxShadow='none')}>
+                style={{ display:'flex', alignItems:'center', gap: lg ? 12 : 10, padding: lg ? '12px 14px' : '10px 12px', background:'var(--surf-card)', borderRadius:12, border:'1px solid var(--outline)', opacity: m.is_active ? 1 : 0.5, cursor:'pointer', boxShadow:'0 1px 2px rgba(16,24,29,0.03)' }}>
                 <div style={{ position:'relative', flexShrink:0 }}>
-                  <div style={{ width:38, height:38, borderRadius:12, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, fontFamily:'var(--font-head)' }}>{ini}</div>
-                  {dotColor && <span title={dotTitle} style={{ position:'absolute', bottom:-1, right:-1, width:10, height:10, borderRadius:'50%', background:dotColor, border:'2px solid var(--surf-card)' }}/>}
+                  <div style={{ width:avSize, height:avSize, borderRadius:avRadius, background: m.is_active ? 'var(--pri)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize: lg ? 12 : 11, fontFamily:'var(--font-head)' }}>{ini(m.full_name)}</div>
+                  <span title={st.title} style={{ position:'absolute', bottom:-1, right:-1, width:9, height:9, borderRadius:'50%', background:st.color, border:'2px solid var(--surf-card)', display:'block' }} />
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
-                  <span style={{ fontSize:11, fontWeight:600, color: roleColor[role]||'var(--pri)', background: roleBg[role]||'var(--pri-xl)', borderRadius:99, padding:'2px 7px' }}>{ROLE_LABELS[role]||role}</span>
+                  <div style={{ fontSize: lg ? 13 : 12.5, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
+                  {st.leaveTxt && <div style={{ fontSize:10.5, color:st.leaveColor, opacity:0.8, marginTop:2 }}>{st.leaveTxt}</div>}
                 </div>
                 <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
               </div>
@@ -1235,76 +1240,126 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 <h1 style={s.h1}>Team</h1>
                 <p style={s.sub}>{team.filter(m=>m.is_active).length} aktiv · {team.length} gesamt</p>
               </div>
-              <button onClick={() => setShowInviteOverlay(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 12px rgba(9,106,112,0.25)', flexShrink:0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:18 }}>person_add</span>
+              <button onClick={() => setShowInviteOverlay(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 15px', borderRadius:10, border:'none', background:'var(--pri)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 2px 8px rgba(9,106,112,0.22)', flexShrink:0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:17 }}>person_add</span>
                 Einladen
               </button>
             </div>
 
-            {/* Status-Legende */}
-            <div style={{ display:'flex', gap:14, marginBottom:18, flexWrap:'wrap' as const }}>
-              {[
-                { color:'#22c55e', label:'In Arbeit' },
-                { color:'#f97316', label:'Krank' },
-                { color:'#dc2626', label:'Urlaub' },
-              ].map(({ color, label }) => (
-                <div key={label} style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, color:'var(--txt-muted)' }}>
-                  <span style={{ width:8, height:8, borderRadius:'50%', background:color, display:'inline-block', flexShrink:0 }}/>
+            {/* Legende */}
+            <div style={{ display:'flex', gap:14, marginBottom:20, flexWrap:'wrap' as const }}>
+              {[{color:'#22c55e',label:'Aktiv'},{color:'#f59e0b',label:'Abwesend'},{color:'#3b82f6',label:'Krank'},{color:'#dc2626',label:'Urlaub'}].map(({color,label}) => (
+                <div key={label} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--txt-muted)' }}>
+                  <span style={{ width:7, height:7, borderRadius:'50%', background:color, display:'inline-block', flexShrink:0 }}/>
                   {label}
                 </div>
               ))}
             </div>
 
-            {/* Teamleiter-Gruppen */}
+            {/* Gruppen */}
             {team.length === 0 ? (
               <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--txt-muted)', fontSize:14 }}>
                 <span className="material-symbols-outlined" style={{ fontSize:40, display:'block', marginBottom:8, opacity:0.4 }}>group</span>
                 Noch keine Mitarbeiter
               </div>
-            ) : grouped.map(({ tlId, tlName, members }) => {
+            ) : grouped.map(({ tlId, members }) => {
               const tlMember = tlId ? teamleiterMap[tlId] : null
+              const pickerId = tlId ?? 'unassigned'
               return (
-              <div key={tlId ?? 'none'} style={{ marginBottom:20, paddingBottom:16, borderBottom:'1px solid var(--outline)' }}>
-                {/* Teamleiter-Card (klickbar) oder "Nicht zugeordnet" Header */}
-                {tlMember ? (
-                  <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.10em', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:13 }}>supervisor_account</span>
-                      Teamleiter · {members.length} Mitarbeiter
+                <div key={tlId ?? 'none'} style={{ marginBottom:22, paddingBottom:18, borderBottom:'1px solid var(--outline)' }}>
+                  {tlMember ? (
+                    <div style={{ marginBottom:10 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.09em', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:13 }}>supervisor_account</span>
+                        Teamleiter · {members.length} Mitarbeiter
+                      </div>
+                      <MemberCard m={tlMember} lg />
                     </div>
-                    <MemberCard m={tlMember} />
-                  </div>
-                ) : (
-                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                    <div style={{ width:24, height:24, borderRadius:8, background:'var(--surf-high)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:13, color:'var(--txt-muted)' }}>person_off</span>
+                  ) : (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                      <div style={{ width:22, height:22, borderRadius:7, background:'var(--surf-high)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:12, color:'var(--txt-muted)' }}>person_off</span>
+                      </div>
+                      <div style={{ fontSize:13, fontWeight:700, color:'var(--txt-muted)' }}>Nicht zugeordnet</div>
+                      <div style={{ fontSize:11, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:6, padding:'2px 7px' }}>{members.length}</div>
                     </div>
-                    <div style={{ fontSize:13, fontWeight:700, color:'var(--txt-muted)' }}>{tlName}</div>
-                    <div style={{ fontSize:11, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:99, padding:'2px 8px' }}>{members.length}</div>
-                  </div>
-                )}
-                {/* Mitarbeiter dieser Gruppe */}
-                {tlMember && <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.10em', marginBottom:8, marginTop:14 }}>Mitarbeiter</div>}
-                {members.length === 0 ? (
-                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'10px 14px', background:'var(--surf-low)', borderRadius:12, border:'1px dashed var(--outline)' }}>Noch keine Mitarbeiter zugeordnet — Mitarbeiter-Karte öffnen und Teamleiter zuweisen</div>
-                ) : (
-                  <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(2,1fr)' : '1fr', gap:8 }}>
-                    {members.map(m => <MemberCard key={m.id} m={m} />)}
-                  </div>
-                )}
-              </div>
+                  )}
+                  {tlMember && members.length > 0 && (
+                    <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.09em', marginBottom:8, marginTop:14 }}>Mitarbeiter</div>
+                  )}
+                  {members.length === 0 ? (
+                    <div onClick={() => setShowAssignPicker(pickerId)}
+                      style={{ fontSize:12, color:'var(--txt-muted)', padding:'12px 14px', background:'var(--surf-low)', borderRadius:11, border:'1px dashed var(--outline)', cursor:'pointer' }}>
+                      Noch keine Mitarbeiter zugeordnet — antippen zum Zuordnen
+                    </div>
+                  ) : (
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
+                      {members.map(m => <MemberCard key={m.id} m={m} />)}
+                      <div onClick={() => setShowAssignPicker(pickerId)}
+                        style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:5, padding:'10px 12px', borderRadius:12, border:'1px dashed var(--outline)', color:'var(--txt-muted)', fontSize:11.5, fontWeight:600, cursor:'pointer' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:15 }}>add</span>
+                        Hinzufügen
+                      </div>
+                    </div>
+                  )}
+                </div>
               )
             })}
 
-            {/* Admins separat (klein, kein Klick nötig) */}
+            {/* Admins */}
             {team.filter(m=>m.role_name==='admin').length > 0 && (
-              <div style={{ marginTop:4, marginBottom:20 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.10em', marginBottom:8 }}>Administration</div>
-                <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(2,1fr)' : '1fr', gap:8 }}>
+              <div style={{ marginTop:2, marginBottom:20 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.09em', marginBottom:8 }}>Administration</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
                   {team.filter(m=>m.role_name==='admin').map(m => <MemberCard key={m.id} m={m} />)}
                 </div>
               </div>
             )}
+
+            {/* Assign Picker Bottom Sheet */}
+            {showAssignPicker !== undefined && (() => {
+              const targetTlId = showAssignPicker === 'unassigned' ? null : showAssignPicker
+              const alreadyIn = team.filter(m => m.teamleiter_id === targetTlId && m.role_name === 'mitarbeiter').map(m => m.id)
+              const candidates = team.filter(m => m.role_name === 'mitarbeiter' && !alreadyIn.includes(m.id))
+              const tlName = targetTlId ? (teamleiterMap[targetTlId]?.full_name ?? '–') : 'Ohne Teamleiter'
+              return (
+                <div style={{ position:'fixed', inset:0, background:'rgba(12,16,19,0.45)', zIndex:600, display:'flex', alignItems:'flex-end' }}
+                  onClick={e => { if (e.target === e.currentTarget) setShowAssignPicker(undefined) }}>
+                  <div style={{ background:'var(--bg)', borderRadius:'18px 18px 0 0', width:'100%', padding:'20px 18px 34px', maxWidth:540, margin:'0 auto', boxSizing:'border-box' as const, maxHeight:'70vh', overflowY:'auto' as const }}>
+                    <div style={{ width:34, height:4, borderRadius:99, background:'var(--outline)', margin:'0 auto 18px' }}/>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                      <div>
+                        <h3 style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', margin:0, color:'var(--txt)' }}>Mitarbeiter zuordnen</h3>
+                        <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:3 }}>Teamleiter: {tlName}</div>
+                      </div>
+                      <button onClick={() => setShowAssignPicker(undefined)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex' }}>
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    {candidates.length === 0 ? (
+                      <div style={{ fontSize:13, color:'var(--txt-muted)', padding:'20px 0', textAlign:'center' as const }}>Alle Mitarbeiter bereits zugeordnet</div>
+                    ) : (
+                      <div style={{ display:'flex', flexDirection:'column' as const, gap:6, marginTop:10 }}>
+                        {candidates.map(m => {
+                          const curTl = m.teamleiter_id ? (teamleiterMap[m.teamleiter_id]?.full_name ?? '–') : 'Nicht zugeordnet'
+                          return (
+                            <div key={m.id} onClick={async () => {
+                              const { error } = await supabase.from('users').update({ teamleiter_id: targetTlId }).eq('id', m.id)
+                              if (error) { showToast('Fehler beim Zuordnen', 'warn'); return }
+                              setTeam(prev => prev.map(x => x.id === m.id ? { ...x, teamleiter_id: targetTlId } : x))
+                              setShowAssignPicker(undefined)
+                            }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'var(--surf-card)', borderRadius:11, border:'1px solid var(--outline)', cursor:'pointer' }}>
+                              <span style={{ fontSize:13.5, fontWeight:600, color:'var(--txt)' }}>{m.full_name}</span>
+                              <span style={{ fontSize:11, color:'var(--txt-muted)' }}>{curTl}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Urlaubssperren */}
             <div style={{ marginTop:8, paddingTop:20, borderTop:'1px solid var(--outline)' }}>
@@ -1314,72 +1369,66 @@ export default function Dashboard({ userName, onLogout }: Props) {
                   <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>Zeiträume ohne Urlaubsanträge</div>
                 </div>
                 <button onClick={()=>{setBlackoutFrom('');setBlackoutTo('');setBlackoutReason('');setShowBlackoutForm(true)}}
-                  style={{ display:'flex', alignItems:'center', gap:5, padding:'8px 12px', borderRadius:10, border:'1px solid #fca5a5', background:'#fef2f2', color:'#dc2626', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
+                  style={{ display:'flex', alignItems:'center', gap:5, padding:'8px 12px', borderRadius:9, border:'1px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
                   <span className="material-symbols-outlined" style={{ fontSize:15 }}>add</span>
                   Neu
                 </button>
               </div>
-
               {blackouts.length === 0 ? (
-                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:10 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', opacity:0.5 }}>event_available</span>
+                <div style={{ background:'var(--surf-low)', borderRadius:11, padding:'12px 15px', display:'flex', alignItems:'center', gap:10 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)', opacity:0.5 }}>event_available</span>
                   <div style={{ fontSize:12, color:'var(--txt-muted)' }}>Keine aktiven Urlaubssperren</div>
                 </div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column' as const, gap:6 }}>
                   {blackouts.map((b:any) => (
-                    <div key={b.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'#fef2f2', borderRadius:12, border:'1px solid #fca5a5' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:15, color:'#dc2626', flexShrink:0 }}>block</span>
+                    <div key={b.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 13px', background:'var(--surf-card)', borderRadius:11, border:'1px solid var(--outline)' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:15, color:'#c2402e', flexShrink:0 }}>block</span>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:13, fontWeight:700, color:'#991b1b' }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>
                           {new Date(b.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})} – {new Date(b.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
                         </div>
-                        {b.reason && <div style={{ fontSize:11, color:'#dc2626', marginTop:1 }}>{b.reason}</div>}
+                        {b.reason && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{b.reason}</div>}
                       </div>
                       <button onClick={async()=>{
                         if (!confirm('Sperre entfernen?')) return
                         const { error: blErr } = await supabase.from('vacation_blackouts').delete().eq('id', b.id)
                         if (blErr) { showToast('⚠ Löschen fehlgeschlagen', 'warn'); return }
                         setBlackouts(prev => prev.filter((x:any) => x.id !== b.id))
-                      }} style={{ width:28, height:28, borderRadius:8, border:'1px solid #fca5a5', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#dc2626', flexShrink:0 }}>
+                      }} style={{ width:26, height:26, borderRadius:7, border:'1px solid var(--outline)', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt-muted)', flexShrink:0 }}>
                         <span className="material-symbols-outlined" style={{ fontSize:14 }}>delete</span>
                       </button>
                     </div>
                   ))}
                 </div>
               )}
-
-              {/* Sperre-Formular */}
               {showBlackoutForm && (
-                <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:600, display:'flex', alignItems:'flex-end' }} onClick={e=>{if(e.target===e.currentTarget)setShowBlackoutForm(false)}}>
-                  <div style={{ background:'var(--bg)', borderRadius:'22px 22px 0 0', width:'100%', padding:'20px 18px 36px', maxWidth:540, margin:'0 auto' }}>
-                    <div style={{ width:36, height:4, borderRadius:99, background:'var(--outline)', margin:'0 auto 18px' }}/>
+                <div style={{ position:'fixed', inset:0, background:'rgba(12,16,19,0.45)', zIndex:600, display:'flex', alignItems:'flex-end' }} onClick={e=>{if(e.target===e.currentTarget)setShowBlackoutForm(false)}}>
+                  <div style={{ background:'var(--bg)', borderRadius:'18px 18px 0 0', width:'100%', padding:'20px 18px 36px', maxWidth:540, margin:'0 auto', boxSizing:'border-box' as const }}>
+                    <div style={{ width:34, height:4, borderRadius:99, background:'var(--outline)', margin:'0 auto 18px' }}/>
                     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
-                      <h3 style={{ fontSize:17, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Urlaubssperre anlegen</h3>
+                      <h3 style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Urlaubssperre anlegen</h3>
                       <button onClick={()=>setShowBlackoutForm(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex' }}>
                         <span className="material-symbols-outlined">close</span>
                       </button>
                     </div>
-                    <div style={{ background:'#fef2f2', borderRadius:12, padding:'11px 14px', marginBottom:16, display:'flex', gap:8 }}>
-                      <span className="material-symbols-outlined" style={{ color:'#dc2626', fontSize:16, flexShrink:0, marginTop:1 }}>info</span>
-                      <div style={{ fontSize:12, color:'#991b1b', lineHeight:1.5 }}>In diesem Zeitraum können Mitarbeiter keinen Urlaub beantragen. Krankmeldungen sind weiterhin möglich.</div>
+                    <div style={{ background:'#fbf1ef', borderRadius:11, padding:'11px 14px', marginBottom:16, display:'flex', gap:8 }}>
+                      <span className="material-symbols-outlined" style={{ color:'#c2402e', fontSize:16, flexShrink:0, marginTop:1 }}>info</span>
+                      <div style={{ fontSize:12, color:'#8a3226', lineHeight:1.5 }}>In diesem Zeitraum können Mitarbeiter keinen Urlaub beantragen. Krankmeldungen sind weiterhin möglich.</div>
                     </div>
                     <div style={{ display:'flex', gap:10, marginBottom:12 }}>
                       <div style={{ flex:1 }}>
-                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Von</label>
-                        <input type="date" value={blackoutFrom} onChange={e=>setBlackoutFrom(e.target.value)}
-                          style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
+                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.07em', marginBottom:6 }}>Von</label>
+                        <input type="date" value={blackoutFrom} onChange={e=>setBlackoutFrom(e.target.value)} style={{ width:'100%', padding:'11px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
                       </div>
                       <div style={{ flex:1 }}>
-                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Bis</label>
-                        <input type="date" value={blackoutTo} onChange={e=>setBlackoutTo(e.target.value)}
-                          style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
+                        <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.07em', marginBottom:6 }}>Bis</label>
+                        <input type="date" value={blackoutTo} onChange={e=>setBlackoutTo(e.target.value)} style={{ width:'100%', padding:'11px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
                       </div>
                     </div>
-                    <div style={{ marginBottom:16 }}>
-                      <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Begründung (optional)</label>
-                      <input type="text" value={blackoutReason} onChange={e=>setBlackoutReason(e.target.value)} placeholder="z.B. Hochsaison, Messe, Projektwoche"
-                        style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
+                    <div style={{ marginBottom:18 }}>
+                      <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.07em', marginBottom:6 }}>Begründung (optional)</label>
+                      <input type="text" value={blackoutReason} onChange={e=>setBlackoutReason(e.target.value)} placeholder="z.B. Hochsaison, Messe, Projektwoche" style={{ width:'100%', padding:'11px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
                     </div>
                     <button disabled={blackoutSaving||!blackoutFrom||!blackoutTo||blackoutFrom>blackoutTo}
                       onClick={async()=>{
@@ -1388,8 +1437,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
                         if (!error && data) { setBlackouts(prev=>[...prev, data].sort((a:any,b:any)=>a.from_date.localeCompare(b.from_date))); setShowBlackoutForm(false) }
                         setBlackoutSaving(false)
                       }}
-                      style={{ width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,#dc2626,#ef4444)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', opacity:(!blackoutFrom||!blackoutTo||blackoutFrom>blackoutTo)?0.5:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:18 }}>{blackoutSaving?'hourglass_empty':'block'}</span>
+                      style={{ width:'100%', padding:13, borderRadius:12, border:'none', background:'var(--pri)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', opacity:(!blackoutFrom||!blackoutTo||blackoutFrom>blackoutTo)?0.5:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:17 }}>{blackoutSaving?'hourglass_empty':'block'}</span>
                       {blackoutSaving?'Wird gespeichert…':'Urlaubssperre setzen'}
                     </button>
                   </div>
