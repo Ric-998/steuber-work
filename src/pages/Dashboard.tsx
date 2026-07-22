@@ -25,6 +25,7 @@ interface TeamMember {
   work_days?: string[]|null; work_hours_per_week?: number|null
   work_hours_type?: 'fest'|'variabel'; hourly_wage?: number|null
   admin_setup_done?: boolean; is_onboarded?: boolean; vacation_days_per_year?: number
+  teamleiter_id?: string|null
 }
 interface Category { id:string; name:string; emoji:string }
 type ObjectType = 'einfamilienhaus'|'mehrfamilienhaus'|'firmengelaende'|'grundstueck'
@@ -296,7 +297,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
     const [stRes, prRes, tmRes, tkRes, obRes, catRes, custRes, lvRes, bkRes, cpRes] = await Promise.all([
       supabase.rpc('get_dashboard_stats'),
       supabase.rpc('get_dashboard_problems'),
-      supabase.from('users').select('id,full_name,phone,email,is_active,role_id,street,postal_code,city,created_at,employed_since,work_days,work_hours_per_week,work_hours_type,hourly_wage,admin_setup_done,is_onboarded,vacation_days_per_year').order('full_name'),
+      supabase.from('users').select('id,full_name,phone,email,is_active,role_id,street,postal_code,city,created_at,employed_since,work_days,work_hours_per_week,work_hours_type,hourly_wage,admin_setup_done,is_onboarded,vacation_days_per_year,teamleiter_id').order('full_name'),
       supabase.from('tasks').select('id,title,description,interval,is_active,due_date,end_date,category_id,object_id,contract_id,default_assignee_id,categories(name,emoji),objects(name,address,city),contracts(id,type,start_date,end_date,object_id,customer_id),users!tasks_default_assignee_id_fkey(full_name)').order('created_at',{ascending:false}).limit(300),
       supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,objektleiter_id,customers(id,name)').order('address').limit(200),
       supabase.from('categories').select('*').order('name'),
@@ -1175,10 +1176,60 @@ export default function Dashboard({ userName, onLogout }: Props) {
         )}
 
         {/* ── TEAM ── */}
-        {tab === 'team' && (
+        {tab === 'team' && (() => {
+          const todayStr = new Date().toISOString().split('T')[0]
+          // Build leave status map for today
+          const leaveStatusMap: Record<string, 'urlaub'|'krankmeldung'> = {}
+          leaveRequests.forEach(r => {
+            if (r.status !== 'abgelehnt' && r.from_date <= todayStr && r.to_date >= todayStr) {
+              leaveStatusMap[r.user_id] = r.request_type === 'urlaub' ? 'urlaub' : 'krankmeldung'
+            }
+          })
+
+          // Group team by teamleiter
+          const teamleiterMap: Record<string, TeamMember> = {}
+          team.forEach(m => { if (m.role_name === 'teamleiter') teamleiterMap[m.id] = m })
+          const tlIds = Object.keys(teamleiterMap)
+          const grouped: { tlId: string|null; tlName: string; members: TeamMember[] }[] = []
+          tlIds.sort((a,b) => teamleiterMap[a].full_name.localeCompare(teamleiterMap[b].full_name,'de')).forEach(tlId => {
+            const members = team.filter(m => m.teamleiter_id === tlId && m.role_name !== 'teamleiter' && m.role_name !== 'admin')
+            grouped.push({ tlId, tlName: teamleiterMap[tlId].full_name, members })
+          })
+          const unassigned = team.filter(m => !m.teamleiter_id && m.role_name === 'mitarbeiter')
+          if (unassigned.length > 0) grouped.push({ tlId: null, tlName: 'Nicht zugeordnet', members: unassigned })
+
+          const MemberCard = ({ m }: { m: TeamMember }) => {
+            const role = m.role_name || 'mitarbeiter'
+            const ini = m.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
+            const roleColor: Record<string,string> = { admin:'#7c3aed', teamleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
+            const roleBg: Record<string,string> = { admin:'#f3e8ff', teamleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
+            const isActive = activeWorkerIds.has(m.id)
+            const leaveStatus = leaveStatusMap[m.id]
+            // Status dot: green=working, orange=sick, red=vacation, nothing otherwise
+            const dotColor = isActive ? '#22c55e' : leaveStatus === 'urlaub' ? '#dc2626' : leaveStatus === 'krankmeldung' ? '#f97316' : null
+            const dotTitle = isActive ? 'Gerade in Arbeit' : leaveStatus === 'urlaub' ? 'Im Urlaub' : leaveStatus === 'krankmeldung' ? 'Krank gemeldet' : ''
+            return (
+              <div onClick={() => setSelectedMember(m)}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', opacity: m.is_active ? 1 : 0.5, cursor:'pointer', transition:'box-shadow 0.15s' }}
+                onMouseEnter={e=>(e.currentTarget.style.boxShadow='0 4px 14px rgba(9,106,112,0.10)')}
+                onMouseLeave={e=>(e.currentTarget.style.boxShadow='none')}>
+                <div style={{ position:'relative', flexShrink:0 }}>
+                  <div style={{ width:38, height:38, borderRadius:12, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, fontFamily:'var(--font-head)' }}>{ini}</div>
+                  {dotColor && <span title={dotTitle} style={{ position:'absolute', bottom:-1, right:-1, width:10, height:10, borderRadius:'50%', background:dotColor, border:'2px solid var(--surf-card)' }}/>}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
+                  <span style={{ fontSize:11, fontWeight:600, color: roleColor[role]||'var(--pri)', background: roleBg[role]||'var(--pri-xl)', borderRadius:99, padding:'2px 7px' }}>{ROLE_LABELS[role]||role}</span>
+                </div>
+                <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
+              </div>
+            )
+          }
+
+          return (
           <>
-            {/* Header mit Einladen-Button */}
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:20, marginBottom:16 }}>
+            {/* Header */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:20, marginBottom:20 }}>
               <div>
                 <h1 style={s.h1}>Team</h1>
                 <p style={s.sub}>{team.filter(m=>m.is_active).length} aktiv · {team.length} gesamt</p>
@@ -1189,77 +1240,79 @@ export default function Dashboard({ userName, onLogout }: Props) {
               </button>
             </div>
 
-            {/* Team-Liste */}
+            {/* Status-Legende */}
+            <div style={{ display:'flex', gap:14, marginBottom:18, flexWrap:'wrap' as const }}>
+              {[
+                { color:'#22c55e', label:'In Arbeit' },
+                { color:'#f97316', label:'Krank' },
+                { color:'#dc2626', label:'Urlaub' },
+              ].map(({ color, label }) => (
+                <div key={label} style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, color:'var(--txt-muted)' }}>
+                  <span style={{ width:8, height:8, borderRadius:'50%', background:color, display:'inline-block', flexShrink:0 }}/>
+                  {label}
+                </div>
+              ))}
+            </div>
+
+            {/* Teamleiter-Gruppen */}
             {team.length === 0 ? (
               <div style={{ textAlign:'center', padding:'40px 20px', color:'var(--txt-muted)', fontSize:14 }}>
                 <span className="material-symbols-outlined" style={{ fontSize:40, display:'block', marginBottom:8, opacity:0.4 }}>group</span>
                 Noch keine Mitarbeiter
               </div>
-            ) : (
-              <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill,minmax(280px,1fr))' : '1fr', gap:8 }}>
-                {[...team].sort((a,b)=>a.full_name.localeCompare(b.full_name,'de')).map(m => {
-                  const role = m.role_name || 'mitarbeiter'
-                  const ini = m.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
-                  const roleColor: Record<string,string> = { admin:'#7c3aed', teamleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
-                  const roleBg: Record<string,string> = { admin:'#f3e8ff', teamleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
-                  return (
-                    <div key={m.id}
-                      onClick={() => setSelectedMember(m)}
-                      style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', opacity: m.is_active ? 1 : 0.55, cursor:'pointer', transition:'box-shadow 0.15s' }}
-                      onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 16px rgba(9,106,112,0.10)')}
-                      onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}
-                    >
-                      {/* Avatar */}
-                      <div style={{ position:'relative', flexShrink:0 }}>
-                        <div style={{ width:40, height:40, borderRadius:12, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, fontFamily:'var(--font-head)' }}>{ini}</div>
-                        {activeWorkerIds.has(m.id) && (
-                          <span style={{ position:'absolute', bottom:0, right:0, width:10, height:10, borderRadius:'50%', background:'#22c55e', border:'2px solid var(--surf-card)' }}/>
-                        )}
-                      </div>
-                      {/* Info */}
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, fontWeight:600, color: roleColor[role]||'var(--pri)', background: roleBg[role]||'var(--pri-xl)', borderRadius:99, padding:'2px 7px', marginTop:3 }}>
-                          {ROLE_LABELS[role]||role}
-                        </span>
-                      </div>
-                      {/* Status */}
-                      <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                        <span style={{ fontSize:11, fontWeight:600, color: m.is_active ? 'var(--ok)' : 'var(--txt-muted)', background: m.is_active ? 'var(--ok-bg)' : 'var(--surf-high)', borderRadius:99, padding:'2px 8px' }}>
-                          {m.is_active ? 'Aktiv' : 'Inaktiv'}
-                        </span>
-                        <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)' }}>chevron_right</span>
-                      </div>
-                    </div>
-                  )
-                })}
+            ) : grouped.map(({ tlId, tlName, members }) => (
+              <div key={tlId ?? 'none'} style={{ marginBottom:20 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                  <div style={{ width:24, height:24, borderRadius:8, background: tlId ? 'var(--pri-xl)' : 'var(--surf-high)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:13, color: tlId ? 'var(--pri)' : 'var(--txt-muted)' }}>{tlId ? 'supervisor_account' : 'person_off'}</span>
+                  </div>
+                  <div style={{ fontSize:13, fontWeight:700, color: tlId ? 'var(--txt)' : 'var(--txt-muted)' }}>{tlName}</div>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:99, padding:'2px 8px' }}>{members.length}</div>
+                </div>
+                {members.length === 0 ? (
+                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'10px 14px', background:'var(--surf-low)', borderRadius:12, border:'1px dashed var(--outline)' }}>Noch keine Mitarbeiter zugeordnet</div>
+                ) : (
+                  <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill,minmax(260px,1fr))' : '1fr', gap:8 }}>
+                    {members.map(m => <MemberCard key={m.id} m={m} />)}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Admins separat (klein, kein Klick nötig) */}
+            {team.filter(m=>m.role_name==='admin').length > 0 && (
+              <div style={{ marginTop:4, marginBottom:20 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:10 }}>Administration</div>
+                <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill,minmax(260px,1fr))' : '1fr', gap:8 }}>
+                  {team.filter(m=>m.role_name==='admin').map(m => <MemberCard key={m.id} m={m} />)}
+                </div>
               </div>
             )}
 
-            {/* ── Urlaubssperren ── */}
-            <div style={{ marginTop:28 }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+            {/* Urlaubssperren */}
+            <div style={{ marginTop:8, paddingTop:20, borderTop:'1px solid var(--outline)' }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
                 <div>
-                  <h3 style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', margin:0, color:'var(--txt)' }}>Urlaubssperren</h3>
-                  <p style={{ fontSize:12, color:'var(--txt-muted)', margin:'2px 0 0' }}>Zeiträume, in denen kein Urlaub beantragt werden kann</p>
+                  <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)' }}>Urlaubssperren</div>
+                  <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:1 }}>Zeiträume ohne Urlaubsanträge</div>
                 </div>
                 <button onClick={()=>{setBlackoutFrom('');setBlackoutTo('');setBlackoutReason('');setShowBlackoutForm(true)}}
-                  style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 14px', borderRadius:12, border:'none', background:'#fef2f2', color:'#dc2626', fontSize:13, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:16 }}>block</span>
-                  Sperre
+                  style={{ display:'flex', alignItems:'center', gap:5, padding:'8px 12px', borderRadius:10, border:'1px solid #fca5a5', background:'#fef2f2', color:'#dc2626', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:15 }}>add</span>
+                  Neu
                 </button>
               </div>
 
               {blackouts.length === 0 ? (
-                <div style={{ background:'var(--surf-low)', borderRadius:14, padding:'18px 16px', textAlign:'center' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:28, color:'var(--txt-muted)', display:'block', marginBottom:6, opacity:0.4 }}>event_available</span>
-                  <div style={{ fontSize:13, color:'var(--txt-muted)' }}>Keine aktiven Urlaubssperren</div>
+                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'14px 16px', textAlign:'center' as const }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:24, color:'var(--txt-muted)', display:'block', marginBottom:4, opacity:0.4 }}>event_available</span>
+                  <div style={{ fontSize:12, color:'var(--txt-muted)' }}>Keine aktiven Urlaubssperren</div>
                 </div>
               ) : (
-                <div>
+                <div style={{ display:'flex', flexDirection:'column' as const, gap:6 }}>
                   {blackouts.map((b:any) => (
-                    <div key={b.id} style={{ background:'#fef2f2', borderRadius:12, padding:'10px 14px', marginBottom:6, border:'1px solid #fca5a5', display:'flex', alignItems:'center', gap:10 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:16, color:'#dc2626', flexShrink:0 }}>block</span>
+                    <div key={b.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'#fef2f2', borderRadius:12, border:'1px solid #fca5a5' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:15, color:'#dc2626', flexShrink:0 }}>block</span>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:13, fontWeight:700, color:'#991b1b' }}>
                           {new Date(b.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})} – {new Date(b.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
@@ -1268,10 +1321,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
                       </div>
                       <button onClick={async()=>{
                         if (!confirm('Sperre entfernen?')) return
-                        const { error: blErr } = await supabase.from('vacation_blackouts').delete().eq('id', b.id); if (blErr) { showToast('⚠ Löschen fehlgeschlagen', 'warn'); return }
+                        const { error: blErr } = await supabase.from('vacation_blackouts').delete().eq('id', b.id)
+                        if (blErr) { showToast('⚠ Löschen fehlgeschlagen', 'warn'); return }
                         setBlackouts(prev => prev.filter((x:any) => x.id !== b.id))
-                      }} style={{ width:32, height:32, borderRadius:9, border:'1px solid #fca5a5', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#dc2626', flexShrink:0 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:16 }}>delete</span>
+                      }} style={{ width:28, height:28, borderRadius:8, border:'1px solid #fca5a5', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#dc2626', flexShrink:0 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:14 }}>delete</span>
                       </button>
                     </div>
                   ))}
@@ -1297,18 +1351,18 @@ export default function Dashboard({ userName, onLogout }: Props) {
                       <div style={{ flex:1 }}>
                         <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Von</label>
                         <input type="date" value={blackoutFrom} onChange={e=>setBlackoutFrom(e.target.value)}
-                          style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                          style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
                       </div>
                       <div style={{ flex:1 }}>
                         <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Bis</label>
                         <input type="date" value={blackoutTo} onChange={e=>setBlackoutTo(e.target.value)}
-                          style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                          style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
                       </div>
                     </div>
                     <div style={{ marginBottom:16 }}>
                       <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Begründung (optional)</label>
                       <input type="text" value={blackoutReason} onChange={e=>setBlackoutReason(e.target.value)} placeholder="z.B. Hochsaison, Messe, Projektwoche"
-                        style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
+                        style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' as const }} />
                     </div>
                     <button disabled={blackoutSaving||!blackoutFrom||!blackoutTo||blackoutFrom>blackoutTo}
                       onClick={async()=>{
@@ -1326,7 +1380,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
               )}
             </div>
           </>
-        )}
+          )
+        })()}
 
         {/* ── TAGESBERICHT ── */}
         {tab === 'bericht' && (() => {
