@@ -128,11 +128,11 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     const horizon = addDaysISO(14)
     const [objRes, usersRes] = await Promise.all([
       supabase.from('objects').select('*').eq('objektleiter_id', userId).eq('is_active', true).order('name'),
-      supabase.from('users').select('id,full_name,is_active,roles(name)').eq('is_active', true).order('full_name'),
+      supabase.from('users').select('id,full_name,is_active,teamleiter_id,roles(name)').eq('is_active', true).order('full_name'),
     ])
     const objs = objRes.data || []
     setObjects(objs)
-    setAllUsers((usersRes.data || []).filter((u:any) => u.id !== userId && u.roles?.name === 'mitarbeiter'))
+    setAllUsers((usersRes.data || []).filter((u:any) => u.id !== userId && u.roles?.name === 'mitarbeiter' && u.teamleiter_id === userId))
 
     if (objs.length > 0) {
       const objIds = objs.map((o: any) => o.id)

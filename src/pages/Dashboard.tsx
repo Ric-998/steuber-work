@@ -2039,6 +2039,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             setSelectedMember(null)
             showToast('Mitarbeiter gelöscht', 'ok')
           }}
+          teamleiterList={team.filter(m => m.role_name === 'teamleiter' && m.is_active).map(m => ({ id: m.id, full_name: m.full_name }))}
         />
       )}
 
@@ -7282,13 +7283,14 @@ const WEEKDAYS = [
   { key:'do', label:'Do' }, { key:'fr', label:'Fr' }, { key:'sa', label:'Sa' },
 ]
 
-function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDelete, isDesktop }: {
+function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDelete, isDesktop, teamleiterList }: {
   member: TeamMember
   onClose: () => void
   onUpdated: (updated: Partial<TeamMember>) => void
   onToggleActive: () => void
   onDelete: (userId: string) => Promise<void>
   isDesktop: boolean
+  teamleiterList: { id: string; full_name: string }[]
 }) {
   const [saving, setSaving] = useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
@@ -7305,6 +7307,8 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
   const [vacationDays, setVacationDays] = useState<string>(member.vacation_days_per_year?.toString() ?? '30')
   const [editMode, setEditMode] = useState(!member.admin_setup_done)
   const [saveErr, setSaveErr] = useState('')
+  const [tlId, setTlId] = useState<string>(member.teamleiter_id ?? '')
+  const [tlSaving, setTlSaving] = useState(false)
 
   // XLSX Export
   const [showExportModal, setShowExportModal] = useState(false)
@@ -7714,6 +7718,44 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
             </div>
           )}
         </div>
+
+        {/* Teamleiter-Zuweisung */}
+        {role !== 'admin' && role !== 'teamleiter' && (
+          <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
+            <div style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)', display:'flex', alignItems:'center', gap:6 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:14 }}>supervisor_account</span>
+              Teamleiter
+            </div>
+            <div style={{ padding:'14px 16px' }}>
+              {teamleiterList.length === 0 ? (
+                <div style={{ fontSize:13, color:'var(--txt-muted)', fontStyle:'italic' }}>Keine Teamleiter angelegt</div>
+              ) : (
+                <div style={{ position:'relative' }}>
+                  <select
+                    value={tlId}
+                    disabled={tlSaving}
+                    onChange={async e => {
+                      const newVal = e.target.value
+                      setTlId(newVal)
+                      setTlSaving(true)
+                      const { error } = await supabase.from('users').update({ teamleiter_id: newVal || null }).eq('id', member.id)
+                      setTlSaving(false)
+                      if (!error) onUpdated({ id: member.id, teamleiter_id: newVal || null } as any)
+                    }}
+                    style={{ width:'100%', padding:'11px 36px 11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', color:'var(--txt)', fontSize:14, fontWeight:600, appearance:'none', WebkitAppearance:'none', cursor:'pointer', outline:'none', opacity: tlSaving ? 0.6 : 1 }}>
+                    <option value="">Kein Teamleiter</option>
+                    {teamleiterList.map(tl => (
+                      <option key={tl.id} value={tl.id}>{tl.full_name}</option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:18, color:'var(--txt-muted)', pointerEvents:'none' }}>
+                    {tlSaving ? 'hourglass_empty' : 'expand_more'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Zeiterfassung & Urlaub */}
         {(() => {
