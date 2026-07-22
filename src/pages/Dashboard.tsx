@@ -7330,6 +7330,11 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
   const [tlId, setTlId] = useState<string>(member.teamleiter_id ?? '')
   const [tlSaving, setTlSaving] = useState(false)
 
+  // Fresh contact data (loaded from DB on mount)
+  const [freshPhone, setFreshPhone] = useState(member.phone ?? '')
+  const [freshStreet, setFreshStreet] = useState((member as any).street ?? '')
+  const [freshCity, setFreshCity] = useState((member as any).city ?? '')
+
   // XLSX Export
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportMonth, setExportMonth] = useState(() => {
@@ -7455,6 +7460,18 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
         .eq('user_id', member.id)
         .eq('status', 'erledigt')
       setMaDoneCount(count ?? 0)
+
+      // Fresh profile
+      const { data: prof } = await supabase
+        .from('users')
+        .select('phone,street,city')
+        .eq('id', member.id)
+        .single()
+      if (prof) {
+        setFreshPhone(prof.phone ?? '')
+        setFreshStreet((prof as any).street ?? '')
+        setFreshCity((prof as any).city ?? '')
+      }
     }
     fetchMaData()
   }, [member.id])
@@ -7585,17 +7602,17 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
           </div>
 
           {/* Kontakt inline */}
-          {member.phone && (
+          {freshPhone && (
             <div style={{ padding:'0 16px 9px', display:'flex', alignItems:'center', gap:10 }}>
               <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--txt-muted)', flexShrink:0 }}>phone</span>
-              <a href={`tel:${member.phone}`} style={{ fontSize:13, fontWeight:600, color:'var(--pri)', textDecoration:'none' }}>{member.phone}</a>
+              <a href={`tel:${freshPhone}`} style={{ fontSize:13, fontWeight:600, color:'var(--pri)', textDecoration:'none' }}>{freshPhone}</a>
             </div>
           )}
-          {(member.street || member.city) && (
+          {(freshStreet || freshCity) && (
             <div style={{ padding:'0 16px 12px', display:'flex', alignItems:'center', gap:10 }}>
               <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--txt-muted)', flexShrink:0 }}>home</span>
               <span style={{ fontSize:13, color:'var(--txt)', fontWeight:500 }}>
-                {[member.street, member.postal_code && member.city ? `${member.postal_code} ${member.city}` : member.city].filter(Boolean).join(', ')}
+                {[freshStreet, freshCity].filter(Boolean).join(', ')}
               </span>
             </div>
           )}
