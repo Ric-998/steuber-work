@@ -1172,6 +1172,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             onSearchChange={setCpSearch}
             onRefresh={loadAll}
             onNavigateToObject={obj => { setSelectedObject(obj); setTab('objekte') }}
+            isDesktop={isDesktop}
           />
         )}
 
@@ -8651,7 +8652,7 @@ function ObjekteListe({ objs, onNav }: { objs: any[], onNav: (o: any) => void })
 }
 
 // ─── AnsprechpartnerList ──────────────────────────────────────────────────────
-function AnsprechpartnerList({ contacts, customers, objects, search, onSearchChange, onRefresh, onNavigateToObject }: {
+function AnsprechpartnerList({ contacts, customers, objects, search, onSearchChange, onRefresh, onNavigateToObject, isDesktop }: {
   contacts: any[]
   customers: any[]
   objects: any[]
@@ -8659,6 +8660,7 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
   onSearchChange: (v: string) => void
   onRefresh?: () => void
   onNavigateToObject?: (obj: any) => void
+  isDesktop?: boolean
 }) {
   const [showExport, setShowExport] = useState(false)
   const [selectedContact, setSelectedContact] = useState<any>(null)
@@ -8905,9 +8907,9 @@ function AnsprechpartnerList({ contacts, customers, objects, search, onSearchCha
           : cp.name || '–'
         const initials = ((cp.first_name?.[0]||'') + (cp.last_name?.[0]||cp.name?.[0]||'')).toUpperCase() || '?'
         return (
-          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1100, display:'flex', alignItems: window.innerWidth >= 768 ? 'center' : 'flex-end', justifyContent: window.innerWidth >= 768 ? 'center' : 'stretch' }}
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1100, display:'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: isDesktop ? 'center' : 'stretch' }}
             onClick={() => { setSelectedContact(null); setEditMode(false); setShowDeleteConfirm(false) }}>
-            <div style={{ background:'var(--bg)', borderRadius: window.innerWidth >= 768 ? 20 : '24px 24px 0 0', width: window.innerWidth >= 768 ? 420 : '100%', maxHeight:'92vh', overflowY:'auto', paddingBottom: window.innerWidth >= 768 ? 0 : 'env(safe-area-inset-bottom, 20px)', boxShadow: window.innerWidth >= 768 ? '0 8px 40px rgba(0,0,0,0.2)' : 'none' }}
+            <div style={{ background:'var(--bg)', borderRadius: isDesktop ? 20 : '24px 24px 0 0', width: isDesktop ? 480 : '100%', maxWidth: isDesktop ? 480 : '100%', maxHeight:'92vh', overflowY:'auto', paddingBottom: isDesktop ? 0 : 'env(safe-area-inset-bottom, 20px)', boxShadow: isDesktop ? '0 8px 40px rgba(0,0,0,0.2)' : 'none' }}
               onClick={e => e.stopPropagation()}>
               {/* Handle + Header-Zeile */}
               <div style={{ display:'flex', justifyContent:'center', padding:'10px 0 0' }}>
