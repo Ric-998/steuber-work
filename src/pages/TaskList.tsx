@@ -94,6 +94,13 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   const [toast, setToast] = useState<{msg:string;type:'ok'|'warn'}|null>(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
 
+  const [hasPhone, setHasPhone] = useState<boolean|null>(null)
+  useEffect(() => {
+    supabase.from('users').select('phone').eq('id', userId).single().then(({ data }) => {
+      setHasPhone(!!data?.phone)
+    })
+  }, [userId])
+
   useEffect(() => {
     const on  = () => setIsOnline(true)
     const off = () => setIsOnline(false)
@@ -601,6 +608,17 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
                   </div>
                 )}
               </div>
+              {hasPhone === false && (
+                <div style={{ display:'flex', gap:10, padding:'12px 14px', borderRadius:14, background:'#fff8e1', border:'1px solid #fbbf24', alignItems:'flex-start', marginBottom:8, cursor:'pointer' }}
+                  onClick={() => setActiveTab('profile')}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18, color:'#d97706', flexShrink:0, marginTop:1 }}>warning</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>Kontaktdaten fehlen</div>
+                    <div style={{ fontSize:12, color:'#b45309', marginTop:1 }}>Bitte hinterlege deine Telefonnummer und Adresse im Profil.</div>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize:16, color:'#d97706', flexShrink:0, marginTop:2 }}>arrow_forward</span>
+                </div>
+              )}
 
               {/* ── Wochenstreifen ── */}
               <div style={{ display:'flex', gap:5, marginBottom:18 }}>
@@ -914,7 +932,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
 
         {activeTab === 'zeit' && <ZeitTab userId={userId} loading={loading} myLeaves={myLeaves} vacationDaysPerYear={vacationDaysPerYear} assignments={assignments} onLeavesChanged={fetchMyLeaves} availableVertretungen={availableVertretungen} ownVertretungen={ownVertretungen} onTakeOver={takeOverVertretung} onCancelVertretung={cancelVertretung} takingOver={takingOver} cancellingVertretung={cancellingVertretung} />}
         {activeTab === 'chat' && <ChatTab currentUserName={userName} currentUserId={userId} />}
-        {activeTab === 'profile' && <ProfileTab userName={userName} initials={initials} onLogout={onLogout} userId={userId} pushEnabled={pushEnabled} pushSupported={pushSupported} onTogglePush={togglePush} onBugReport={()=>setShowBugReport(true)} onFeedback={()=>setShowFeedback(true)} />}
+        {activeTab === 'profile' && <ProfileTab userName={userName} initials={initials} onLogout={onLogout} userId={userId} pushEnabled={pushEnabled} pushSupported={pushSupported} onTogglePush={togglePush} onBugReport={()=>setShowBugReport(true)} onFeedback={()=>setShowFeedback(true)} onPhoneLoaded={(has) => setHasPhone(has)} />}
       </div>
       {/* MonthSheet */}
       <MonthSheet
@@ -2474,9 +2492,9 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
 }
 
 
-function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSupported, onTogglePush, onBugReport, onFeedback }: {
+function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSupported, onTogglePush, onBugReport, onFeedback, onPhoneLoaded }: {
   userName:string; initials:string; onLogout:()=>void; userId:string;
-  pushEnabled:boolean; pushSupported:boolean; onTogglePush:()=>void; onBugReport:()=>void; onFeedback:()=>void
+  pushEnabled:boolean; pushSupported:boolean; onTogglePush:()=>void; onBugReport:()=>void; onFeedback:()=>void; onPhoneLoaded?:(has:boolean)=>void
 }) {
   const [showGuide, setShowGuide] = useState(false)
   const [showInstall, setShowInstall] = useState(false)
@@ -2524,7 +2542,8 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
   const [showDataForm, setShowDataForm] = useState(false)
   const [editName, setEditName] = useState(userName)
   const [editPhone, setEditPhone] = useState('')
-  const [editHomeAddress, setEditHomeAddress] = useState('')
+  const [editStreet, setEditStreet] = useState('')
+  const [editCity, setEditCity] = useState('')
   const [dataSaving, setDataSaving] = useState(false)
   const [dataMsg, setDataMsg] = useState<{ok:boolean;text:string}|null>(null)
   const [profileLoaded, setProfileLoaded] = useState(false)
@@ -2533,10 +2552,12 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
     supabase.auth.getUser().then(({ data }) => {
       if (data.user?.email) setEmailState(data.user.email)
     })
-    supabase.from('users').select('phone,full_name,home_address').eq('id', userId).single().then(({ data }) => {
+    supabase.from('users').select('phone,full_name,street,city').eq('id', userId).single().then(({ data }) => {
       if (data?.phone) setEditPhone(data.phone)
       if (data?.full_name) setEditName(data.full_name)
-      if (data?.home_address) setEditHomeAddress(data.home_address)
+      if (data?.street) setEditStreet(data.street)
+      if (data?.city) setEditCity(data.city)
+      onPhoneLoaded?.(!!data?.phone)
       setProfileLoaded(true)
     })
   }, [userId])
@@ -2560,20 +2581,9 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
     e.preventDefault(); setDataMsg(null)
     if (!editName.trim()) { setDataMsg({ok:false, text:'Name darf nicht leer sein.'}); return }
     setDataSaving(true)
-    // Geocode home address if changed
-    let geoUpdate: {home_lat?: number, home_lng?: number} = {}
-    const addrTrimmed = editHomeAddress.trim()
-    if (addrTrimmed) {
-      try {
-        const q = encodeURIComponent(addrTrimmed + ', Deutschland')
-        const gr = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, { headers:{ 'User-Agent':'SteuberWork/1.0' } })
-        const gj = await gr.json()
-        if (gj?.[0]) { geoUpdate = { home_lat: parseFloat(gj[0].lat), home_lng: parseFloat(gj[0].lon) } }
-      } catch {}
-    }
-    const { error } = await supabase.from('users').update({ full_name: editName.trim(), phone: editPhone.trim() || null, home_address: addrTrimmed || null, ...geoUpdate }).eq('id', userId)
+    const { error } = await supabase.from('users').update({ full_name: editName.trim(), phone: editPhone.trim() || null, street: editStreet.trim() || null, city: editCity.trim() || null }).eq('id', userId)
     if (error) { setDataMsg({ok:false, text:error.message}) }
-    else { setDataMsg({ok:true, text:'Daten gespeichert!'}); setTimeout(() => { setShowDataForm(false); setDataMsg(null) }, 2000) }
+    else { setDataMsg({ok:true, text:'Daten gespeichert!'}); onPhoneLoaded?.(!!editPhone.trim()); setTimeout(() => { setShowDataForm(false); setDataMsg(null) }, 2000) }
     setDataSaving(false)
   }
 
@@ -2657,7 +2667,7 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
             </div>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:14, fontWeight:600, color: showDataForm ? 'var(--pri)' : 'var(--txt)' }}>Meine Daten</div>
-              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>Name und Telefonnummer</div>
+              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>Name, Telefon & Adresse</div>
             </div>
             <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', transition:'transform 0.2s', transform: showDataForm ? 'rotate(90deg)' : 'none' }}>chevron_right</span>
           </div>
@@ -2673,11 +2683,16 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
                 <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>phone</span>
                 <input type="tel" value={editPhone} onChange={e=>setEditPhone(e.target.value)} placeholder="+49 160 12345678"
                   style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', fontFamily:'var(--font-body)' }} />
+              </div>
               <div style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>home</span>
-                <input type="text" value={editHomeAddress} onChange={e=>setEditHomeAddress(e.target.value)} placeholder="Heimadresse (für Routenplanung)"
-                  style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)' }} />
+                <input type="text" value={editStreet} onChange={e=>setEditStreet(e.target.value)} placeholder="Straße und Hausnummer"
+                  style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', fontFamily:'var(--font-body)' }} />
               </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>location_city</span>
+                <input type="text" value={editCity} onChange={e=>setEditCity(e.target.value)} placeholder="Ort"
+                  style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color:'var(--txt)', fontFamily:'var(--font-body)' }} />
               </div>
               {dataMsg && <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10, background: dataMsg.ok ? 'var(--ok-bg)' : 'var(--err-bg)', color: dataMsg.ok ? 'var(--ok)' : 'var(--err)', fontSize:13 }}>
                 <span className="material-symbols-outlined icon-sm icon-fill">{dataMsg.ok ? 'check_circle' : 'error'}</span>{dataMsg.text}

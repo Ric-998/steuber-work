@@ -124,6 +124,8 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
   const [dataMsg, setDataMsg] = useState<{ok:boolean;text:string}|null>(null)
   const [showFeedback, setShowFeedback] = useState(false)
   const [profileLoaded, setProfileLoaded] = useState(false)
+  const [editStreet, setEditStreet] = useState('')
+  const [editCity, setEditCity] = useState('')
 
   const initials = userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
@@ -217,9 +219,11 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     supabase.auth.getUser().then(({ data }) => {
       if (data.user?.email) setEmailState(data.user.email)
     })
-    supabase.from('users').select('phone,full_name').eq('id', userId).single().then(({ data }) => {
+    supabase.from('users').select('phone,full_name,street,city').eq('id', userId).single().then(({ data }) => {
       if (data?.phone) setEditPhone(data.phone)
       if (data?.full_name) setEditName(data.full_name)
+      if (data?.street) setEditStreet(data.street)
+      if (data?.city) setEditCity(data.city)
       setProfileLoaded(true)
     })
   }, [userId])
@@ -332,7 +336,7 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     e.preventDefault(); setDataMsg(null)
     if (!editName.trim()) { setDataMsg({ok:false, text:'Name darf nicht leer sein.'}); return }
     setDataSaving(true)
-    const { error } = await supabase.from('users').update({ full_name: editName.trim(), phone: editPhone.trim() || null }).eq('id', userId)
+    const { error } = await supabase.from('users').update({ full_name: editName.trim(), phone: editPhone.trim() || null, street: editStreet.trim() || null, city: editCity.trim() || null }).eq('id', userId)
     if (error) { setDataMsg({ok:false, text:error.message}) }
     else { setDataMsg({ok:true, text:'Daten gespeichert!'}); setTimeout(()=>{setShowDataForm(false);setDataMsg(null)},2000) }
     setDataSaving(false)
@@ -472,6 +476,17 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
   // ── Tab: Übersicht ───────────────────────────────────────────────
   const renderUebersichtTab = () => (
     <>
+      {profileLoaded && !editPhone && (
+        <div style={{ display:'flex', gap:10, padding:'12px 14px', borderRadius:14, background:'#fff8e1', border:'1px solid #fbbf24', alignItems:'flex-start', marginBottom:14, cursor:'pointer' }}
+          onClick={() => setTab('profil')}>
+          <span className="material-symbols-outlined" style={{ fontSize:18, color:'#d97706', flexShrink:0, marginTop:1 }}>warning</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>Kontaktdaten fehlen</div>
+            <div style={{ fontSize:12, color:'#b45309', marginTop:1 }}>Bitte hinterlege Telefonnummer und Adresse im Profil.</div>
+          </div>
+          <span className="material-symbols-outlined" style={{ fontSize:16, color:'#d97706', flexShrink:0, marginTop:2 }}>arrow_forward</span>
+        </div>
+      )}
       <div style={s.kpiGrid}>
         {[
           { label:'Aufgaben heute', val:stats.total, warn:false },
@@ -825,7 +840,7 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
             </div>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:14, fontWeight:600, color:showDataForm?'var(--pri)':'var(--txt)' }}>Meine Daten</div>
-              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>Name und Telefonnummer</div>
+              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>Name, Telefon & Adresse</div>
             </div>
             <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', transition:'transform 0.2s', transform:showDataForm?'rotate(90deg)':'none' }}>chevron_right</span>
           </div>
@@ -835,6 +850,8 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
               {[
                 { icon:'person', val:editName, set:setEditName, ph:'Vor- und Nachname', type:'text' },
                 { icon:'phone', val:editPhone, set:setEditPhone, ph:'+49 160 12345678', type:'tel' },
+                { icon:'home', val:editStreet, set:setEditStreet, ph:'Straße und Hausnummer', type:'text' },
+                { icon:'location_city', val:editCity, set:setEditCity, ph:'Ort', type:'text' },
               ].map(({ icon, val, set, ph, type }) => (
                 <div key={icon} style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
                   <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', flexShrink:0 }}>{icon}</span>
