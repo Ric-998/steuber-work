@@ -115,6 +115,7 @@ export interface TaskAssignment {
   started_at?: string
   completed_at?: string
   travel_minutes?: number
+  work_minutes?: number | null
   sort_order?: number
   substitute_id?: string
   tasks?: Task

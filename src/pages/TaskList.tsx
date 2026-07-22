@@ -105,6 +105,8 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
   // Zeiterfassung & Routing
   const [travelMinutes, setTravelMinutes] = useState<number>(0)
   const [customTravel, setCustomTravel] = useState('')
+  const [workMinutes, setWorkMinutes] = useState<number>(0)
+  const [customWork, setCustomWork] = useState('')
   const [optimizingRoute, setOptimizingRoute] = useState(false)
 
   // Urlaubs-/Krankmeldungs-Daten für Kalender
@@ -289,6 +291,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
       if (detail?.id === id) setDetail(prev => prev ? { ...prev, ...updates } : prev)
     }
     setUpdating(false); setSheetTask(null); setSheetType(null); setSelectedOption(''); setProblemNote(''); setProblemUrgent(false)
+    setWorkMinutes(0); setCustomWork(''); setTravelMinutes(0); setCustomTravel('')
   }
 
   const confirmAction = async () => {
@@ -310,7 +313,7 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
         }
       }
 
-      await updateStatus(sheetTask.id, 'erledigt', { travel_minutes: travelMinutes })
+      await updateStatus(sheetTask.id, 'erledigt', { travel_minutes: travelMinutes, work_minutes: workMinutes || null })
 
       // Save report with photo
       await supabase.from('task_reports').insert({
@@ -1095,6 +1098,27 @@ export default function TaskList({ userId, userName, onLogout }: Props) {
                           <span style={{ fontSize:15, fontWeight:800, color:'var(--pri)', fontFamily:'var(--font-head)' }}>{workedStr}</span>
                         </div>
                       )}
+                      {/* Arbeitsstunden */}
+                      <div style={{ fontSize:12, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:14, verticalAlign:'middle', marginRight:4 }}>schedule</span>
+                        Arbeitsstunden (diese Aufgabe)
+                      </div>
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+                        {[30, 60, 90, 120, 180, 240].map(m => (
+                          <button key={m} onClick={() => { setWorkMinutes(m); setCustomWork('') }}
+                            style={{ padding:'7px 12px', borderRadius:10, border:`1.5px solid ${workMinutes===m && customWork==='' ? 'var(--pri)' : 'var(--outline)'}`, background:workMinutes===m && customWork==='' ? 'var(--pri-xl)' : 'var(--surf-card)', color:workMinutes===m && customWork==='' ? 'var(--pri)' : 'var(--txt)', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                            {m < 60 ? `${m} Min.` : `${m/60}h`}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:10, border:'1.5px solid var(--outline)', background:'var(--surf-card)', marginBottom:14 }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)' }}>edit</span>
+                        <input type="number" min={0} max={960} placeholder="Eigene Eingabe (min)" value={customWork}
+                          onChange={e => { setCustomWork(e.target.value); setWorkMinutes(parseInt(e.target.value)||0) }}
+                          style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:13, color:'var(--txt)' }} />
+                        <span style={{ fontSize:12, color:'var(--txt-muted)' }}>min</span>
+                      </div>
+
                       <div style={{ fontSize:12, fontWeight:700, color:'var(--txt-sec)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
                         <span className="material-symbols-outlined" style={{ fontSize:14, verticalAlign:'middle', marginRight:4 }}>directions_car</span>
                         Fahrzeit (Hin + Rückfahrt)

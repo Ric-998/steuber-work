@@ -70,9 +70,24 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
   const [leaves, setLeaves] = useState<any[]>([])
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [weekAssigns, setWeekAssigns] = useState<any[]>([])
   const [selectedObj, setSelectedObj] = useState<any>(null)
   const [objTasks, setObjTasks] = useState<any[]>([])
   const [objAssigns, setObjAssigns] = useState<any[]>([])
+
+  // Categories (for new task form)
+  const [categories, setCategories] = useState<any[]>([])
+
+  // Neue Aufgabe Form
+  const [showNewTask, setShowNewTask] = useState(false)
+  const [ntObj, setNtObj] = useState('')
+  const [ntTitle, setNtTitle] = useState('')
+  const [ntCat, setNtCat] = useState('')
+  const [ntInterval, setNtInterval] = useState<'einmalig'|'täglich'|'wöchentlich'|'monatlich'|'quartalsweise'>('einmalig')
+  const [ntDate, setNtDate] = useState(localToday())
+  const [ntAssignee, setNtAssignee] = useState('')
+  const [ntSaving, setNtSaving] = useState(false)
+  const [ntErr, setNtErr] = useState('')
 
   // Toast-Feedback
   const [toast, setToast] = useState<string|null>(null)
@@ -126,10 +141,12 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     setLoading(true)
     const today = localToday()
     const horizon = addDaysISO(14)
-    const [objRes, usersRes] = await Promise.all([
+    const [objRes, usersRes, catRes] = await Promise.all([
       supabase.from('objects').select('*').eq('objektleiter_id', userId).eq('is_active', true).order('name'),
       supabase.from('users').select('id,full_name,is_active,teamleiter_id,roles(name)').eq('is_active', true).order('full_name'),
+      supabase.from('categories').select('id,name,emoji').order('name'),
     ])
+    setCategories(catRes.data || [])
     const objs = objRes.data || []
     setObjects(objs)
     const filteredUsers = (usersRes.data || []).filter((u:any) => u.id !== userId && u.roles?.name === 'mitarbeiter' && u.teamleiter_id === userId)
@@ -147,9 +164,10 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
 
       if (taskIds.length > 0) {
         const monthAgo = addDaysISO(-30)
-        const [todayRes, upcomingRes, teamRes] = await Promise.all([
+        const weekStart = addDaysISO(-6)
+        const [todayRes, upcomingRes, teamRes, weekRes] = await Promise.all([
           supabase.from('task_assignments')
-            .select('id,task_id,user_id,substitute_id,due_date,status,travel_minutes,started_at,completed_at,tasks(title,object_id,categories(emoji)),users!task_assignments_user_id_fkey(id,full_name),substitute:users!task_assignments_substitute_id_fkey(id,full_name)')
+            .select('id,task_id,user_id,substitute_id,due_date,status,travel_minutes,work_minutes,started_at,completed_at,tasks(title,object_id,categories(emoji)),users!task_assignments_user_id_fkey(id,full_name),substitute:users!task_assignments_substitute_id_fkey(id,full_name)')
             .in('task_id', taskIds).eq('due_date', today),
           supabase.from('task_assignments')
             .select('id,task_id,user_id,substitute_id,due_date,status,tasks(title,object_id,categories(emoji)),users!task_assignments_user_id_fkey(id,full_name),substitute:users!task_assignments_substitute_id_fkey(id,full_name)')
@@ -157,9 +175,13 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
           supabase.from('task_assignments')
             .select('user_id,users!task_assignments_user_id_fkey(id,full_name)')
             .in('task_id', taskIds).gte('due_date', monthAgo),
+          supabase.from('task_assignments')
+            .select('id,user_id,due_date,status,work_minutes,travel_minutes')
+            .in('task_id', taskIds).gte('due_date', weekStart).lte('due_date', today),
         ])
         setTodayAssigns(todayRes.data || [])
         setUpcomingAssigns(upcomingRes.data || [])
+        setWeekAssigns(weekRes.data || [])
 
         const seen = new Set<string>()
         const uniqueTeam: any[] = []
@@ -168,10 +190,10 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
         })
         setTeam(uniqueTeam.filter(Boolean))
       } else {
-        setTodayAssigns([]); setUpcomingAssigns([]); setTeam([])
+        setTodayAssigns([]); setUpcomingAssigns([]); setTeam([]); setWeekAssigns([])
       }
     } else {
-      setTasks([]); setTodayAssigns([]); setUpcomingAssigns([]); setTeam([])
+      setTasks([]); setTodayAssigns([]); setUpcomingAssigns([]); setTeam([]); setWeekAssigns([])
     }
 
     // Leaves always based on filteredUsers (not on task assignments)
@@ -259,6 +281,38 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     if (selectedObj) loadObjectDetail(selectedObj)
     load()
     showToast(`Vertretung gesetzt: ${substName}`)
+  }
+
+  const handleCreateTask = async () => {
+    if (!ntObj || !ntTitle.trim()) { setNtErr('Objekt und Titel sind Pflichtfelder'); return }
+    setNtSaving(true); setNtErr('')
+    // Insert task
+    const { data: newTask, error: taskErr } = await supabase.from('tasks').insert({
+      object_id: ntObj,
+      title: ntTitle.trim(),
+      category_id: ntCat || null,
+      interval: ntInterval,
+      due_date: ntDate,
+      is_active: true,
+      default_assignee_id: ntAssignee || null,
+    }).select().single()
+    if (taskErr || !newTask) { setNtErr(taskErr?.message || 'Fehler beim Speichern'); setNtSaving(false); return }
+    // Insert assignment for chosen date
+    if (ntAssignee) {
+      await supabase.from('task_assignments').insert({
+        task_id: newTask.id, user_id: ntAssignee, due_date: ntDate, status: 'offen',
+      })
+    } else if (ntInterval === 'einmalig') {
+      // einmalig ohne Mitarbeiter: trotzdem assignment anlegen (unzugewiesen)
+      await supabase.from('task_assignments').insert({
+        task_id: newTask.id, due_date: ntDate, status: 'offen',
+      })
+    }
+    setNtSaving(false)
+    setShowNewTask(false)
+    setNtTitle(''); setNtCat(''); setNtInterval('einmalig'); setNtAssignee(''); setNtErr('')
+    load()
+    showToast(`Aufgabe angelegt: ${newTask.title}`)
   }
 
   const handlePwSave = async (e: React.FormEvent) => {
@@ -479,7 +533,13 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     )
     return (
       <>
-        <div style={s.sectionLabel}>Aufgaben planen ({tasks.length})</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+          <div style={s.sectionLabel}>Aufgaben ({tasks.length})</div>
+          <button onClick={() => { setShowNewTask(true); setNtObj(objects.length===1?objects[0].id:''); setNtDate(localToday()); setNtErr('') }}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:10, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 3px 10px rgba(9,106,112,0.2)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:17 }}>add</span>Neue Aufgabe
+          </button>
+        </div>
         {objects.map((obj:any) => {
           const objTasksList = tasks.filter((t:any)=>t.object_id===obj.id)
           if (objTasksList.length === 0) return null
@@ -674,9 +734,11 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
                 const mt = todayAssigns.filter((a:any)=>a.user_id===member.id || a.substitute_id===member.id)
                 const done = mt.filter((a:any)=>a.status==='erledigt').length
                 const hasProb = mt.some((a:any)=>a.status==='problem')
-                const travel = todayAssigns
-                  .filter((a:any)=>a.user_id===member.id)
-                  .reduce((sum:number,a:any)=> sum + (a.travel_minutes||0), 0)
+                const _todayTravel = todayAssigns.filter((a:any)=>a.user_id===member.id).reduce((s:number,a:any)=>s+(a.travel_minutes||0),0)
+                const _todayWork = todayAssigns.filter((a:any)=>a.user_id===member.id).reduce((s:number,a:any)=>s+(a.work_minutes||0),0)
+                void _todayTravel; void _todayWork
+                const weekWork = weekAssigns.filter((a:any)=>a.user_id===member.id).reduce((s:number,a:any)=>s+(a.work_minutes||0),0)
+                const weekTravel = weekAssigns.filter((a:any)=>a.user_id===member.id).reduce((s:number,a:any)=>s+(a.travel_minutes||0),0)
                 const onLeave = activeLeaves.find((l:any)=>l.user_id===member.id)
                 return (
                   <div key={member.id} style={s.teamCard}>
@@ -684,8 +746,9 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{member.full_name}</div>
                       <div style={{ fontSize:12, color:'#9ca3af', marginTop:2 }}>
-                        {mt.length>0 ? `${done}/${mt.length} heute erledigt` : 'Heute keine Aufgaben'}
-                        {travel>0 ? ` · ${travel} Min Fahrzeit` : ''}
+                        {mt.length>0 ? `${done}/${mt.length} heute` : 'Heute keine Aufgaben'}
+                        {weekWork>0 ? ` · ${Math.round(weekWork/60*10)/10}h diese Woche` : ''}
+                        {weekTravel>0 ? ` · ${Math.round(weekTravel/60*10)/10}h Fahrzeit` : ''}
                       </div>
                     </div>
                     {onLeave
@@ -706,10 +769,7 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
             </div>
         }
 
-        <div style={{ marginTop:16, padding:'12px 14px', borderRadius:12, background:'var(--surf-low)', border:'1px dashed var(--outline)', fontSize:12, color:'var(--txt-muted)', display:'flex', alignItems:'center', gap:8 }}>
-          <span className="material-symbols-outlined" style={{ fontSize:16 }}>schedule</span>
-          Arbeitsstunden werden künftig manuell erfasst und hier je Mitarbeiter angezeigt.
-        </div>
+
       </>
     )
   }
@@ -904,6 +964,84 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
             ))}
           </nav>
         </>
+      )}
+
+      {/* Neue Aufgabe Sheet */}
+      {showNewTask && (
+        <div style={s.editOverlay} onClick={e=>{ if(e.target===e.currentTarget) setShowNewTask(false) }}>
+          <div style={{ ...s.editSheet, maxHeight:'90dvh', overflowY:'auto' as const }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+              <div style={{ fontSize:17, fontWeight:800, fontFamily:'Manrope, sans-serif', color:'var(--txt)' }}>Neue Aufgabe</div>
+              <button onClick={()=>setShowNewTask(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex' }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Objekt */}
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Objekt *</label>
+            <div style={{ position:'relative', marginBottom:14 }}>
+              <select value={ntObj} onChange={e=>setNtObj(e.target.value)} style={{ ...s.inputStyle, padding:'10px 32px 10px 12px', appearance:'none', WebkitAppearance:'none', marginBottom:0 }}>
+                <option value="">Objekt wählen…</option>
+                {objects.map((o:any) => <option key={o.id} value={o.id}>{o.name || o.address}</option>)}
+              </select>
+              <span className="material-symbols-outlined" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:16, color:'var(--txt-muted)', pointerEvents:'none' }}>expand_more</span>
+            </div>
+
+            {/* Titel */}
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Titel *</label>
+            <input type="text" value={ntTitle} onChange={e=>setNtTitle(e.target.value)} placeholder="z.B. Eingang reinigen"
+              style={{ ...s.inputStyle, marginBottom:14 }} />
+
+            {/* Kategorie */}
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Kategorie</label>
+            <div style={{ display:'flex', flexWrap:'wrap' as const, gap:6, marginBottom:14 }}>
+              {categories.map((c:any) => (
+                <button key={c.id} type="button" onClick={()=>setNtCat(ntCat===c.id?'':c.id)}
+                  style={{ padding:'6px 10px', borderRadius:8, border:`1.5px solid ${ntCat===c.id?'var(--pri)':'var(--outline)'}`, background:ntCat===c.id?'var(--pri-xl)':'var(--surf-card)', color:ntCat===c.id?'var(--pri)':'var(--txt)', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                  {c.emoji} {c.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Intervall */}
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Intervall</label>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' as const, marginBottom:14 }}>
+              {(['einmalig','täglich','wöchentlich','monatlich','quartalsweise'] as const).map(iv => (
+                <button key={iv} type="button" onClick={()=>setNtInterval(iv)}
+                  style={{ padding:'6px 10px', borderRadius:8, border:`1.5px solid ${ntInterval===iv?'var(--pri)':'var(--outline)'}`, background:ntInterval===iv?'var(--pri-xl)':'var(--surf-card)', color:ntInterval===iv?'var(--pri)':'var(--txt)', fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                  {iv.charAt(0).toUpperCase()+iv.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* Datum */}
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Startdatum</label>
+            <input type="date" value={ntDate} onChange={e=>setNtDate(e.target.value)} style={{ ...s.inputStyle, marginBottom:14 }} />
+
+            {/* Mitarbeiter */}
+            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Mitarbeiter (optional)</label>
+            <div style={{ position:'relative', marginBottom:16 }}>
+              <select value={ntAssignee} onChange={e=>setNtAssignee(e.target.value)} style={{ ...s.inputStyle, padding:'10px 32px 10px 12px', appearance:'none', WebkitAppearance:'none', marginBottom:0 }}>
+                <option value="">Kein Mitarbeiter</option>
+                {allUsers.map((u:any) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+              </select>
+              <span className="material-symbols-outlined" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:16, color:'var(--txt-muted)', pointerEvents:'none' }}>expand_more</span>
+            </div>
+
+            {ntErr && <div style={{ display:'flex', gap:8, padding:'10px 12px', borderRadius:10, background:'var(--err-bg)', color:'var(--err)', fontSize:13, marginBottom:12, alignItems:'center' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:15 }}>error</span>{ntErr}
+            </div>}
+
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>setShowNewTask(false)} style={{ flex:1, padding:13, borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:14, fontWeight:700, cursor:'pointer' }}>Abbrechen</button>
+              <button onClick={handleCreateTask} disabled={ntSaving||!ntObj||!ntTitle.trim()}
+                style={{ flex:2, padding:13, borderRadius:12, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', opacity:(!ntObj||!ntTitle.trim())?0.5:1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:17 }}>{ntSaving?'hourglass_empty':'add_task'}</span>
+                {ntSaving?'Wird gespeichert…':'Aufgabe anlegen'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Einteilen Sheet */}
