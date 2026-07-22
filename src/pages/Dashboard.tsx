@@ -2061,6 +2061,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
           teamWorkers={selectedMember.role_name === 'teamleiter'
             ? team.filter(m => m.teamleiter_id === selectedMember.id).map(m => ({ id: m.id, full_name: m.full_name }))
             : undefined}
+          allMitarbeiter={selectedMember.role_name === 'teamleiter'
+            ? team.filter(m => m.role_name === 'mitarbeiter' && m.is_active).map(m => ({ id: m.id, full_name: m.full_name }))
+            : undefined}
+          onAssignWorker={selectedMember.role_name === 'teamleiter' ? (workerId) => {
+            setTeam(prev => prev.map(m => m.id === workerId ? { ...m, teamleiter_id: selectedMember.id } : m))
+          } : undefined}
         />
       )}
 
@@ -7304,7 +7310,7 @@ const WEEKDAYS = [
   { key:'do', label:'Do' }, { key:'fr', label:'Fr' }, { key:'sa', label:'Sa' },
 ]
 
-function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDelete, isDesktop, teamleiterList, teamWorkers }: {
+function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDelete, isDesktop, teamleiterList, teamWorkers, allMitarbeiter, onAssignWorker }: {
   member: TeamMember
   onClose: () => void
   onUpdated: (updated: Partial<TeamMember>) => void
@@ -7313,6 +7319,8 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
   isDesktop: boolean
   teamleiterList: { id: string; full_name: string }[]
   teamWorkers?: { id: string; full_name: string }[]
+  allMitarbeiter?: { id: string; full_name: string }[]
+  onAssignWorker?: (workerId: string) => void
 }) {
   const [saving, setSaving] = useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
@@ -7331,6 +7339,8 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
   const [saveErr, setSaveErr] = useState('')
   const [tlId, setTlId] = useState<string>(member.teamleiter_id ?? '')
   const [tlSaving, setTlSaving] = useState(false)
+  const [showAddWorker, setShowAddWorker] = useState(false)
+  const [addingWorker, setAddingWorker] = useState(false)
 
   // Fresh contact data (loaded from DB on mount)
   const [freshPhone, setFreshPhone] = useState(member.phone ?? '')
@@ -7765,9 +7775,41 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
               <div style={{ padding:'11px 16px 14px' }}>
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
                   <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Zugeordnete Mitarbeiter</span>
-                  <span style={{ background:'var(--surf-low)', borderRadius:99, padding:'2px 8px', fontSize:11, fontWeight:600, color:'var(--txt-muted)' }}>{teamWorkers.length}</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ background:'var(--surf-low)', borderRadius:99, padding:'2px 8px', fontSize:11, fontWeight:600, color:'var(--txt-muted)' }}>{teamWorkers.length}</span>
+                    {allMitarbeiter && onAssignWorker && (
+                      <button onClick={() => setShowAddWorker(v => !v)}
+                        style={{ width:26, height:26, borderRadius:8, border:'none', background: showAddWorker ? 'var(--pri)' : 'var(--surf-low)', color: showAddWorker ? '#fff' : 'var(--txt-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:16 }}>{showAddWorker ? 'close' : 'add'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {teamWorkers.length === 0 ? (
+                {showAddWorker && allMitarbeiter && (() => {
+                  const available = allMitarbeiter.filter(m => !teamWorkers.find(w => w.id === m.id))
+                  return available.length === 0 ? (
+                    <div style={{ fontSize:12, color:'var(--txt-muted)', fontStyle:'italic', marginBottom:8 }}>Alle Mitarbeiter bereits zugeordnet</div>
+                  ) : (
+                    <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
+                      {available.map(m => (
+                        <button key={m.id} disabled={addingWorker} onClick={async () => {
+                          setAddingWorker(true)
+                          await supabase.from('users').update({ teamleiter_id: member.id }).eq('id', m.id)
+                          onAssignWorker!(m.id)
+                          setShowAddWorker(false)
+                          setAddingWorker(false)
+                        }} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:10, border:'none', background:'var(--surf-low)', cursor:'pointer', textAlign:'left' as const, opacity: addingWorker ? 0.6 : 1 }}>
+                          <div style={{ width:28, height:28, borderRadius:8, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>
+                            {m.full_name.split(' ').map((n: string)=>n[0]).join('').slice(0,2).toUpperCase()}
+                          </div>
+                          <span style={{ fontSize:13, fontWeight:600, color:'var(--txt)', flex:1 }}>{m.full_name}</span>
+                          <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--pri)' }}>add</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })()}
+                {teamWorkers.length === 0 && !showAddWorker ? (
                   <div style={{ fontSize:13, color:'var(--txt-muted)', fontStyle:'italic' }}>Noch keine Mitarbeiter zugeordnet</div>
                 ) : (
                   <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
