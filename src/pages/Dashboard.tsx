@@ -1261,24 +1261,40 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 <span className="material-symbols-outlined" style={{ fontSize:40, display:'block', marginBottom:8, opacity:0.4 }}>group</span>
                 Noch keine Mitarbeiter
               </div>
-            ) : grouped.map(({ tlId, tlName, members }) => (
-              <div key={tlId ?? 'none'} style={{ marginBottom:20 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-                  <div style={{ width:24, height:24, borderRadius:8, background: tlId ? 'var(--pri-xl)' : 'var(--surf-high)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:13, color: tlId ? 'var(--pri)' : 'var(--txt-muted)' }}>{tlId ? 'supervisor_account' : 'person_off'}</span>
+            ) : grouped.map(({ tlId, tlName, members }) => {
+              const tlMember = tlId ? teamleiterMap[tlId] : null
+              return (
+              <div key={tlId ?? 'none'} style={{ marginBottom:24 }}>
+                {/* Teamleiter-Card (klickbar) oder "Nicht zugeordnet" Header */}
+                {tlMember ? (
+                  <div style={{ marginBottom:8 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:13 }}>supervisor_account</span>
+                      Teamleiter · {members.length} Mitarbeiter
+                    </div>
+                    <MemberCard m={tlMember} />
                   </div>
-                  <div style={{ fontSize:13, fontWeight:700, color: tlId ? 'var(--txt)' : 'var(--txt-muted)' }}>{tlName}</div>
-                  <div style={{ fontSize:11, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:99, padding:'2px 8px' }}>{members.length}</div>
-                </div>
+                ) : (
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                    <div style={{ width:24, height:24, borderRadius:8, background:'var(--surf-high)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:13, color:'var(--txt-muted)' }}>person_off</span>
+                    </div>
+                    <div style={{ fontSize:13, fontWeight:700, color:'var(--txt-muted)' }}>{tlName}</div>
+                    <div style={{ fontSize:11, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:99, padding:'2px 8px' }}>{members.length}</div>
+                  </div>
+                )}
+                {/* Mitarbeiter dieser Gruppe */}
+                {tlMember && <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:6, marginTop:12 }}>Mitarbeiter</div>}
                 {members.length === 0 ? (
-                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'10px 14px', background:'var(--surf-low)', borderRadius:12, border:'1px dashed var(--outline)' }}>Noch keine Mitarbeiter zugeordnet</div>
+                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'10px 14px', background:'var(--surf-low)', borderRadius:12, border:'1px dashed var(--outline)', maxWidth: isDesktop ? 420 : '100%' }}>Noch keine Mitarbeiter zugeordnet — Mitarbeiter-Karte öffnen und Teamleiter zuweisen</div>
                 ) : (
                   <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill,minmax(260px,1fr))' : '1fr', gap:8 }}>
                     {members.map(m => <MemberCard key={m.id} m={m} />)}
                   </div>
                 )}
               </div>
-            ))}
+              )
+            })}
 
             {/* Admins separat (klein, kein Klick nötig) */}
             {team.filter(m=>m.role_name==='admin').length > 0 && (
@@ -1291,7 +1307,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             )}
 
             {/* Urlaubssperren */}
-            <div style={{ marginTop:8, paddingTop:20, borderTop:'1px solid var(--outline)' }}>
+            <div style={{ marginTop:8, paddingTop:20, borderTop:'1px solid var(--outline)', maxWidth: isDesktop ? 600 : '100%' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
                 <div>
                   <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)' }}>Urlaubssperren</div>
@@ -1305,8 +1321,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
               </div>
 
               {blackouts.length === 0 ? (
-                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'14px 16px', textAlign:'center' as const }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:24, color:'var(--txt-muted)', display:'block', marginBottom:4, opacity:0.4 }}>event_available</span>
+                <div style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:10 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)', opacity:0.5 }}>event_available</span>
                   <div style={{ fontSize:12, color:'var(--txt-muted)' }}>Keine aktiven Urlaubssperren</div>
                 </div>
               ) : (
@@ -2041,6 +2057,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
             showToast('Mitarbeiter gelöscht', 'ok')
           }}
           teamleiterList={team.filter(m => m.role_name === 'teamleiter' && m.is_active).map(m => ({ id: m.id, full_name: m.full_name }))}
+          teamWorkers={selectedMember.role_name === 'teamleiter'
+            ? team.filter(m => m.teamleiter_id === selectedMember.id).map(m => ({ id: m.id, full_name: m.full_name }))
+            : undefined}
         />
       )}
 
@@ -7284,7 +7303,7 @@ const WEEKDAYS = [
   { key:'do', label:'Do' }, { key:'fr', label:'Fr' }, { key:'sa', label:'Sa' },
 ]
 
-function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDelete, isDesktop, teamleiterList }: {
+function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDelete, isDesktop, teamleiterList, teamWorkers }: {
   member: TeamMember
   onClose: () => void
   onUpdated: (updated: Partial<TeamMember>) => void
@@ -7292,6 +7311,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
   onDelete: (userId: string) => Promise<void>
   isDesktop: boolean
   teamleiterList: { id: string; full_name: string }[]
+  teamWorkers?: { id: string; full_name: string }[]
 }) {
   const [saving, setSaving] = useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
@@ -7755,6 +7775,30 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Zugeordnete Mitarbeiter (nur für Teamleiter sichtbar) */}
+        {role === 'teamleiter' && teamWorkers !== undefined && (
+          <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
+            <div style={{ padding:'10px 16px', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <span>Zugeordnete Mitarbeiter</span>
+              <span style={{ background:'var(--surf-low)', borderRadius:99, padding:'2px 8px', fontSize:11, fontWeight:600 }}>{teamWorkers.length}</span>
+            </div>
+            {teamWorkers.length === 0 ? (
+              <div style={{ padding:'14px 16px', fontSize:13, color:'var(--txt-muted)', fontStyle:'italic' }}>Noch keine Mitarbeiter zugeordnet</div>
+            ) : (
+              <div>
+                {teamWorkers.map((w, i) => (
+                  <div key={w.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 16px', borderBottom: i < teamWorkers.length-1 ? '1px solid var(--outline)' : 'none' }}>
+                    <div style={{ width:32, height:32, borderRadius:10, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>
+                      {w.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()}
+                    </div>
+                    <div style={{ fontSize:13, fontWeight:600, color:'var(--txt)' }}>{w.full_name}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
