@@ -1599,13 +1599,14 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 const unassigned = tasks.filter(t => t.is_active && !t.default_assignee_id && (t.due_date??'')<= todayStr && (!t.end_date || t.end_date >= todayStr))
                 if (unassigned.length === 0) return null
                 return (
-                  <div style={{ marginBottom:16, maxWidth: isDesktop ? 600 : '100%' }}>
-                    {/* Kompakter Hinweis-Chip */}
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:10, background:'#fef3c7', marginBottom:10 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:16, color:'#d97706', flexShrink:0 }}>warning</span>
-                      <span style={{ fontSize:12, fontWeight:700, color:'#92400e', flex:1 }}>
-                        {unassigned.length === 1 ? '1 Aufgabe ohne zugewiesenen Mitarbeiter' : `${unassigned.length} Aufgaben ohne zugewiesenen Mitarbeiter`}
-                      </span>
+                  <div style={{ marginBottom:20, maxWidth: isDesktop ? 600 : '100%' }}>
+                    {/* Abschnitts-Header */}
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <h3 style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', margin:0 }}>Nicht zugewiesen</h3>
+                        <span style={{ fontSize:12, fontWeight:700, color:'#d97706', background:'#fef3c7', padding:'1px 8px', borderRadius:20 }}>{unassigned.length}</span>
+                      </div>
+                      <span style={{ fontSize:12, color:'var(--txt-muted)' }}>Mitarbeiter fehlt</span>
                     </div>
                     {/* Aufgaben als eigenständige Cards */}
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
