@@ -811,14 +811,19 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
       <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:8 }}>Sonstiges</div>
       <div style={{ background:'var(--surf-card)', borderRadius:18, overflow:'hidden', border:'1px solid var(--outline)', marginBottom:20 }}>
         <Row icon="lightbulb" iconBg="rgba(217,119,6,0.08)" label="Feedback & Ideen"
-          sub="Fehler melden, Feature-Wünsche, Vorschläge" chevron onClick={()=>setShowFeedback(true)} last />
+          sub="Fehler melden, Feature-Wünsche, Vorschläge" chevron onClick={()=>setShowFeedback(true)} />
+        <div style={{ borderTop:'1px solid var(--outline)' }}>
+          <div onClick={onLogout} style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 16px', cursor:'pointer' }}>
+            <div style={{ width:34, height:34, borderRadius:10, background:'rgba(186,26,26,0.08)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--err-dot)' }}>logout</span>
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:14, fontWeight:600, color:'var(--err-dot)' }}>Abmelden</div>
+              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>Sitzung beenden</div>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <button onClick={onLogout} style={{ width:'100%', padding:'14px', borderRadius:16, border:'none',
-        background:'rgba(186,26,26,0.08)', color:'var(--err-dot)', fontSize:14, fontWeight:700,
-        display:'flex', alignItems:'center', justifyContent:'center', gap:8, cursor:'pointer' }}>
-        <span className="material-symbols-outlined" style={{ fontSize:18 }}>logout</span>Abmelden
-      </button>
     </div>
   )
 
@@ -861,12 +866,22 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
       {isDesktop ? (
         <div style={s.desktopLayout}>
           <nav style={s.sidebar}>
-            {NAV_ITEMS.map(({ key, icon, label }) => (
-              <button key={key} style={s.sideTab(tab===key)} onClick={()=>{ setTab(key); setSelectedObj(null) }}>
-                <span className="material-symbols-outlined" style={{ fontSize:20 }}>{icon}</span>
-                {label}
+            <div style={{ display:'flex', flexDirection:'column', gap:4, flex:1 }}>
+              {NAV_ITEMS.map(({ key, icon, label }) => (
+                <button key={key} style={s.sideTab(tab===key)} onClick={()=>{ setTab(key); setSelectedObj(null) }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:20 }}>{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div style={{ borderTop:'1px solid var(--brd)', paddingTop:10, marginTop:8 }}>
+              <button onClick={onLogout} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:12, border:'none', background:'transparent', color:'var(--err-dot)', fontSize:14, fontWeight:600, width:'100%', textAlign:'left', cursor:'pointer', transition:'background 0.15s' }}
+                onMouseEnter={e=>(e.currentTarget.style.background='rgba(186,26,26,0.08)')}
+                onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+                <span className="material-symbols-outlined" style={{ fontSize:20 }}>logout</span>
+                Abmelden
               </button>
-            ))}
+            </div>
           </nav>
           <main style={s.content}>
             {renderTabContent()}
