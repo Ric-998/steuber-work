@@ -113,9 +113,19 @@ export default function App() {
     </div>
   )
 
-  // ── Profil noch nicht vervollständigt (E-Mail-Einladung) ─────────────────────
+  // ── Profil noch nicht vervollständigt ────────────────────────────────────────
   if (!profile.is_onboarded) {
-    return <SetupProfileOverlay session={session} onComplete={loadProfile} onLogout={handleLogout} />
+    // Neuer User (kein Name) → Profil-Setup; bestehender User (Rolle geändert) → Rollen-Onboarding
+    if (!profile.full_name) {
+      return <SetupProfileOverlay session={session} onComplete={loadProfile} onLogout={handleLogout} />
+    }
+    return <RoleChangeOnboarding
+      roleName={profile.role_name}
+      userName={profile.full_name}
+      userId={profile.id}
+      onComplete={loadProfile}
+      onLogout={handleLogout}
+    />
   }
 
   // ── Passwort-Reset (Password-Recovery-Link oder Temp-PW beim ersten Login) ───
@@ -469,3 +479,113 @@ function ChangePasswordOverlay({ onComplete, onLogout, isFirstLogin }: {
   )
 }
 
+// ─── RoleChangeOnboarding ─────────────────────────────────────────────────────
+// Erscheint wenn ein bestehender User eine neue Rolle zugewiesen bekommt
+
+const ROLE_INFO: Record<string, { icon: string; title: string; subtitle: string; items: string[] }> = {
+  teamleiter: {
+    icon: 'supervisor_account',
+    title: 'Du bist jetzt Teamleiter',
+    subtitle: 'Du koordinierst dein Team und behältst alle Aufgaben im Blick.',
+    items: [
+      'Alle Aufgaben deiner Objekte sehen & vergeben',
+      'Mitarbeiter einteilen und Vertretungen setzen',
+      'Probleme und Tagesberichte deines Teams einsehen',
+      'Abwesenheiten deines Teams verwalten',
+    ],
+  },
+  mitarbeiter: {
+    icon: 'handyman',
+    title: 'Du bist jetzt Mitarbeiter',
+    subtitle: 'Du siehst deine täglichen Aufgaben und kannst sie direkt abhaken.',
+    items: [
+      'Deine Aufgaben für heute und die Woche einsehen',
+      'Status aktualisieren: offen → in Arbeit → erledigt',
+      'Fotos beim Abschluss hochladen',
+      'Urlaub & Krankmeldungen einreichen',
+    ],
+  },
+  admin: {
+    icon: 'admin_panel_settings',
+    title: 'Du bist jetzt Administrator',
+    subtitle: 'Du hast vollen Zugriff auf alle Bereiche der App.',
+    items: [
+      'Objekte, Kunden und Aufgaben verwalten',
+      'Mitarbeiter einladen und Rollen vergeben',
+      'Tagesberichte und KPIs im Überblick',
+      'Team- und Urlaubsplanung steuern',
+    ],
+  },
+}
+
+function RoleChangeOnboarding({ roleName, userName, userId, onComplete, onLogout }: {
+  roleName: string
+  userName: string
+  userId: string
+  onComplete: () => void
+  onLogout: () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const info = ROLE_INFO[roleName] ?? ROLE_INFO['mitarbeiter']
+  const firstName = userName.split(' ')[0]
+
+  const handleStart = async () => {
+    setLoading(true)
+    await supabase.from('users').update({ is_onboarded: true }).eq('id', userId)
+    onComplete()
+  }
+
+  return (
+    <div style={{ minHeight:'100dvh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', padding:'24px 20px' }}>
+      <div style={{ background:'var(--surf-card)', borderRadius:24, padding:'36px 28px 28px', width:'100%', maxWidth:400, boxShadow:'0 4px 32px rgba(8,93,104,0.08)' }}>
+
+        {/* Icon */}
+        <div style={{ textAlign:'center', marginBottom:24 }}>
+          <div style={{ width:64, height:64, borderRadius:20, background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', boxShadow:'0 8px 24px rgba(8,93,104,0.25)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:30, color:'#fff' }}>{info.icon}</span>
+          </div>
+          <h2 style={{ fontSize:21, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', margin:'0 0 6px' }}>
+            Hey {firstName}! 👋
+          </h2>
+          <p style={{ fontSize:16, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--pri)', margin:'0 0 8px' }}>
+            {info.title}
+          </p>
+          <p style={{ fontSize:14, color:'var(--txt-muted)', lineHeight:1.55, margin:0 }}>
+            {info.subtitle}
+          </p>
+        </div>
+
+        {/* Was du kannst */}
+        <div style={{ background:'var(--surf-low)', borderRadius:14, padding:'14px 16px', marginBottom:20 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Was du ab jetzt siehst</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {info.items.map((item, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:10 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--ok)', flexShrink:0, marginTop:1 }}>check_circle</span>
+                <span style={{ fontSize:13.5, color:'var(--txt)', lineHeight:1.45 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={handleStart}
+          disabled={loading}
+          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:14, borderRadius:14, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'var(--font-head)', boxShadow:'0 4px 16px rgba(8,93,104,0.25)', cursor:loading?'wait':'pointer' }}>
+          {loading
+            ? <><span className="material-symbols-outlined" style={{ fontSize:18 }}>hourglass_empty</span> Einen Moment...</>
+            : <><span className="material-symbols-outlined" style={{ fontSize:18 }}>rocket_launch</span> Loslegen</>}
+        </button>
+
+        <button
+          type="button"
+          onClick={onLogout}
+          style={{ display:'block', width:'100%', background:'none', border:'none', color:'var(--txt-muted)', fontSize:13, cursor:'pointer', textDecoration:'underline', padding:'12px 0 0', textAlign:'center' }}>
+          Abmelden
+        </button>
+
+      </div>
+    </div>
+  )
+}

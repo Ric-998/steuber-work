@@ -1932,6 +1932,9 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
   const [editTo, setEditTo]     = useState('')
   const [editNote, setEditNote] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  const [substituteId, setSubstituteId] = useState('')
+  const [teamMembers, setTeamMembers] = useState<{id:string;full_name:string}[]>([])
+  const [incomingSubReqs, setIncomingSubReqs] = useState<any[]>([])
 
   useEffect(() => {
     supabase.from('vacation_blackouts')
@@ -1939,6 +1942,24 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
       .gte('to_date', new Date().toISOString().slice(0,10))
       .then(({ data }) => setBlackouts(data ?? []))
   }, [])
+
+  useEffect(() => {
+    supabase.from('users').select('id,full_name').eq('is_active', true).neq('id', userId)
+      .then(({ data }) => setTeamMembers(data?.filter((m:any) => m.full_name) ?? []))
+  }, [userId])
+
+  const fetchIncomingSubReqs = () => {
+    const todayISO = new Date().toISOString().slice(0,10)
+    supabase.from('leave_requests')
+      .select('id,from_date,to_date,note,users!user_id(id,full_name)')
+      .eq('substitute_id', userId)
+      .eq('substitute_confirmed', false)
+      .eq('request_type', 'urlaub')
+      .gte('to_date', todayISO)
+      .then(({ data }) => setIncomingSubReqs(data ?? []))
+  }
+
+  useEffect(() => { fetchIncomingSubReqs() }, [userId])
 
   const today = new Date().toISOString().slice(0,10)
 
@@ -2014,7 +2035,8 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
 
     // 4) Eintragen
     const { error } = await supabase.from('leave_requests').insert({
-      user_id: userId, from_date: from, to_date: to, request_type: reqType, note: note || null
+      user_id: userId, from_date: from, to_date: to, request_type: reqType, note: note || null,
+      ...(reqType === 'urlaub' && substituteId ? { substitute_id: substituteId } : {})
     })
     if (!error) {
       const { data: affected } = await supabase
@@ -2024,7 +2046,7 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
         .in('status', ['offen','in_arbeit']).order('due_date')
       if (affected && affected.length > 0) { setConflictAssigns(affected); setShowConflict(true) }
       else setMsg({ text: reqType === 'krankmeldung' ? 'Krankmeldung übermittelt.' : 'Urlaubsantrag gesendet!', ok: true })
-      setFrom(''); setTo(''); setNote('')
+      setFrom(''); setTo(''); setNote(''); setSubstituteId('')
       await onLeavesChanged()
       if (!affected?.length) setShowAntrag(false)
     } else {
@@ -2039,7 +2061,7 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
   }
 
   const openAntrag = (type: 'urlaub'|'krankmeldung') => {
-    setReqType(type); setMsg(null); setFrom(''); setTo(''); setNote(''); setShowAntrag(true)
+    setReqType(type); setMsg(null); setFrom(''); setTo(''); setNote(''); setSubstituteId(''); setShowAntrag(true)
   }
 
   // Day count preview helper
@@ -2141,6 +2163,55 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
         </button>
       </div>
 
+      {/* ── Vertretungs-Anfragen (eingehend) ── */}
+      {incomingSubReqs.length > 0 && (
+        <div style={{ marginBottom:16 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.09em' }}>Vertretungs-Anfragen</div>
+            <span style={{ fontSize:11, fontWeight:800, background:'var(--pri)', color:'#fff', borderRadius:99, minWidth:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px' }}>{incomingSubReqs.length}</span>
+          </div>
+          {incomingSubReqs.map((req:any) => {
+            const requester = (req['users!user_id'] ?? req.users)?.full_name ?? 'Kollege/Kollegin'
+            const days = (() => { let c=0; const cur=new Date(req.from_date); const end=new Date(req.to_date); while(cur<=end){c++;cur.setDate(cur.getDate()+1)} return c })()
+            return (
+              <div key={req.id} style={{ background:'var(--pri-xl)', border:'1.5px solid var(--pri)', borderRadius:16, padding:'14px 16px', marginBottom:8 }}>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:12 }}>
+                  <div style={{ width:38, height:38, borderRadius:12, background:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:'#fff' }}>beach_access</span>
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'var(--txt)' }}>{requester} braucht eine Vertretung</div>
+                    <div style={{ fontSize:12, color:'var(--pri)', marginTop:2, fontWeight:600 }}>
+                      {new Date(req.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})} – {new Date(req.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})} · {days} Tag{days>1?'e':''}
+                    </div>
+                    {req.note && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>„{req.note}“</div>}
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={async () => {
+                    await supabase.from('leave_requests').update({ substitute_confirmed: true }).eq('id', req.id)
+                    setIncomingSubReqs(prev => prev.filter(r => r.id !== req.id))
+                    await onLeavesChanged()
+                  }} style={{ flex:1, padding:'10px', borderRadius:11, border:'none', background:'var(--pri)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:5 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:15 }}>check</span>
+                    Bestätigen
+                  </button>
+                  <button onClick={async () => {
+                    if (!confirm('Vertretung ablehnen? Die Anfrage wird storniert.')) return
+                    await supabase.from('leave_requests').delete().eq('id', req.id)
+                    setIncomingSubReqs(prev => prev.filter(r => r.id !== req.id))
+                    await onLeavesChanged()
+                  }} style={{ padding:'10px 14px', borderRadius:11, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt-muted)', fontSize:13, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:5 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:15 }}>close</span>
+                    Ablehnen
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* ── Tauschbörse-Hinweis ── */}
       {tauschBadge > 0 && (
         <button onClick={()=>setShowTausch(true)} style={{ width:'100%', background:'#f3e8ff', border:'1.5px solid #d8b4fe', borderRadius:16, padding:'13px 16px', display:'flex', alignItems:'center', gap:12, cursor:'pointer', marginBottom:16, textAlign:'left' }}>
@@ -2173,6 +2244,14 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
                     {' · '}{countDays(r)} Tag{countDays(r)>1?'e':''}
                   </div>
                   {r.note && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>„{r.note}"</div>}
+                  {!isKrank && r.substitute_id && (
+                    <div style={{ fontSize:11, marginTop:3, display:'flex', alignItems:'center', gap:4, color: r.substitute_confirmed ? 'var(--ok)' : '#b45309' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:12 }}>{r.substitute_confirmed ? 'check_circle' : 'hourglass_empty'}</span>
+                      {r.substitute_confirmed
+                        ? `Vertretung: ${teamMembers.find(m=>m.id===r.substitute_id)?.full_name ?? '–'} ✓`
+                        : `Wartet auf Bestätigung von ${teamMembers.find(m=>m.id===r.substitute_id)?.full_name ?? '–'}`}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display:'flex', gap:6, flexShrink:0 }}>
                   <button onClick={()=>{setEditReq(r);setEditFrom(r.from_date);setEditTo(r.to_date);setEditNote(r.note??'')}}
@@ -2306,14 +2385,29 @@ function ZeitTab({ userId, loading, myLeaves, vacationDaysPerYear, assignments, 
                   style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', fontSize:14, color:'var(--txt)', boxSizing:'border-box' }} />
               </div>
 
+              {reqType === 'urlaub' && (
+                <div style={{ marginBottom:14 }}>
+                  <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Vertretung (Pflicht)</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)' }}>
+                    <span className="material-symbols-outlined" style={{ color:'var(--txt-muted)', fontSize:18, flexShrink:0 }}>person_search</span>
+                    <select value={substituteId} onChange={e => setSubstituteId(e.target.value)}
+                      style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color: substituteId ? 'var(--txt)' : 'var(--txt-muted)', cursor:'pointer' }}>
+                      <option value="">Vertretung auswählen…</option>
+                      {teamMembers.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:5, lineHeight:1.4 }}>Deine Vertretung muss bestätigen, bevor Till den Antrag sieht.</div>
+                </div>
+              )}
+
               {msg && (
                 <div style={{ background:msg.ok?'var(--ok-bg)':'#fef2f2', color:msg.ok?'var(--ok)':'#dc2626', borderRadius:10, padding:'11px 14px', fontSize:13, display:'flex', gap:8, marginBottom:14, alignItems:'center' }}>
                   <span className="material-symbols-outlined icon-fill" style={{ fontSize:16 }}>{msg.ok?'check_circle':'error'}</span>{msg.text}
                 </div>
               )}
 
-              <button type="submit" disabled={sending||!from||!to||from>to}
-                style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:reqType==='krankmeldung'?'linear-gradient(135deg,#dc2626,#ef4444)':'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:15, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8, cursor:'pointer', opacity:(!from||!to||from>to)?0.5:1, transition:'opacity 0.15s' }}>
+              <button type="submit" disabled={sending||!from||!to||from>to||(reqType==='urlaub'&&!substituteId)}
+                style={{ width:'100%', padding:15, borderRadius:14, border:'none', background:reqType==='krankmeldung'?'linear-gradient(135deg,#dc2626,#ef4444)':'linear-gradient(135deg,var(--pri),var(--pri-c))', color:'#fff', fontSize:15, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:8, cursor:'pointer', opacity:(!from||!to||from>to||(reqType==='urlaub'&&!substituteId))?0.5:1, transition:'opacity 0.15s' }}>
                 <span className="material-symbols-outlined icon-sm">{sending?'hourglass_empty':reqType==='krankmeldung'?'sick':'send'}</span>
                 {sending?'Wird gesendet…':reqType==='krankmeldung'?'Krankmeldung senden':'Urlaub beantragen'}
               </button>

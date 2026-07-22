@@ -25,18 +25,18 @@ Die App rendert je nach Rolle automatisch die passende View (Admin, Mitarbeiter,
 ### Admin (Till)
 `src/pages/Dashboard.tsx` – responsive (Desktop-Sidebar + Mobile-Tabs), 8 Tabs:
 - **Übersicht**: KPI-Kacheln (Tagesstatus, Probleme, Erledigte diese Woche); Probleme-Sektion direkt inline auf der Seite (kein Popup); Bento-Kacheln klickbar → navigieren zum Tagesbericht-Tab; Tagesbericht-Vorschau
-- **Objekte**: Liste aller Objekte mit Server-Suche (ab 2 Zeichen, 350ms debounce), Gruppierung (keine/Stadt/Kunde); Detail-View (`ObjectDetail`) mit variantA-Design (Header mit Typ-Badge + Adresse, 2-Spalten-Grid Kunde+Ansprechpartner, Leistungen nach Frequenz gruppiert, Nächste Termine nach Datum gruppiert, Kunden-Name klickbar → navigiert zu KundeDetail), F5-stabile URL-Hash-Navigation
+- **Objekte**: Liste aller Objekte mit Server-Suche (ab 2 Zeichen, 350ms debounce), Gruppierung (keine/Stadt/Kunde); Detail-View (`ObjectDetail`) mit variantA-Design (Header mit Typ-Badge + Adresse, 2-Spalten-Grid Kunde+Ansprechpartner, Leistungen nach Frequenz gruppiert, Nächste Termine nach Datum gruppiert, Kunden-Name klickbar → navigiert zu KundeDetail), F5-stabile URL-Hash-Navigation; Ansprechpartner-Zeilen haben Edit + Delete Icons direkt inline
 - **Kunden**: Kundenliste mit Server-Suche; `KundeDetail` mit modernisierter UI (Icon-Header, uniforme Listenzeilen für Telefon/Mail/Adresse, Objekt-Liste); Privatpersonen editierbar
 - **Ansprechpartner**: Globale Kontaktliste mit Server-Suche; Edit + Delete (Änderung propagiert zu allen verknüpften Objekten); Privatpersonen aus dieser Liste bearbeitbar
 - **Tagesbericht**: Tagesprotokoll, Auswertung abgeschlossener Aufgaben mit Fotos; FK-Disambiguation: `users!user_id` (nicht `users`) wegen zwei FKs in `task_assignments`
 - **Nachrichten**: Chat-Funktion
-- **Team**: Mitarbeiter einladen (per E-Mail über Edge Function), manuell anlegen (per `create-user-direct`), Team-Liste mit Aktiv/Inaktiv-Toggle, Urlaubssperren verwalten
+- **Team**: Mitarbeiter einladen (per E-Mail/Manuell, Rolle wählbar); Promote → Teamleiter per „Team eröffnen"-Button; Demote → „Zurückstufen" pro TL-Gruppe; Mitarbeiter per Picker TL zuordnen (`teamleiter_id`); Gruppierung nach Teamleiter (immer inkl. „Nicht zugeordnet"-Gruppe); Desktop max-width 720px; Urlaubssperren verwalten; `MemberDetailOverlay` mit frischer DB-Daten-Abfrage, Kontaktdaten, Zugeordnete-Mitarbeiter-Liste; ausstehende `leave_requests` mit Substitute-Status (Name + ✓/⏳)
 - **Profil**: Abmelden, Einstellungen
 
 ### Mitarbeiter
 `src/pages/TaskList.tsx` – 3 Tabs:
-- **Aufgaben**: Wochenkalender (scrollbar), gefilterte Tagesliste nach Objekt gruppiert, Status-Update (offen → in_arbeit → erledigt/problem), Foto-Upload beim Abschluss
-- **Zeitplan**: Urlaubsantrag, Krankmeldung, Verlauf der Anträge (Verfügbarkeit als Platzhalter für Phase 3)
+- **Aufgaben**: Wochenkalender (scrollbar), gefilterte Tagesliste nach Objekt gruppiert, Status-Update (offen → in_arbeit → erledigt/problem), Foto-Upload beim Abschluss, Stunden + Fahrzeit beim Abschluss eingeben (`work_minutes`, `travel_minutes`)
+- **Zeitplan**: Urlaubsantrag mit Pflicht-Vertretungsauswahl (Substitute muss bestätigen); Krankmeldung; eingehende Vertretungsanfragen-Sektion (Bestätigen/Ablehnen); Verlauf der Anträge mit Vertretungsstatus (⏳/✓)
 - **Profil**: Push-Benachrichtigungen ein/aus, App-Tour, PWA-Installationsanleitung, Bug melden, Abmelden
 
 ### Teamleiter
@@ -44,7 +44,7 @@ Die App rendert je nach Rolle automatisch die passende View (Admin, Mitarbeiter,
 - **Übersicht**: KPI-Kacheln (Aufgaben heute, In Arbeit, Erledigt, Probleme); Probleme-Liste; alle heutigen Aufgaben des Teams
 - **Aufgaben**: alle Tasks seiner Objekte (gruppiert nach Objekt); Mitarbeiter einteilen; Vertretung setzen (`substitute_id` + Status `vertretung`)
 - **Objekte**: nur seine Objekte (`objektleiter_id = userId`), lesende Detailansicht (Leistungen + kommende Termine)
-- **Team**: aus Zuweisungen abgeleitete Mitarbeiter; Abwesenheiten (Krankmeldung/Urlaub aus `leave_requests`); Fahrzeit-Summe (`travel_minutes`); Stunden als Platzhalter
+- **Team**: aus Zuweisungen abgeleitete Mitarbeiter; Abwesenheiten (Krankmeldung/Urlaub aus `leave_requests`); Fahrzeit-Summe (`travel_minutes`); Stunden-Summe (`work_minutes`)
 - **Profil**: identisch mit MA-Profil (Meine Daten, Passwort, Feedback, Abmelden)
 
 Zuweisung: Admin setzt `objektleiter_id` je Objekt – Dropdown in `EditObjectOverlay` + Inline-Dropdown im ObjectDetail-Header. Rechte über RLS (`objektleiter_*`-Policies auf objects/tasks/task_assignments; zusätzlich Rollen-String `teamleiter` in 2 Policies auf task_assignments/task_reports).
@@ -55,15 +55,15 @@ Zuweisung: Admin setzt `objektleiter_id` je Objekt – Dropdown in `EditObjectOv
 
 | Tabelle | Beschreibung |
 |---|---|
-| `roles` | admin, mitarbeiter, teamleiter |
-| `users` | Mitarbeiterprofile (full_name, phone, role_id, is_active, is_onboarded, **must_change_password**) |
+| `roles` | admin, mitarbeiter, teamleiter, support |
+| `users` | Mitarbeiterprofile (full_name, phone, role_id, is_active, is_onboarded, **must_change_password**, **teamleiter_id**) |
 | `customers` | Kunden / Hausverwaltungen (customer_type: privatperson \| firma \| weg-verwaltung \| mietverwaltung) |
 | `objects` | Gebäude/Objekte mit Adresse, verknüpft mit customer; `object_type`, `objektleiter_id` (Spaltenname bleibt, im UI „Teamleiter") |
 | `categories` | Aufgabenkategorien mit Emoji (Gebäudereinigung, Sanitär, Glas, …) |
 | `tasks` | Aufgaben mit Intervall (täglich/wöchentlich/monatlich/quartalsweise/einmalig), due_date, end_date, default_assignee |
-| `task_assignments` | Konkrete Zuweisung pro Tag; Status: offen/in_arbeit/erledigt/problem/vertretung; hat zwei FKs zu `users` (`user_id` + `substitute_id`) → PostgREST-Joins immer mit `users!user_id(...)` disambiguieren |
+| `task_assignments` | Konkrete Zuweisung pro Tag; Status: offen/in_arbeit/erledigt/problem/vertretung; zwei FKs zu `users` (`user_id` + `substitute_id`); **`work_minutes`** + **`travel_minutes`** für Stunden-/Fahrzeit-Erfassung |
 | `task_reports` | Abschlussberichte mit Foto-URLs (Storage: `task-photos`) und Notiz |
-| `leave_requests` | Urlaubs- und Krankmeldungen; Status: ausstehend/genehmigt/abgelehnt |
+| `leave_requests` | Urlaubs- und Krankmeldungen; Status: ausstehend/genehmigt/abgelehnt; **`substitute_id`** (FK auf users, `leave_requests_substitute_id_fkey`) + **`substitute_confirmed`** (bool, default false) für Vertretungs-Flow |
 | `vacation_blackouts` | Urlaubssperren (from_date, to_date, reason, created_by) |
 | `contact_persons` | Ansprechpartner; verknüpft über `object_id` oder `customer_id`; normalisiert (eine Zeile → alle Objekte) |
 | `contracts` | Verträge (type: jahresvertrag \| einmalig), verknüpft mit object + customer |
@@ -83,15 +83,35 @@ RPC: `get_my_profile()` (gibt `must_change_password` zurück), `get_dashboard_st
 | **Link-Share** | `invite_tokens` Tabelle → Share-Link → `RegisterPage` | MA setzt eigenes Passwort |
 | **Manuell anlegen** | Admin füllt Formular → `create-user-direct` Edge Function → Temp-PW wird angezeigt | Admin teilt Temp-PW → MA muss beim ersten Login Passwort ändern (`must_change_password = true`) |
 
+Bei allen 3 Methoden kann die **Rolle** beim Einladen gewählt werden (mitarbeiter, teamleiter).
+
 ---
 
-## Auth-Flow & Passwort-Reset
+## Auth-Flow & Rollen-Onboarding
 
 `src/App.tsx` enthält:
 - `onAuthStateChange` mit `PASSWORD_RECOVERY`-Handler: Falls Supabase dieses Event sendet (User hat Reset-Link geklickt), wird sofort `ChangePasswordOverlay` gezeigt
 - Nach Login: Falls `profile.must_change_password === true`, erscheint ebenfalls `ChangePasswordOverlay` (Methode 3 / Temp-PW)
 - `ChangePasswordOverlay`: Passwort-Eingabe (2×) mit Stärke-Chips, setzt nach Erfolg `must_change_password = false` in DB
-- `SetupProfileOverlay`: Erscheint bei E-Mail-Einladung wenn `is_onboarded === false`
+- **`is_onboarded === false` + kein `full_name`** → `SetupProfileOverlay` (neue E-Mail-Einladung, Daten noch nicht eingetragen)
+- **`is_onboarded === false` + `full_name` vorhanden** → `RoleChangeOnboarding` (bestehender User, Rolle wurde geändert)
+
+### RoleChangeOnboarding
+Komponente in `App.tsx`. Wird ausgelöst wenn Admin Promote/Demote durchführt – setzt dabei `is_onboarded = false`. Beim nächsten Login sieht der User eine kurze Einführung zur neuen Rolle bevor die App startet. `ROLE_INFO`-Map für `teamleiter`, `mitarbeiter`, `admin`: Icon, Titel, Untertitel, Features-Liste. „Loslegen"-Button setzt `is_onboarded = true`.
+
+---
+
+## Vertretungs-Flow (Urlaub)
+
+Beim Urlaubsantrag muss eine Vertretung ausgewählt werden (Pflichtfeld). Ablauf:
+
+1. MA wählt Zeitraum + Vertretung → Insert mit `substitute_id` + `substitute_confirmed = false`
+2. Vertretungs-Person sieht im Zeitplan-Tab „Vertretungs-Anfragen"-Sektion → Bestätigen oder Ablehnen
+3. Bestätigung: `substitute_confirmed = true` → Admin-Karte zeigt „Vertretung: [Name] ✓"
+4. Ablehnung: Antrag wird gelöscht
+5. Antragsteller sieht in Verlauf-Liste Vertretungsstatus (⏳ wartend / ✓ bestätigt)
+
+Krankmeldungen benötigen keine Vertretung.
 
 ---
 
@@ -99,7 +119,7 @@ RPC: `get_my_profile()` (gibt `must_change_password` zurück), `get_dashboard_st
 
 | Function | Zweck |
 |---|---|
-| `invite-user` | Admin-only: schickt Einladungs-E-Mail per `inviteUserByEmail`, legt Profil mit Rolle an |
+| `invite-user` | Admin-only: schickt Einladungs-E-Mail per `inviteUserByEmail`, legt Profil mit wählbarer Rolle an |
 | `create-user-direct` | Admin-only: legt MA-Account mit Temp-PW an (kein E-Mail-Versand), setzt `must_change_password = true` |
 | `send-push` | Sendet Web-Push-Benachrichtigungen an Mitarbeiter (**TODO S1: noch ohne Auth, vor Go-Live absichern**) |
 | `generate-assignments` | Cron: generiert `task_assignments` vorausschauend (rolling horizon) |
@@ -113,10 +133,11 @@ RPC: `get_my_profile()` (gibt `must_change_password` zurück), `get_dashboard_st
 
 ```
 src/
-  App.tsx                      # Auth-Gate, Rollenweiche, ChangePasswordOverlay, SetupProfileOverlay; DEV_MODE = false
+  App.tsx                      # Auth-Gate, Rollenweiche, ChangePasswordOverlay,
+                               #   SetupProfileOverlay, RoleChangeOnboarding; DEV_MODE = false
   pages/
-    Dashboard.tsx              # Admin-View (~8900 Zeilen); alle Tabs + Overlays
-    TaskList.tsx               # Mitarbeiter-View (inkl. ZeitTab, ProfileTab)
+    Dashboard.tsx              # Admin-View (~9200 Zeilen); alle Tabs + Overlays
+    TaskList.tsx               # Mitarbeiter-View (inkl. ZeitTab mit Vertretungs-Flow, ProfileTab)
     Login.tsx                  # Login-Page (inkl. Passwort-Vergessen-Flow)
     CustomerStatusPage.tsx     # Öffentliche Kunden-Statusseite (via ?view=TOKEN)
     TeamleiterDashboard.tsx    # Teamleiter-View (5 Tabs: Übersicht, Aufgaben, Objekte, Team, Profil)
@@ -155,22 +176,24 @@ public/
 
 ## Dashboard.tsx – Interne Struktur (wichtig für Edits)
 
-Die Datei ist ~8900 Zeilen lang. Wichtige Funktionen:
+Die Datei ist **~9200 Zeilen** lang. Wichtige Funktionen:
 
 | Funktion | Beschreibung |
 |---|---|
 | `Dashboard` (default export) | Hauptkomponente; State, loadAll, Realtime, Tab-Rendering |
-| `loadAll()` | Lädt alle Daten mit `.limit(200/300)`; Server-Suche je Tab |
+| `loadAll()` | Lädt alle Daten mit `.limit(200/300)`; Server-Suche je Tab; `leave_requests` inkl. `substitute:users!leave_requests_substitute_id_fkey(full_name)` |
 | `loadDailyReport()` | Lädt Tagesbericht; Join: `users!user_id(id,full_name)` (FK-disambiguiert) |
-| `ObjectDetail` | Objekt-Detailansicht; variantA-Design; Kunden-Name klickbar → KundeDetail; URL-Hash-Navigation |
+| `ObjectDetail` | Objekt-Detailansicht; variantA-Design; Ansprechpartner mit Edit/Delete-Icons inline; URL-Hash-Navigation |
 | `KundeDetail` | Kunden-Detailansicht; modernes Design: Icon-Header + uniforme Listenzeilen |
-| `EditObjectOverlay` | Objekt bearbeiten |
+| `EditObjectOverlay` | Objekt bearbeiten inkl. Teamleiter-Dropdown (`objektleiter_id`) |
 | `KundenList` | Kundenliste mit Server-Suche |
 | `AnsprechpartnerList` | Globale Kontaktliste; Edit+Delete; Privatpersonen editierbar |
 | `EditTaskOverlay` | Aufgabe bearbeiten; kompakter Header mit 3-Dot-Menü (Stornieren, Löschen, Als Vorlage) |
 | `CreateTaskOverlay` | Neue Aufgabe anlegen (3-Step) |
+| `MemberDetailOverlay` | Mitarbeiter-Detail; lädt frische Kontaktdaten per `fetchMaData`; Rollenänderung setzt `is_onboarded=false`; „+"-Button zum Zuordnen von MAs (bei Teamleitern) |
+| Team-Tab (inline) | 2-Spalten-Grid, Status-Dots, TL-Gruppen, „Nicht zugeordnet" immer sichtbar, Promote/Demote, Assign-Picker, Desktop max-width 720px |
 
-**Achtung:** Das `Edit`-Tool ist auf dem OneDrive-Pfad geblockt. Alle Änderungen an `Dashboard.tsx` (und anderen Dateien im Projektordner) müssen per `python3`-Skript via Bash (String-Replacement) erfolgen.
+**Achtung:** Das `Edit`-Tool ist auf dem OneDrive-Pfad geblockt. Alle Änderungen an Dateien im Projektordner müssen per `python3`-Skript via Bash (String-Replacement oder Line-Insertion) erfolgen.
 
 ---
 
@@ -189,14 +212,19 @@ Die Admin-App nutzt `window.location.hash` zur Zustandspersistenz:
 - `loadAll()`: Haupttabellen mit `.limit(200/300)` abgesichert
 - Server-Suche (350ms debounce, ab 2 Zeichen) in: Objekte, Kunden, Ansprechpartner
 - `ObjectDetail`: Leistungen nach Frequenz gruppiert; Nächste Termine filtert inaktive Tasks heraus
+- `activeWorkerIds`: Set aus `task_assignments` mit `status=in_arbeit` für heute → Status-Dot grün
 
 ---
 
 ## Bekannte Fallstricke
 
-- **PostgREST FK-Ambiguität**: `task_assignments` hat zwei FKs auf `users` (`user_id` + `substitute_id`). Joins immer explizit disambiguieren: `.select('...,users!user_id(id,full_name)')` – sonst liefert PostgREST still `null`
+- **PostgREST FK-Ambiguität**: Tabellen mit mehreren FKs auf `users` erfordern explizite Disambiguation:
+  - `task_assignments`: `users!user_id(...)` für den ausführenden MA; bei Joins immer so disambiguieren
+  - `leave_requests`: `users!leave_requests_user_id_fkey(full_name,phone)` für Antragsteller, `substitute:users!leave_requests_substitute_id_fkey(full_name)` für Vertretung
 - **Zsh History-Expansion**: `!` in doppelt-gequoteten git-Commit-Nachrichten gibt Fehler. Single-Quotes verwenden.
 - **`.git/index.lock`**: VM-Bash und Mac-Git greifen auf denselben OneDrive-Sync-Ordner zu → git-Kommandos nur auf dem Mac ausführen, nicht via Bash im VM
+- **`showToast()`** akzeptiert nur `'ok' | 'warn' | 'info'` – nicht `'err'` oder `'error'`
+- **Smart-Quotes in Python-Strings**: Anführungszeichen wie `„` und `"` können String-Matching in Python-Skripten brechen → bei Problemen Line-Number-Insertion statt String-Replace nutzen
 
 ---
 
@@ -205,23 +233,27 @@ Die Admin-App nutzt `window.location.hash` zur Zustandspersistenz:
 - **S1 Security (vor Go-Live)**: `send-push` Edge Function hat noch keine Auth-Prüfung → absichern bevor live auf finalem Host
 - **MapView**: Leaflet-Abhängigkeit vorhanden, SVG-Platzhalter wird noch gerendert
 - **Verfügbarkeitsplanung**: Phase 3 – UI-Platzhalter vorhanden
-- **Vertretungs-Anfrage**: Status `vertretung` definiert, UI-Flow fehlt noch
-- **Teamleiter-Rolle**: `TeamleiterDashboard.tsx` mit 5 Tabs implementiert; DB-Rolle `objektleiter`→`teamleiter` umbenannt (inkl. RLS-Policies)
+- **Personalfragebogen**: MA füllt beim Onboarding eigene Stammdaten aus (Phase 3)
+- **Gehalt-Feld**: nur Admin sichtbar/bearbeitbar (noch nicht implementiert)
+- **Push bei Vertretungsanfragen**: Technisch vorbereitet, Versand noch nicht implementiert (wäre via `send-push` + S1-Fix)
+- **Drag & Drop im Team-Tab**: Aktuell Picker (Bottom Sheet) – echtes DnD noch nicht implementiert
 
 ---
 
 ## Teamleiter-Rolle (implementiert – Juli 2026)
 
-> ✅ **Umgesetzt:** DB-Rolle `objektleiter`→`teamleiter` (roles-Tabelle + 2 RLS-Policies), alle Rollenwerte/Labels im Code auf „Teamleiter", `TeamleiterDashboard.tsx` mit 5 Tabs, Teamleiter-Dropdown in `EditObjectOverlay` (+ objektleiter_id im Save). Spalte `objektleiter_id` unverändert. Offen: eigene Teamleiter-Accounts anlegen, Sparten-Zuordnung, Stunden-Erfassung.
+### Was umgesetzt ist
+- DB-Rolle `objektleiter` → `teamleiter` (roles-Tabelle + RLS-Policies), alle Rollenwerte/Labels im Code
+- `TeamleiterDashboard.tsx` mit 5 Tabs (Übersicht, Aufgaben, Objekte, Team, Profil)
+- Teamleiter-Dropdown in `EditObjectOverlay` + Inline-Dropdown im ObjectDetail-Header (speichert `objektleiter_id`)
+- **Promote**: Admin befördert MA → Teamleiter („Team eröffnen"-Button im Team-Tab); setzt `is_onboarded=false` → `RoleChangeOnboarding` beim nächsten Login
+- **Demote**: Admin stuft Teamleiter → MA zurück; setzt ebenfalls `is_onboarded=false`
+- Mitarbeiter per Picker einem Teamleiter zuordnen (`teamleiter_id` auf `users`)
+- Stunden + Fahrzeit: MA trägt `work_minutes` + `travel_minutes` bei Task-Abschluss ein; Teamleiter sieht Summen
 
-### Umbenennung
-Rolle `objektleiter` → `teamleiter` (DB + UI). Spalte `objektleiter_id` auf `objects` bleibt, heißt im UI "Teamleiter".
-
-### Zuweisung: Objekt → Teamleiter
-- Admin weist jedem Objekt **einmalig** einen Teamleiter zu (Dropdown in `EditObjectOverlay`)
-- Danach automatisch: jede Aufgabe für Objekt X erscheint im Dashboard von Teamleiter X
-- Keine Regions-/Stadtlogik – direkte 1:1-Zuweisung pro Objekt
-- Bei Teamleiter-Wechsel reicht eine Änderung im Objekt
+### Spalten-Konvention
+- `objektleiter_id` auf `objects` → bleibt so (FK zu `users`), heißt im UI „Teamleiter"
+- `teamleiter_id` auf `users` → verknüpft einen Mitarbeiter organisatorisch mit seinem Teamleiter
 
 ### Sparten (Steuber hat 2 Bereiche)
 - **Grünanlagen**: 1 Teamleiter (aktuell für alle Orte)
@@ -242,21 +274,9 @@ Rolle `objektleiter` → `teamleiter` (DB + UI). Spalte `objektleiter_id` auf `o
 | Urlaub genehmigen | ❌ | ✅ | ❌ |
 | MA-Stammdaten bearbeiten | ❌ | ✅ | ✅ (nur eigene) |
 | Objekte / Kunden bearbeiten | ❌ | ✅ | ❌ |
-| Neue MA einladen | ❌ | ✅ | ❌ |
+| Neue MA einladen / befördern | ❌ | ✅ | ❌ |
 | Tagesbericht seines Teams sehen | ✅ | ✅ | ❌ |
 | Selbst als MA Aufgaben erledigen | ✅ | – | ✅ |
-
-### Stunden & Fahrzeit
-- MA trägt Arbeitsstunden **und Fahrzeit** manuell ein (pro Tag oder bei Task-Abschluss)
-- Perspektivisch: automatische Berechnung aus Task-Status (Datenstruktur so anlegen, dass das möglich ist)
-- Teamleiter sieht Stunden seines Teams zur Kontrolle
-
-### Noch offen / spätere Phase
-- Personalfragebogen beim Onboarding (MA füllt eigene Daten aus)
-- Periodische Datenbestätigung (alle paar Monate: MA bestätigt dass Daten noch stimmen)
-- Gehalt-Feld: nur Admin sichtbar/bearbeitbar (noch nicht implementiert)
-- Detailklärung MA-Stammdaten: was genau darf Admin vs. MA bearbeiten
-
 
 ---
 

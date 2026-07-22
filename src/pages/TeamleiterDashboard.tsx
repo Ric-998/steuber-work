@@ -708,85 +708,127 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     )
   )
 
-  // ── Tab: Team (Status + Krankmeldungen + Fahrzeit/Stunden) ───────
+  // ── Tab: Team (Teamübersicht mit Status-Dots) ────────────────────────
   const renderTeamTab = () => {
     const today = localToday()
-    const activeLeaves = leaves.filter((l:any)=> l.from_date <= today && l.to_date >= today)
-    const upcomingLeaves = leaves.filter((l:any)=> l.from_date > today)
+    const activeLeaves = leaves.filter((l:any) => l.from_date <= today && l.to_date >= today)
+    const upcomingLeaves = leaves.filter((l:any) => l.from_date > today)
+
+    // Leave-Map für Status-Dots
+    const leaveMap: Record<string, { type: string; to_date: string }> = {}
+    activeLeaves.forEach((l:any) => { leaveMap[l.user_id] = { type: l.request_type, to_date: l.to_date } })
+
+    // Aktive Worker (task in_arbeit heute)
+    const activeWorkerSet = new Set(
+      todayAssigns.filter((a:any) => a.status === 'in_arbeit').map((a:any) => a.user_id)
+    )
+
+    const fmtShort = (d: string) => new Date(d).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'2-digit' })
+    const ini = (name: string) => name.split(' ').map((n:string) => n[0]).join('').slice(0,2).toUpperCase()
+
+    const getStatus = (m: any) => {
+      const isWorking = activeWorkerSet.has(m.id)
+      const leave = leaveMap[m.id]
+      const color = isWorking ? '#22c55e' : leave?.type === 'urlaub' ? '#dc2626' : leave?.type === 'krankmeldung' ? '#3b82f6' : '#f59e0b'
+      const leaveTxt = leave ? ((leave.type === 'urlaub' ? 'Urlaub' : 'Krank') + ' bis ' + fmtShort(leave.to_date)) : null
+      const leaveColor = leave?.type === 'urlaub' ? '#dc2626' : '#3b82f6'
+      return { color, leaveTxt, leaveColor }
+    }
+
     return (
       <>
-        {(activeLeaves.length > 0 || upcomingLeaves.length > 0) && <>
-          <div style={s.sectionLabel}>Abwesenheiten</div>
-          {[...activeLeaves, ...upcomingLeaves].map((l:any) => {
-            const col = LEAVE_COLOR[l.request_type] || { c:'#6b7280', bg:'#f3f4f6' }
-            const running = l.from_date <= today && l.to_date >= today
-            return (
-              <div key={l.id} style={{ ...s.card, display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${col.c}` }}>
-                <span style={{ padding:'2px 8px', borderRadius:6, fontSize:11, fontWeight:700, color:col.c, background:col.bg, flexShrink:0 }}>
-                  {LEAVE_LABEL[l.request_type]||l.request_type}
-                </span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{(l.users as any)?.full_name||'—'}</div>
-                  <div style={{ fontSize:12, color:'#9ca3af', marginTop:1 }}>
-                    {fmtDate(l.from_date)} – {fmtDate(l.to_date)}{l.status==='genehmigt' ? '' : ' · ausstehend'}
+        {/* Header */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:20, marginBottom:20 }}>
+          <div>
+            <h2 style={{ fontSize:20, fontWeight:800, fontFamily:'var(--font-head)', margin:0, color:'var(--txt)' }}>Mein Team</h2>
+            <p style={{ fontSize:13, color:'var(--txt-muted)', margin:'4px 0 0' }}>
+              {allUsers.filter((m:any)=>m.is_active).length} aktiv· {allUsers.length} gesamt
+            </p>
+          </div>
+        </div>
+
+        {/* Legende */}
+        <div style={{ display:'flex', gap:14, marginBottom:20, flexWrap:'wrap' as const }}>
+          {([{color:'#22c55e',label:'Aktiv'},{color:'#f59e0b',label:'Abwesend'},{color:'#3b82f6',label:'Krank'},{color:'#dc2626',label:'Urlaub'}] as const).map(({color,label}) => (
+            <div key={label} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--txt-muted)' }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:color, display:'inline-block', flexShrink:0 }}/>
+              {label}
+            </div>
+          ))}
+        </div>
+
+        {/* Mitglieder-Grid */}
+        {allUsers.length === 0 ? (
+          <div style={s.emptyState}>
+            <span className="material-symbols-outlined" style={{ fontSize:40, display:'block', marginBottom:8, opacity:0.4 }}>group</span>
+            Noch keine Mitarbeiter zugeordnet
+          </div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8, marginBottom:24 }}>
+            {allUsers.map((m:any) => {
+              const st = getStatus(m)
+              return (
+                <div key={m.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'var(--surf-card)', borderRadius:12, border:'1px solid var(--outline)', boxShadow:'0 1px 2px rgba(16,24,29,0.03)', opacity:m.is_active?1:0.5 }}>
+                  <div style={{ position:'relative', flexShrink:0 }}>
+                    <div style={{ width:34, height:34, borderRadius:10, background:'var(--pri)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, fontFamily:'var(--font-head)' }}>{ini(m.full_name)}</div>
+                    <span style={{ position:'absolute', bottom:-1, right:-1, width:9, height:9, borderRadius:'50%', background:st.color, border:'2px solid var(--surf-card)', display:'block' }} />
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12.5, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
+                    {st.leaveTxt && <div style={{ fontSize:10.5, color:st.leaveColor, opacity:0.8, marginTop:2 }}>{st.leaveTxt}</div>}
                   </div>
                 </div>
-                {running && <span style={{ fontSize:11, fontWeight:700, color:col.c }}>läuft</span>}
-              </div>
-            )
-          })}
-          <div style={{ marginBottom:16 }} />
-        </>}
+              )
+            })}
+          </div>
+        )}
 
-        <div style={s.sectionLabel}>Mein Team ({allUsers.length} Mitarbeiter)</div>
-        {allUsers.length === 0
-          ? <div style={s.emptyState}>
-              <span className="material-symbols-outlined" style={{ fontSize:36, display:'block', marginBottom:8 }}>group</span>
-              Noch keine Mitarbeiter zugeordnet
-            </div>
-          : <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
-              {allUsers.map((member:any) => {
-                if (!member) return null
-                const ini = (member.full_name||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
-                const mt = todayAssigns.filter((a:any)=>a.user_id===member.id || a.substitute_id===member.id)
-                const done = mt.filter((a:any)=>a.status==='erledigt').length
-                const hasProb = mt.some((a:any)=>a.status==='problem')
-                const _todayTravel = todayAssigns.filter((a:any)=>a.user_id===member.id).reduce((s:number,a:any)=>s+(a.travel_minutes||0),0)
-                const _todayWork = todayAssigns.filter((a:any)=>a.user_id===member.id).reduce((s:number,a:any)=>s+(a.work_minutes||0),0)
-                void _todayTravel; void _todayWork
-                const weekWork = weekAssigns.filter((a:any)=>a.user_id===member.id).reduce((s:number,a:any)=>s+(a.work_minutes||0),0)
-                const weekTravel = weekAssigns.filter((a:any)=>a.user_id===member.id).reduce((s:number,a:any)=>s+(a.travel_minutes||0),0)
-                const onLeave = activeLeaves.find((l:any)=>l.user_id===member.id)
-                return (
-                  <div key={member.id} style={s.teamCard}>
-                    <div style={s.memberAvatar}>{ini}</div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{member.full_name}</div>
-                      <div style={{ fontSize:12, color:'#9ca3af', marginTop:2 }}>
-                        {mt.length>0 ? `${done}/${mt.length} heute` : 'Heute keine Aufgaben'}
-                        {weekWork>0 ? ` · ${Math.round(weekWork/60*10)/10}h diese Woche` : ''}
-                        {weekTravel>0 ? ` · ${Math.round(weekTravel/60*10)/10}h Fahrzeit` : ''}
-                      </div>
+        {/* Abwesenheiten */}
+        {(activeLeaves.length > 0 || upcomingLeaves.length > 0) && (
+          <>
+            <div style={s.sectionLabel}>Abwesenheiten</div>
+            {[...activeLeaves, ...upcomingLeaves].map((l:any) => {
+              const col = LEAVE_COLOR[l.request_type] || { c:'#6b7280', bg:'#f3f4f6' }
+              const running = l.from_date <= today && l.to_date >= today
+              return (
+                <div key={l.id} style={{ ...s.card, display:'flex', alignItems:'center', gap:10, borderLeft:`3px solid ${col.c}` }}>
+                  <span style={{ padding:'2px 8px', borderRadius:6, fontSize:11, fontWeight:700, color:col.c, background:col.bg, flexShrink:0 }}>
+                    {LEAVE_LABEL[l.request_type]||l.request_type}
+                  </span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:600, color:'var(--txt)' }}>{(l.users as any)?.full_name||'-'}</div>
+                    <div style={{ fontSize:12, color:'#9ca3af', marginTop:1 }}>
+                      {fmtDate(l.from_date)} – {fmtDate(l.to_date)}{l.status==='genehmigt' ? '' : ' · ausstehend'}
                     </div>
-                    {onLeave
-                      ? <span style={{ fontSize:11, fontWeight:700, color:(LEAVE_COLOR[onLeave.request_type]||{c:'#6b7280'}).c, background:(LEAVE_COLOR[onLeave.request_type]||{bg:'#f3f4f6'}).bg, padding:'3px 8px', borderRadius:6, flexShrink:0 }}>
-                          {LEAVE_LABEL[onLeave.request_type]||onLeave.request_type}
-                        </span>
-                      : hasProb
-                        ? <span style={{ fontSize:11, fontWeight:600, color:'#dc2626', background:'#fef2f2', padding:'3px 8px', borderRadius:6, flexShrink:0 }}>Problem</span>
-                        : mt.length>0
-                          ? <span style={{ fontSize:11, fontWeight:600, color:done===mt.length?'#16a34a':'#d97706', background:done===mt.length?'#f0fdf4':'#fffbeb', padding:'3px 8px', borderRadius:6, flexShrink:0 }}>
-                              {done===mt.length?'Fertig':'In Arbeit'}
-                            </span>
-                          : null
-                    }
+                  </div>
+                  {running && <span style={{ fontSize:11, fontWeight:700, color:col.c }}>läuft</span>}
+                </div>
+              )
+            })}
+            <div style={{ marginBottom:16 }} />
+          </>
+        )}
+
+        {/* Stunden diese Woche */}
+        {allUsers.some((m:any) => weekAssigns.some((a:any) => a.user_id === m.id && (a.work_minutes || a.travel_minutes))) && (
+          <>
+            <div style={s.sectionLabel}>Stunden diese Woche</div>
+            <div style={{ display:'flex', flexDirection:'column' as const, gap:6, marginBottom:24 }}>
+              {allUsers.map((m:any) => {
+                const weekWork = weekAssigns.filter((a:any)=>a.user_id===m.id).reduce((s:number,a:any)=>s+(a.work_minutes||0),0)
+                const weekTravel = weekAssigns.filter((a:any)=>a.user_id===m.id).reduce((s:number,a:any)=>s+(a.travel_minutes||0),0)
+                if (weekWork === 0 && weekTravel === 0) return null
+                return (
+                  <div key={m.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--surf-card)', borderRadius:11, border:'1px solid var(--outline)' }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:'var(--txt)', flex:1 }}>{m.full_name}</span>
+                    {weekWork > 0 && <span style={{ fontSize:12, color:'var(--pri)', fontWeight:600 }}>{Math.round(weekWork/60*10)/10}h</span>}
+                    {weekTravel > 0 && <span style={{ fontSize:12, color:'var(--txt-muted)', marginLeft:6 }}>{Math.round(weekTravel/60*10)/10}h Fahrt</span>}
                   </div>
                 )
               })}
             </div>
-        }
-
-
+          </>
+        )}
       </>
     )
   }

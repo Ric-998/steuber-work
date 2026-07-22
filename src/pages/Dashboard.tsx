@@ -17,6 +17,8 @@ interface LeaveRequest {
   id: string; user_id: string; request_type: 'urlaub'|'krankmeldung'|'sonstiges'; from_date: string; to_date: string
   note?: string|null; status: 'ausstehend'|'genehmigt'|'abgelehnt'; created_at: string
   users?: { full_name: string; phone?: string|null }|null
+  substitute_id?: string|null; substitute_confirmed?: boolean
+  substitute?: { full_name: string }|null
 }
 interface TeamMember {
   id: string; full_name: string; is_active: boolean; role_id: string; role_name?: string
@@ -140,6 +142,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
   const [blackouts, setBlackouts] = useState<any[]>([])
   const [showBlackoutForm, setShowBlackoutForm] = useState(false)
   const [showAssignPicker, setShowAssignPicker] = useState<string|undefined>(undefined)
+  const [showPromotePicker, setShowPromotePicker] = useState(false)
   const [blackoutFrom, setBlackoutFrom] = useState('')
   const [blackoutTo, setBlackoutTo] = useState('')
   const [blackoutReason, setBlackoutReason] = useState('')
@@ -303,7 +306,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
       supabase.from('objects').select('id,name,address,city,postal_code,object_number,customer_id,is_active,object_type,access_note,parking_note,floor_info,notes,objektleiter_id,customers(id,name)').order('address').limit(200),
       supabase.from('categories').select('*').order('name'),
       supabase.from('customers').select('id,customer_type,name,first_name,last_name,salutation,contact_person,contact_first_name,contact_last_name,email,phone,street,street_name,street_number,postal_code,city,address_supplement,notes,lexware_id,hausverwaltung_objekt_id,contract_type,hausverwaltung_id,co_contact_id,is_hausverwaltung,hausverwaltung:hausverwaltung_id(id,name,customer_type),co_contact:co_contact_id(id,name,role,phone,email)').order('name').limit(200),
-      supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,users!leave_requests_user_id_fkey(full_name,phone)').order('created_at',{ascending:false}).limit(50),
+      supabase.from('leave_requests').select('id,user_id,request_type,from_date,to_date,note,status,created_at,substitute_id,substitute_confirmed,users!leave_requests_user_id_fkey(full_name,phone),substitute:users!leave_requests_substitute_id_fkey(full_name)').order('created_at',{ascending:false}).limit(50),
       supabase.from('vacation_blackouts').select('*').order('from_date',{ascending:true}),
       supabase.from('contact_persons').select('id,name,first_name,last_name,role,phone,email,customer_id,object_id').order('last_name').order('name').limit(300),
     ])
@@ -1198,7 +1201,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
             members: team.filter(m => m.teamleiter_id === tlId && m.role_name !== 'teamleiter' && m.role_name !== 'admin')
           }))
           const unassigned = team.filter(m => !m.teamleiter_id && m.role_name === 'mitarbeiter')
-          if (unassigned.length > 0) grouped.push({ tlId: null, members: unassigned })
+          grouped.push({ tlId: null, members: unassigned }) // immer als Backlog anzeigen
 
           const fmtDate = (d: string) => new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})
           const ini = (name: string) => name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
@@ -1233,17 +1236,23 @@ export default function Dashboard({ userName, onLogout }: Props) {
           }
 
           return (
-          <>
+          <div style={{ maxWidth: isDesktop ? 720 : undefined }}>
             {/* Header */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:20, marginBottom:20 }}>
               <div>
                 <h1 style={s.h1}>Team</h1>
                 <p style={s.sub}>{team.filter(m=>m.is_active).length} aktiv · {team.length} gesamt</p>
               </div>
-              <button onClick={() => setShowInviteOverlay(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 15px', borderRadius:10, border:'none', background:'var(--pri)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 2px 8px rgba(9,106,112,0.22)', flexShrink:0 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:17 }}>person_add</span>
-                Einladen
-              </button>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6, flexShrink:0 }}>
+                <button onClick={() => setShowInviteOverlay(true)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 15px', borderRadius:10, border:'none', background:'var(--pri)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', boxShadow:'0 2px 8px rgba(9,106,112,0.22)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:17 }}>person_add</span>
+                  Einladen
+                </button>
+                <button onClick={() => setShowPromotePicker(true)} style={{ display:'flex', alignItems:'center', gap:4, background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', fontSize:11.5, fontWeight:600, padding:'2px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:14 }}>add_circle</span>
+                  Team eröffnen
+                </button>
+              </div>
             </div>
 
             {/* Legende */}
@@ -1269,9 +1278,29 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 <div key={tlId ?? 'none'} style={{ marginBottom:22, paddingBottom:18, borderBottom:'1px solid var(--outline)' }}>
                   {tlMember ? (
                     <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.09em', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:13 }}>supervisor_account</span>
-                        Teamleiter · {members.length} Mitarbeiter
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                        <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.09em', display:'flex', alignItems:'center', gap:5 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:13 }}>supervisor_account</span>
+                          Teamleiter · {members.length} Mitarbeiter
+                        </div>
+                        <button onClick={async (e) => {
+                          e.stopPropagation()
+                          if (!tlId) return
+                          if (!confirm(`${teamleiterMap[tlId].full_name} zu Mitarbeiter zurückstufen? Alle zugeordneten MAs werden „Nicht zugeordnet".`)) return
+                          const { data: roleRow } = await supabase.from('roles').select('id').eq('name','mitarbeiter').single()
+                          if (!roleRow) return
+                          await supabase.from('users').update({ role_id: roleRow.id, teamleiter_id: null, is_onboarded: false }).eq('id', tlId)
+                          await supabase.from('users').update({ teamleiter_id: null }).eq('teamleiter_id', tlId)
+                          setTeam(prev => prev.map(m => {
+                            if (m.id === tlId) return { ...m, role_id: roleRow.id, role_name: 'mitarbeiter', teamleiter_id: null }
+                            if (m.teamleiter_id === tlId) return { ...m, teamleiter_id: null }
+                            return m
+                          }))
+                          showToast(`${teamleiterMap[tlId].full_name} ist jetzt Mitarbeiter`, 'ok')
+                        }} style={{ display:'flex', alignItems:'center', gap:3, background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', fontSize:10.5, fontWeight:600, padding:0 }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:13 }}>close</span>
+                          Team schließen
+                        </button>
                       </div>
                       <MemberCard m={tlMember} lg />
                     </div>
@@ -1284,14 +1313,21 @@ export default function Dashboard({ userName, onLogout }: Props) {
                       <div style={{ fontSize:11, color:'var(--txt-muted)', background:'var(--surf-low)', borderRadius:6, padding:'2px 7px' }}>{members.length}</div>
                     </div>
                   )}
-                  {tlMember && members.length > 0 && (
+                  {tlMember && (
                     <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.09em', marginBottom:8, marginTop:14 }}>Mitarbeiter</div>
                   )}
                   {members.length === 0 ? (
-                    <div onClick={() => setShowAssignPicker(pickerId)}
-                      style={{ fontSize:12, color:'var(--txt-muted)', padding:'12px 14px', background:'var(--surf-low)', borderRadius:11, border:'1px dashed var(--outline)', cursor:'pointer' }}>
-                      Noch keine Mitarbeiter zugeordnet — antippen zum Zuordnen
-                    </div>
+                    tlId === null ? (
+                      <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'12px 14px', background:'var(--surf-low)', borderRadius:11, border:'1px dashed var(--outline)', textAlign:'center' as const }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:15, display:'block', marginBottom:4, opacity:0.4 }}>check_circle</span>
+                        Alle Mitarbeiter sind einem Teamleiter zugeordnet
+                      </div>
+                    ) : (
+                      <div onClick={() => setShowAssignPicker(pickerId)}
+                        style={{ fontSize:12, color:'var(--txt-muted)', padding:'12px 14px', background:'var(--surf-low)', borderRadius:11, border:'1px dashed var(--outline)', cursor:'pointer' }}>
+                        Noch keine Mitarbeiter zugeordnet — antippen zum Zuordnen
+                      </div>
+                    )
                   ) : (
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
                       {members.map(m => <MemberCard key={m.id} m={m} />)}
@@ -1310,8 +1346,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
             {team.filter(m=>m.role_name==='admin').length > 0 && (
               <div style={{ marginTop:2, marginBottom:20 }}>
                 <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.09em', marginBottom:8 }}>Administration</div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
-                  {team.filter(m=>m.role_name==='admin').map(m => <MemberCard key={m.id} m={m} />)}
+                <div style={{ display:'flex', flexDirection:'column' as const, gap:8 }}>
+                  {team.filter(m=>m.role_name==='admin').map(m => <MemberCard key={m.id} m={m} lg />)}
                 </div>
               </div>
             )}
@@ -1351,6 +1387,61 @@ export default function Dashboard({ userName, onLogout }: Props) {
                             }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'var(--surf-card)', borderRadius:11, border:'1px solid var(--outline)', cursor:'pointer' }}>
                               <span style={{ fontSize:13.5, fontWeight:600, color:'var(--txt)' }}>{m.full_name}</span>
                               <span style={{ fontSize:11, color:'var(--txt-muted)' }}>{curTl}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Promote Picker */}
+            {showPromotePicker && (() => {
+              const candidates = team.filter(m => m.role_name === 'mitarbeiter' && m.is_active)
+              return (
+                <div style={{ position:'fixed', inset:0, background:'rgba(12,16,19,0.45)', zIndex:600, display:'flex', alignItems:'flex-end' }}
+                  onClick={e => { if (e.target === e.currentTarget) setShowPromotePicker(false) }}>
+                  <div style={{ background:'var(--bg)', borderRadius:'18px 18px 0 0', width:'100%', padding:'20px 18px 34px', maxWidth:540, margin:'0 auto', boxSizing:'border-box' as const, maxHeight:'70vh', overflowY:'auto' as const }}>
+                    <div style={{ width:34, height:4, borderRadius:99, background:'var(--outline)', margin:'0 auto 18px' }}/>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                      <div>
+                        <h3 style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', margin:0, color:'var(--txt)' }}>Team eröffnen</h3>
+                        <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:3 }}>Wer wird neuer Teamleiter?</div>
+                      </div>
+                      <button onClick={() => setShowPromotePicker(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--txt-muted)', display:'flex' }}>
+                        <span className="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                    <div style={{ background:'var(--pri-xl)', borderRadius:10, padding:'10px 13px', marginBottom:14, marginTop:10, display:'flex', gap:8 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--pri)', flexShrink:0, marginTop:1 }}>info</span>
+                      <div style={{ fontSize:12, color:'var(--pri)', lineHeight:1.5 }}>Der Mitarbeiter erhält die Teamleiter-Ansicht und wird beim nächsten Login kurz eingeführt.</div>
+                    </div>
+                    {candidates.length === 0 ? (
+                      <div style={{ fontSize:13, color:'var(--txt-muted)', padding:'20px 0', textAlign:'center' as const }}>Keine Mitarbeiter verfügbar</div>
+                    ) : (
+                      <div style={{ display:'flex', flexDirection:'column' as const, gap:6 }}>
+                        {candidates.map(m => {
+                          const curTl = m.teamleiter_id ? (teamleiterMap[m.teamleiter_id]?.full_name ?? '–') : 'Nicht zugeordnet'
+                          return (
+                            <div key={m.id} onClick={async () => {
+                              const { data: roleRow } = await supabase.from('roles').select('id').eq('name','teamleiter').single()
+                              if (!roleRow) return
+                              const { error } = await supabase.from('users').update({ role_id: roleRow.id, teamleiter_id: null, is_onboarded: false }).eq('id', m.id)
+                              if (error) { showToast('Fehler beim Befördern', 'warn'); return }
+                              setTeam(prev => prev.map(x => x.id === m.id ? { ...x, role_id: roleRow.id, role_name: 'teamleiter', teamleiter_id: null } : x))
+                              setShowPromotePicker(false)
+                              showToast(`${m.full_name} ist jetzt Teamleiter`, 'ok')
+                            }} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', background:'var(--surf-card)', borderRadius:11, border:'1px solid var(--outline)', cursor:'pointer' }}>
+                              <div>
+                                <div style={{ fontSize:13.5, fontWeight:600, color:'var(--txt)' }}>{m.full_name}</div>
+                                <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2 }}>{curTl}</div>
+                              </div>
+                              <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', padding:'4px 10px', borderRadius:8 }}>
+                                <span className="material-symbols-outlined" style={{ fontSize:13 }}>arrow_upward</span>
+                                Befördern
+                              </div>
                             </div>
                           )
                         })}
@@ -1445,7 +1536,7 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 </div>
               )}
             </div>
-          </>
+          </div>
           )
         })()}
 
@@ -1559,6 +1650,12 @@ export default function Dashboard({ userName, onLogout }: Props) {
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{(req.users as any)?.full_name ?? '–'}</div>
                           <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>{isKrank ? 'Krankmeldung' : 'Urlaubsantrag'} · {dateStr}{req.note ? ` · „${req.note}“` : ''}</div>
+                          {!isKrank && req.substitute_id && (
+                            <div style={{ fontSize:11, marginTop:2, display:'flex', alignItems:'center', gap:4, color: req.substitute_confirmed ? 'var(--ok)' : '#b45309' }}>
+                              <span className="material-symbols-outlined" style={{ fontSize:11 }}>{req.substitute_confirmed ? 'check_circle' : 'hourglass_empty'}</span>
+                              Vertretung: {(req as any).substitute?.full_name ?? '–'} {req.substitute_confirmed ? '✓' : '⏳'}
+                            </div>
+                          )}
                         </div>
                         <div style={{ display:'flex', gap:6, flexShrink:0 }}>
                           <button
@@ -2554,23 +2651,31 @@ function ObjectDetail({ obj, tasks, team, categories, objects, onBack, onEditTas
               const ini = ((c.first_name?.[0] || '') + (c.last_name?.[0] || '')).toUpperCase() || '?'
               const dn = [c.first_name, c.last_name].filter(Boolean).join(' ') || c.name || '–'
               return (
-                <div key={c.id} onClick={() => { setSelectedObjContact(c); setEditingObjContact(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: i ? '1px solid #eef0f1' : 'none', cursor: 'pointer' }}>
+                <div key={c.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 0', borderTop: i ? '1px solid #eef0f1' : 'none' }}>
                   <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg,var(--pri),var(--pri-c,#0c8f85))', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12.5, flexShrink: 0 }}>{ini}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dn}</div>
                     {c.role && <div style={{ fontSize: 11, color: '#6f797b' }}>{c.role}</div>}
                   </div>
                   {c.email && (
-                    <a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()} style={{ width: 36, height: 36, borderRadius: 10, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pri)', textDecoration: 'none', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 17 }}>mail</span>
+                    <a href={`mailto:${c.email}`} style={{ width: 32, height: 32, borderRadius: 9, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pri)', textDecoration: 'none', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>mail</span>
                     </a>
                   )}
                   {c.phone && (
-                    <a href={`tel:${c.phone}`} onClick={e => e.stopPropagation()} style={{ width: 36, height: 36, borderRadius: 10, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pri)', textDecoration: 'none', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 17 }}>call</span>
+                    <a href={`tel:${c.phone}`} style={{ width: 32, height: 32, borderRadius: 9, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pri)', textDecoration: 'none', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>call</span>
                     </a>
                   )}
+                  <button onClick={e => { e.stopPropagation(); setSelectedObjContact(c); setEditingObjContact(true); setEditObjCpFn(c.first_name||''); setEditObjCpLn(c.last_name||''); setEditObjCpRole(c.role||''); setEditObjCpPhone(c.phone||''); setEditObjCpEmail(c.email||'') }}
+                    style={{ width: 32, height: 32, borderRadius: 9, background: '#f3f4f5', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', color: 'var(--txt-muted)', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                  </button>
+                  <button onClick={e => { e.stopPropagation(); setConfirmRemoveCp(c) }}
+                    style={{ width: 32, height: 32, borderRadius: 9, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', color: '#dc2626', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+                  </button>
                 </div>
               )
             })}
@@ -7461,11 +7566,17 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
     setRoleChanging(true); setRoleMsg(null)
     const { data: roleRow } = await supabase.from('roles').select('id').eq('name', newRole).single()
     if (!roleRow) { setRoleMsg({ok:false,text:'Rolle nicht gefunden'}); setRoleChanging(false); return }
-    const { error } = await supabase.from('users').update({ role_id: roleRow.id }).eq('id', member.id)
+    const updatePayload: any = { role_id: roleRow.id, is_onboarded: false }
+    if (newRole === 'teamleiter') updatePayload.teamleiter_id = null // TL hat keinen eigenen TL
+    const { error } = await supabase.from('users').update(updatePayload).eq('id', member.id)
     if (error) { setRoleMsg({ok:false, text:error.message}); setRoleChanging(false); return }
+    // Wenn TL→MA: alle seine Mitarbeiter auf nicht zugeordnet setzen
+    if (member.role_name === 'teamleiter' && newRole !== 'teamleiter') {
+      await supabase.from('users').update({ teamleiter_id: null }).eq('teamleiter_id', member.id)
+    }
     setCurrentRole(newRole)
     onUpdated({ role_id: roleRow.id, role_name: newRole } as any)
-    setRoleMsg({ok:true, text:`Rolle auf „${newRole === 'admin' ? 'Administrator' : 'Mitarbeiter'}" geändert`})
+    setRoleMsg({ok:true, text:`Rolle geändert – ${member.full_name.split(' ')[0]} wird beim nächsten Login eingeführt`})
     setTimeout(() => setRoleMsg(null), 3000)
     setRoleChanging(false)
   }
