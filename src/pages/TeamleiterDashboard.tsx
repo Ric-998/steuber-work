@@ -128,11 +128,11 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     const horizon = addDaysISO(14)
     const [objRes, usersRes] = await Promise.all([
       supabase.from('objects').select('*').eq('objektleiter_id', userId).eq('is_active', true).order('name'),
-      supabase.from('users').select('id,full_name,is_active').eq('is_active', true).order('full_name'),
+      supabase.from('users').select('id,full_name,is_active,roles(name)').eq('is_active', true).order('full_name'),
     ])
     const objs = objRes.data || []
     setObjects(objs)
-    setAllUsers(usersRes.data || [])
+    setAllUsers((usersRes.data || []).filter((u:any) => u.id !== userId && u.roles?.name === 'mitarbeiter'))
 
     if (objs.length > 0) {
       const objIds = objs.map((o: any) => o.id)
@@ -961,7 +961,7 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
             <label style={{ fontSize:12, fontWeight:600, color:'var(--txt)', display:'block', marginBottom:6 }}>Vertretung durch</label>
             <select style={s.inputStyle} value={substUser} onChange={e=>setSubstUser(e.target.value)}>
               <option value="">Mitarbeiter wählen…</option>
-              {allUsers.filter((u:any)=>u.id!==substAssign.user_id).map((u:any) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
+              {allUsers.filter((u:any)=>u.id!==substAssign.user_id && u.id!==userId).map((u:any) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
             </select>
             <button style={{ ...s.saveBtn, background:'#7c3aed' }} onClick={handleSaveSubst} disabled={!substUser||substSaving}>
               {substSaving?'Wird gespeichert…':'Vertretung speichern'}
