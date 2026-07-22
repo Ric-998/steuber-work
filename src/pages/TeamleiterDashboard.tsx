@@ -20,10 +20,10 @@ const STATUS_LABEL: Record<string, string> = {
   offen:'Offen', in_arbeit:'In Arbeit', erledigt:'Erledigt', problem:'Problem', vertretung:'Vertretung',
 }
 const LEAVE_LABEL: Record<string, string> = {
-  krankmeldung:'Krank', urlaub:'Urlaub',
+  krankmeldung:'Krank', urlaub:'Urlaub', sonstiges:'Sonstiges',
 }
 const LEAVE_COLOR: Record<string, { c:string; bg:string }> = {
-  krankmeldung:{ c:'#dc2626', bg:'#fef2f2' }, urlaub:{ c:'#0369a1', bg:'#e0f2fe' },
+  krankmeldung:{ c:'#dc2626', bg:'#fef2f2' }, urlaub:{ c:'#0369a1', bg:'#e0f2fe' }, sonstiges:{ c:'#6b7280', bg:'#f3f4f6' },
 }
 
 function localToday() {
@@ -132,7 +132,8 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     ])
     const objs = objRes.data || []
     setObjects(objs)
-    setAllUsers((usersRes.data || []).filter((u:any) => u.id !== userId && u.roles?.name === 'mitarbeiter' && u.teamleiter_id === userId))
+    const filteredUsers = (usersRes.data || []).filter((u:any) => u.id !== userId && u.roles?.name === 'mitarbeiter' && u.teamleiter_id === userId)
+    setAllUsers(filteredUsers)
 
     if (objs.length > 0) {
       const objIds = objs.map((o: any) => o.id)
@@ -165,22 +166,24 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
         ;(teamRes.data || []).forEach((a: any) => {
           if (a.user_id && !seen.has(a.user_id)) { seen.add(a.user_id); uniqueTeam.push(a.users) }
         })
-        const teamMembers = uniqueTeam.filter(Boolean)
-        setTeam(teamMembers)
-
-        // Krankmeldungen / Urlaube des Teams (laufend + kommend)
-        const memberIds = teamMembers.map((m: any) => m.id)
-        if (memberIds.length > 0) {
-          const { data: leaveData } = await supabase.from('leave_requests')
-            .select('id,user_id,request_type,from_date,to_date,status,note,users!leave_requests_user_id_fkey(full_name)')
-            .in('user_id', memberIds).neq('status','abgelehnt').gte('to_date', monthAgo).order('from_date')
-          setLeaves(leaveData || [])
-        } else { setLeaves([]) }
+        setTeam(uniqueTeam.filter(Boolean))
       } else {
-        setTodayAssigns([]); setUpcomingAssigns([]); setTeam([]); setLeaves([])
+        setTodayAssigns([]); setUpcomingAssigns([]); setTeam([])
       }
     } else {
-      setTasks([]); setTodayAssigns([]); setUpcomingAssigns([]); setTeam([]); setLeaves([])
+      setTasks([]); setTodayAssigns([]); setUpcomingAssigns([]); setTeam([])
+    }
+
+    // Leaves always based on filteredUsers (not on task assignments)
+    if (filteredUsers.length > 0) {
+      const monthAgo = addDaysISO(-30)
+      const memberIds = filteredUsers.map((u:any) => u.id)
+      const { data: leaveData } = await supabase.from('leave_requests')
+        .select('id,user_id,request_type,from_date,to_date,status,note,users!leave_requests_user_id_fkey(full_name)')
+        .in('user_id', memberIds).neq('status','abgelehnt').gte('to_date', monthAgo).order('from_date')
+      setLeaves(leaveData || [])
+    } else {
+      setLeaves([])
     }
     setLoading(false)
   }, [userId])
@@ -658,14 +661,14 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
           <div style={{ marginBottom:16 }} />
         </>}
 
-        <div style={s.sectionLabel}>Mein Team ({team.length} Mitarbeiter)</div>
-        {team.length === 0
+        <div style={s.sectionLabel}>Mein Team ({allUsers.length} Mitarbeiter)</div>
+        {allUsers.length === 0
           ? <div style={s.emptyState}>
               <span className="material-symbols-outlined" style={{ fontSize:36, display:'block', marginBottom:8 }}>group</span>
-              Noch keine Mitarbeiter eingeteilt
+              Noch keine Mitarbeiter zugeordnet
             </div>
           : <div style={{ display: isDesktop ? 'grid' : 'block', gridTemplateColumns:'repeat(2,1fr)', gap:10 }}>
-              {team.map((member:any) => {
+              {allUsers.map((member:any) => {
                 if (!member) return null
                 const ini = (member.full_name||'?').split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
                 const mt = todayAssigns.filter((a:any)=>a.user_id===member.id || a.substitute_id===member.id)
