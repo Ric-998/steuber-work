@@ -2527,6 +2527,7 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
   const [editHomeAddress, setEditHomeAddress] = useState('')
   const [dataSaving, setDataSaving] = useState(false)
   const [dataMsg, setDataMsg] = useState<{ok:boolean;text:string}|null>(null)
+  const [profileLoaded, setProfileLoaded] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -2536,6 +2537,7 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
       if (data?.phone) setEditPhone(data.phone)
       if (data?.full_name) setEditName(data.full_name)
       if (data?.home_address) setEditHomeAddress(data.home_address)
+      setProfileLoaded(true)
     })
   }, [userId])
 
@@ -2607,6 +2609,20 @@ function ProfileTab({ userName, initials, onLogout, userId, pushEnabled, pushSup
 
   return (
     <div style={{ paddingBottom:32 }}>
+
+      {/* Profil-Vollständigkeits-Banner */}
+      {profileLoaded && !editPhone && (
+        <div style={{ display:'flex', gap:10, padding:'12px 14px', borderRadius:14, background:'#fff8e1', border:'1px solid #fbbf24', alignItems:'flex-start', marginBottom:16 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:20, color:'#d97706', flexShrink:0, marginTop:1 }}>warning</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>Kontaktdaten fehlen</div>
+            <div style={{ fontSize:12, color:'#b45309', marginTop:2, lineHeight:1.5 }}>Bitte hinterlege deine Telefonnummer, damit der Admin dich erreichen kann.</div>
+          </div>
+          <button onClick={() => setShowDataForm(true)} style={{ flexShrink:0, padding:'7px 12px', borderRadius:10, border:'none', background:'#d97706', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+            Eintragen
+          </button>
+        </div>
+      )}
 
       {/* ── Compact Profile Header ── */}
       <div style={{ display:'flex', alignItems:'center', gap:14, padding:'16px 4px', marginBottom:8 }}>

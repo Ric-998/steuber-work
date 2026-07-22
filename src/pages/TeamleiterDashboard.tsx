@@ -123,6 +123,7 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
   const [dataSaving, setDataSaving] = useState(false)
   const [dataMsg, setDataMsg] = useState<{ok:boolean;text:string}|null>(null)
   const [showFeedback, setShowFeedback] = useState(false)
+  const [profileLoaded, setProfileLoaded] = useState(false)
 
   const initials = userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
@@ -219,6 +220,7 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
     supabase.from('users').select('phone,full_name').eq('id', userId).single().then(({ data }) => {
       if (data?.phone) setEditPhone(data.phone)
       if (data?.full_name) setEditName(data.full_name)
+      setProfileLoaded(true)
     })
   }, [userId])
 
@@ -777,6 +779,19 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
   // ── Tab: Profil ──────────────────────────────────────────────────
   const renderProfilTab = () => (
     <div style={{ paddingBottom:32, maxWidth: isDesktop?540:'100%' }}>
+      {/* Profil-Vollständigkeits-Banner */}
+      {profileLoaded && !editPhone && (
+        <div style={{ display:'flex', gap:10, padding:'12px 14px', borderRadius:14, background:'#fff8e1', border:'1px solid #fbbf24', alignItems:'flex-start', marginBottom:16 }}>
+          <span className="material-symbols-outlined" style={{ fontSize:20, color:'#d97706', flexShrink:0, marginTop:1 }}>warning</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>Kontaktdaten fehlen</div>
+            <div style={{ fontSize:12, color:'#b45309', marginTop:2, lineHeight:1.5 }}>Bitte hinterlege deine Telefonnummer, damit der Admin und das Team dich erreichen können.</div>
+          </div>
+          <button onClick={() => setShowDataForm(true)} style={{ flexShrink:0, padding:'7px 12px', borderRadius:10, border:'none', background:'#d97706', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+            Eintragen
+          </button>
+        </div>
+      )}
       <div style={{ display:'flex', alignItems:'center', gap:14, padding:'8px 4px 20px' }}>
         <div style={{ width:52, height:52, borderRadius:'50%', background:'linear-gradient(135deg,var(--pri),var(--pri-c))',
           display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:800, color:'#fff', flexShrink:0 }}>
