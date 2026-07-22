@@ -1264,11 +1264,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
             ) : grouped.map(({ tlId, tlName, members }) => {
               const tlMember = tlId ? teamleiterMap[tlId] : null
               return (
-              <div key={tlId ?? 'none'} style={{ marginBottom:24 }}>
+              <div key={tlId ?? 'none'} style={{ marginBottom:20, paddingBottom:16, borderBottom:'1px solid var(--outline)' }}>
                 {/* Teamleiter-Card (klickbar) oder "Nicht zugeordnet" Header */}
                 {tlMember ? (
                   <div style={{ marginBottom:8 }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.10em', marginBottom:8, display:'flex', alignItems:'center', gap:5 }}>
                       <span className="material-symbols-outlined" style={{ fontSize:13 }}>supervisor_account</span>
                       Teamleiter · {members.length} Mitarbeiter
                     </div>
@@ -1284,11 +1284,11 @@ export default function Dashboard({ userName, onLogout }: Props) {
                   </div>
                 )}
                 {/* Mitarbeiter dieser Gruppe */}
-                {tlMember && <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:6, marginTop:12 }}>Mitarbeiter</div>}
+                {tlMember && <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.10em', marginBottom:8, marginTop:14 }}>Mitarbeiter</div>}
                 {members.length === 0 ? (
-                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'10px 14px', background:'var(--surf-low)', borderRadius:12, border:'1px dashed var(--outline)', maxWidth: isDesktop ? 420 : '100%' }}>Noch keine Mitarbeiter zugeordnet — Mitarbeiter-Karte öffnen und Teamleiter zuweisen</div>
+                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'10px 14px', background:'var(--surf-low)', borderRadius:12, border:'1px dashed var(--outline)' }}>Noch keine Mitarbeiter zugeordnet — Mitarbeiter-Karte öffnen und Teamleiter zuweisen</div>
                 ) : (
-                  <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill,minmax(260px,1fr))' : '1fr', gap:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(2,1fr)' : '1fr', gap:8 }}>
                     {members.map(m => <MemberCard key={m.id} m={m} />)}
                   </div>
                 )}
@@ -1299,15 +1299,15 @@ export default function Dashboard({ userName, onLogout }: Props) {
             {/* Admins separat (klein, kein Klick nötig) */}
             {team.filter(m=>m.role_name==='admin').length > 0 && (
               <div style={{ marginTop:4, marginBottom:20 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.08em', marginBottom:10 }}>Administration</div>
-                <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill,minmax(260px,1fr))' : '1fr', gap:8 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase' as const, letterSpacing:'0.10em', marginBottom:8 }}>Administration</div>
+                <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(2,1fr)' : '1fr', gap:8 }}>
                   {team.filter(m=>m.role_name==='admin').map(m => <MemberCard key={m.id} m={m} />)}
                 </div>
               </div>
             )}
 
             {/* Urlaubssperren */}
-            <div style={{ marginTop:8, paddingTop:20, borderTop:'1px solid var(--outline)', maxWidth: isDesktop ? 600 : '100%' }}>
+            <div style={{ marginTop:8, paddingTop:20, borderTop:'1px solid var(--outline)' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
                 <div>
                   <div style={{ fontSize:15, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)' }}>Urlaubssperren</div>
