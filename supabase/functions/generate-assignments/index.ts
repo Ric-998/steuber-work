@@ -125,9 +125,6 @@ Deno.serve(async (req) => {
 
   for (const task of tasks) {
     try {
-      // Skip if no assignee (can't create assignment without user)
-      if (!task.default_assignee_id) { skipped++; continue }
-
       // Skip if task has end_date in the past
       if (task.end_date && task.end_date < todayStr) { skipped++; continue }
 
@@ -181,7 +178,7 @@ Deno.serve(async (req) => {
         .filter(d => !existingSet.has(d))
         .map(d => ({
           task_id:  task.id,
-          user_id:  task.default_assignee_id,
+          user_id:  task.default_assignee_id ?? null,  // null = Teamleiter muss verteilen
           due_date: d,
           status:   'offen',
         }))

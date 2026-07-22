@@ -758,7 +758,8 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 {(() => {
                   const pendingLeaves = leaveRequests.filter(r => r.status === 'ausstehend')
                   const newMaList = team.filter(m => m.is_onboarded && !(m as any).admin_setup_done)
-                  const hasItems = pendingLeaves.length > 0 || newMaList.length > 0
+                  const objsWithoutTl = objects.filter(o => o.is_active && !o.objektleiter_id)
+                  const hasItems = pendingLeaves.length > 0 || newMaList.length > 0 || objsWithoutTl.length > 0
                   if (!hasItems) return null
                   return (
                     <div style={{ marginBottom:16, display:'flex', flexDirection:'column', gap:8 }}>
@@ -779,6 +780,24 @@ export default function Dashboard({ userName, onLogout }: Props) {
                           <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
                         </div>
                       )}
+                      {/* Objekte ohne Teamleiter */}
+                      {objsWithoutTl.length > 0 && (
+                        <div
+                          onClick={() => setTab('objekte')}
+                          style={{ display:'flex', alignItems:'center', gap:12, background:'var(--surf-card)', borderRadius:14, padding:'12px 16px', border:'1px solid var(--outline)', borderLeftWidth:3, borderLeftColor:'#dc2626', cursor:'pointer', transition:'background 0.15s' }}
+                          onMouseEnter={e=>(e.currentTarget.style.background='var(--surf-low)')}
+                          onMouseLeave={e=>(e.currentTarget.style.background='var(--surf-card)')}>
+                          <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:'#dc2626', flexShrink:0 }}>apartment</span>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)' }}>
+                              {objsWithoutTl.length} {objsWithoutTl.length === 1 ? 'Objekt ohne Teamleiter' : 'Objekte ohne Teamleiter'}
+                            </div>
+                            <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>Im Objekte-Tab Teamleiter zuweisen</div>
+                          </div>
+                          <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', flexShrink:0 }}>chevron_right</span>
+                        </div>
+                      )}
+
                       {/* Neue MA die Daten brauchen */}
                       {newMaList.map(ma => {
                         const ini2 = ma.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
@@ -1084,6 +1103,9 @@ export default function Dashboard({ userName, onLogout }: Props) {
                               <span style={{ flexShrink:0, fontSize:11, fontWeight:700, color:'var(--pri)', background:'var(--pri-xl)', borderRadius:99, padding:'2px 8px', display:'flex', alignItems:'center', gap:3 }}>
                                 <span className="material-symbols-outlined" style={{ fontSize:12 }}>task_alt</span>{activeTasks}
                               </span>
+                            )}
+                            {!obj.objektleiter_id && (
+                              <span style={{ flexShrink:0, fontSize:10, fontWeight:700, color:'#dc2626', background:'#fef2f2', borderRadius:99, padding:'2px 7px', border:'1px solid #fecaca' }}>Kein TL</span>
                             )}
                           </div>
                           {/* Zeile 2: OBJ-Nummer – immer feste Position */}
@@ -3474,7 +3496,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
 
   const canStep2 = objectId !== ''
   const canStep3 = title.trim() !== ''
-  const canSave  = assigneeId !== ''
+  const canSave  = true // Zuweisung optional – Teamleiter verteilt
 
   const save = async () => {
     setSaving(true); setError('')
@@ -3751,9 +3773,9 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
             </div>
 
             <div style={{ marginBottom:20 }}>
-              <label style={s.fieldLabel}>Zuständiger Mitarbeiter</label>
+              <label style={s.fieldLabel}>Standard-Mitarbeiter <span style={{ fontWeight:400, color:'var(--txt-muted)', fontSize:10 }}>(optional)</span></label>
               {team.filter(m=>m.role_name!=='admin').length === 0
-                ? <div style={{ fontSize:13, color:'var(--txt-muted)', padding:'12px 0' }}>Noch keine Mitarbeiter vorhanden. Lade zuerst Mitarbeiter ein.</div>
+                ? <div style={{ fontSize:13, color:'var(--txt-muted)', padding:'12px 0' }}>Noch keine Mitarbeiter vorhanden.</div>
                 : <div className="iw" style={s.inputWrap}>
                     <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
                     <select
@@ -3761,7 +3783,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
                       onChange={e=>setAssigneeId(e.target.value)}
                       style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:15, color: assigneeId ? 'var(--txt)' : 'var(--txt-muted)', cursor:'pointer', appearance:'none' }}
                     >
-                      <option value="">Mitarbeiter auswählen...</option>
+                      <option value="">Leer lassen → Teamleiter verteilt</option>
                       {team
                         .filter(m=>m.is_active && m.role_name!=='admin')
                         .map(m=>(
@@ -3772,6 +3794,7 @@ function CreateTaskOverlay({ categories, objects, team, templates, onClose, onSa
                     <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>expand_more</span>
                   </div>
               }
+              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:5 }}>Leer lassen wenn der Teamleiter die Zuweisung selbst vornimmt.</div>
             </div>
 
             {/* ── Terminplanung je Intervall ── */}
@@ -4154,11 +4177,11 @@ function EditTaskOverlay({ task, categories, objects, team, onClose, onSaved, is
 
         {/* Mitarbeiter */}
         <div style={{ marginBottom:12 }}>
-          <label style={s.fieldLabel}>Mitarbeiter</label>
+          <label style={s.fieldLabel}>Standard-Mitarbeiter <span style={{ fontWeight:400, color:'var(--txt-muted)', fontSize:10 }}>(optional)</span></label>
           <div className="iw" style={s.inputWrap}>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>person</span>
             <select value={assigneeId} onChange={e=>setAssigneeId(e.target.value)} style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', cursor:'pointer', appearance:'none' as any }}>
-              <option value="">Nicht zugewiesen</option>
+              <option value="">Leer lassen → Teamleiter verteilt</option>
               {team.map(m=><option key={m.id} value={m.id}>{m.full_name}</option>)}
             </select>
             <span className="material-symbols-outlined icon-sm" style={{ color:'var(--txt-muted)' }}>expand_more</span>

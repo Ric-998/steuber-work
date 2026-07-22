@@ -548,6 +548,10 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
         Dir wurden noch keine Objekte zugewiesen
       </div>
     )
+    // Unzugewiesene Assignments heute + demnächst (user_id null)
+    const unassignedAssigns = upcomingAssigns.filter((a:any) => !a.user_id)
+    const today = localToday()
+
     return (
       <>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
@@ -557,6 +561,41 @@ export default function TeamleiterDashboard({ userId, userName, onLogout }: Prop
             <span className="material-symbols-outlined" style={{ fontSize:17 }}>add</span>Neue Aufgabe
           </button>
         </div>
+
+        {/* ── Noch zu verteilen ── */}
+        {unassignedAssigns.length > 0 && (
+          <div style={{ marginBottom:20 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#92400e', textTransform:'uppercase' as const, letterSpacing:'0.09em' }}>Noch zu verteilen</div>
+              <span style={{ fontSize:11, fontWeight:800, background:'#f59e0b', color:'#fff', borderRadius:99, minWidth:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 5px' }}>{unassignedAssigns.length}</span>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column' as const, gap:6 }}>
+              {unassignedAssigns.map((a:any) => {
+                const taskObj = tasks.find((t:any) => t.id === a.task_id)
+                const obj = objects.find((o:any) => o.id === taskObj?.object_id)
+                const isToday = a.due_date === today
+                return (
+                  <div key={a.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', background:'#fffbeb', borderRadius:12, border:'1.5px solid #fbbf24' }}>
+                    <span style={{ fontSize:18, flexShrink:0 }}>{taskObj?.categories?.emoji || '📋'}</span>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{taskObj?.title || 'Aufgabe'}</div>
+                      <div style={{ fontSize:11, color:'#92400e', marginTop:2 }}>
+                        {isToday ? 'Heute' : fmtDate(a.due_date)} · {obj?.name || obj?.address || 'Objekt'}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setEditingAssign(taskObj); setAssignUser(''); setAssignDate(a.due_date) }}
+                      style={{ padding:'7px 11px', borderRadius:9, border:'none', background:'#f59e0b', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:4 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:14 }}>person_add</span>
+                      Einteilen
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {objects.map((obj:any) => {
           const objTasksList = tasks.filter((t:any)=>t.object_id===obj.id)
           if (objTasksList.length === 0) return null
