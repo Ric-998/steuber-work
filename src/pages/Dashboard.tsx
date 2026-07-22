@@ -7461,29 +7461,19 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
 
   return (
     <PageOverlay isDesktop={isDesktop} onClose={onClose}>
-      {/* Header – integrated profile */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom:'1px solid var(--outline)', background:'var(--surf-card)', flexShrink:0 }}>
-        <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', padding:4, borderRadius:8, display:'flex', color:'var(--txt)' }}>
-          <span className="material-symbols-outlined">arrow_back</span>
+
+      {/* Nav – Icon-only */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 16px', borderBottom:'1px solid var(--outline)', background:'var(--surf-card)', flexShrink:0 }}>
+        <button onClick={onClose} style={{ width:32, height:32, borderRadius:10, border:'none', background:'var(--surf-low)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize:18 }}>arrow_back</span>
         </button>
-        <div style={{ width:40, height:40, borderRadius:13, background:'var(--pri)', color:'#fff', fontSize:15, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-head)', flexShrink:0 }}>{ini}</div>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{member.full_name}</div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:3 }}>
-            <span style={{ fontSize:11, fontWeight:700, color: roleColor[role], background: roleBg[role], borderRadius:20, padding:'1px 8px' }}>{roleLabel[role]??role}</span>
-            <span style={{ fontSize:11, fontWeight:600, color: member.is_active ? 'var(--ok)' : 'var(--txt-muted)' }}>{member.is_active ? '● Aktiv' : '○ Inaktiv'}</span>
-          </div>
-        </div>
-        <button onClick={() => setShowExportModal(true)} title="Arbeitszeitnachweis" style={{ background:'var(--surf-low)', border:'1px solid var(--outline)', borderRadius:10, padding:'8px 10px', cursor:'pointer', color:'var(--txt)', display:'flex', alignItems:'center', flexShrink:0 }}>
-          <span className="material-symbols-outlined" style={{ fontSize:18 }}>download</span>
+        <div style={{ flex:1 }} />
+        <button onClick={() => setShowExportModal(true)} title="Arbeitszeitnachweis" style={{ width:32, height:32, borderRadius:10, border:'none', background:'var(--surf-low)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--txt)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize:17 }}>download</span>
         </button>
-        {member.admin_setup_done && (
-          <button onClick={() => { setEditMode(e => !e); setSaveErr('') }}
-            style={{ background: editMode ? 'var(--pri)' : 'var(--surf-low)', border:'none', borderRadius:10, padding:'8px 14px', cursor:'pointer', color: editMode ? '#fff' : 'var(--txt)', fontSize:13, fontWeight:700, display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16 }}>{editMode ? 'close' : 'edit'}</span>
-            {editMode ? 'Abbrechen' : 'Bearbeiten'}
-          </button>
-        )}
+        <button onClick={() => setConfirmDelete(true)} title="Mitarbeiter löschen" style={{ width:32, height:32, borderRadius:10, border:'none', background:'var(--surf-low)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--err-dot)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize:17 }}>delete</span>
+        </button>
       </div>
 
       {/* Export Modal */}
@@ -7527,9 +7517,43 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
         </div>
       )}
 
+      {/* Löschen-Bestätigung – Modal-Overlay */}
+      {confirmDelete && (
+        <div style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}
+          onClick={() => { setConfirmDelete(false); setDeleteErr('') }}>
+          <div style={{ width:'100%', maxWidth:320, background:'var(--surf-card)', borderRadius:22, padding:'20px 18px' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:8 }}>Mitarbeiter löschen?</div>
+            <p style={{ fontSize:13, color:'var(--txt-muted)', lineHeight:1.55, margin:'0 0 16px 0' }}>
+              Wirklich <strong>{member.full_name}</strong> unwiderruflich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+            </p>
+            {deleteErr && (
+              <div style={{ background:'var(--err-bg)', color:'var(--err-dot)', borderRadius:10, padding:'9px 12px', fontSize:13, marginBottom:12, display:'flex', gap:8, alignItems:'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:16, flexShrink:0 }}>error</span>{deleteErr}
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => { setConfirmDelete(false); setDeleteErr('') }}
+                style={{ flex:1, padding:'11px 0', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                Abbrechen
+              </button>
+              <button disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true); setDeleteErr('')
+                  try { await onDelete(member.id) }
+                  catch(e: any) { setDeleteErr(e.message); setDeleting(false); setConfirmDelete(false) }
+                }}
+                style={{ flex:1, padding:'11px 0', borderRadius:12, border:'none', background:'var(--err-dot)', color:'#fff', fontSize:13, fontWeight:700, cursor:deleting?'wait':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                {deleting ? <><span className="material-symbols-outlined" style={{ fontSize:15 }}>hourglass_empty</span>Löschen…</> : 'Ja, löschen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Body */}
-      <div style={{ height:0, flex:1, overflowY:'auto', padding:'16px 20px' }}>
-      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      <div style={{ height:0, flex:1, overflowY:'auto', padding:'12px 14px 28px' }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
 
         {/* Setup-Banner */}
         {!member.admin_setup_done && (
@@ -7542,67 +7566,69 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
           </div>
         )}
 
-        {/* Kontakt */}
-        {(member.phone || member.street || member.city) && (
-          <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
-            <div style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)' }}>Kontakt</div>
-            {member.phone ? (
-              <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', gap:10, borderBottom:(member.street||member.city)?'1px solid var(--outline)':'none' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)', flexShrink:0 }}>phone</span>
-                <span style={{ flex:1, fontSize:13, color:'var(--txt)' }}>{member.phone}</span>
-                <div style={{ display:'flex', gap:6 }}>
-                  <a href={`tel:${member.phone}`} style={{ display:'flex', alignItems:'center', gap:3, background:'var(--pri-xl)', color:'var(--pri)', borderRadius:8, padding:'5px 9px', textDecoration:'none', fontSize:11, fontWeight:700 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:14 }}>call</span>Anrufen
-                  </a>
-                  <a href={`sms:${member.phone}`} style={{ display:'flex', alignItems:'center', gap:3, background:'var(--surf-low)', color:'var(--txt)', borderRadius:8, padding:'5px 9px', textDecoration:'none', fontSize:11, fontWeight:700 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:14 }}>sms</span>SMS
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding:'10px 14px', fontSize:12, color:'var(--txt-muted)', fontStyle:'italic', borderBottom:(member.street||member.city)?'1px solid var(--outline)':'none' }}>Keine Telefonnummer hinterlegt</div>
-            )}
-            {(member.street || member.city) && (
-              <div style={{ padding:'10px 14px', display:'flex', alignItems:'center', gap:10 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)', flexShrink:0 }}>home</span>
-                <span style={{ fontSize:13, color:'var(--txt)' }}>
-                  {[member.street, member.postal_code && member.city ? `${member.postal_code} ${member.city}` : member.city].filter(Boolean).join(', ')}
+        {/* ── PROFIL-CARD (Person + Kontakt + Beschäftigung + Teamleiter) ── */}
+        <div style={{ background:'var(--surf-card)', borderRadius:22, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+
+          {/* Person */}
+          <div style={{ padding:'14px 16px 10px', display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:46, height:46, borderRadius:14, background:'var(--pri)', color:'#fff', fontSize:16, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontFamily:'var(--font-head)' }}>{ini}</div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:16, fontWeight:800, fontFamily:'var(--font-head)', color:'var(--txt)', lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{member.full_name}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:7, marginTop:4 }}>
+                <span style={{ fontSize:11, fontWeight:700, color: roleColor[role], background: roleBg[role], borderRadius:20, padding:'1px 8px' }}>{roleLabel[role]??role}</span>
+                <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, color:'var(--txt-muted)' }}>
+                  <span style={{ width:6, height:6, borderRadius:'50%', background: member.is_active ? 'var(--ok)' : 'var(--txt-muted)', display:'inline-block', flexShrink:0 }}/>
+                  {member.is_active ? 'Aktiv' : 'Inaktiv'}
                 </span>
               </div>
-            )}
+            </div>
           </div>
-        )}
 
-        {/* Beschäftigung */}
-        <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
-          <div style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <span>Beschäftigung</span>
-            {!editMode && member.admin_setup_done && (
-              <button onClick={() => { setEditMode(true); setSaveErr('') }}
-                style={{ background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'var(--pri)', padding:'2px 4px', borderRadius:6 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:13 }}>edit</span>Bearbeiten
+          {/* Kontakt inline */}
+          {member.phone && (
+            <div style={{ padding:'0 16px 9px', display:'flex', alignItems:'center', gap:10 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--txt-muted)', flexShrink:0 }}>phone</span>
+              <a href={`tel:${member.phone}`} style={{ fontSize:13, fontWeight:600, color:'var(--pri)', textDecoration:'none' }}>{member.phone}</a>
+            </div>
+          )}
+          {(member.street || member.city) && (
+            <div style={{ padding:'0 16px 12px', display:'flex', alignItems:'center', gap:10 }}>
+              <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--txt-muted)', flexShrink:0 }}>home</span>
+              <span style={{ fontSize:13, color:'var(--txt)', fontWeight:500 }}>
+                {[member.street, member.postal_code && member.city ? `${member.postal_code} ${member.city}` : member.city].filter(Boolean).join(', ')}
+              </span>
+            </div>
+          )}
+
+          {/* Trennlinie */}
+          <div style={{ height:1, background:'var(--outline)', margin:'0 14px' }} />
+
+          {/* Beschäftigung */}
+          <div style={{ padding:'11px 16px 6px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Beschäftigung</span>
+            {member.admin_setup_done && (
+              <button onClick={() => { setEditMode(e => !e); setSaveErr('') }}
+                style={{ border:'none', background:'none', cursor:'pointer', fontSize:11, fontWeight:700, color: editMode ? 'var(--txt-muted)' : 'var(--pri)', padding:'2px 0' }}>
+                {editMode ? 'Abbrechen' : 'Bearbeiten'}
               </button>
             )}
           </div>
 
           {editMode ? (
-            <div style={{ padding:'16px 14px', display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ padding:'8px 16px 16px', display:'flex', flexDirection:'column', gap:11 }}>
 
               <div>
-                <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>Beschäftigt seit</label>
-                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', flexShrink:0 }}>event</span>
-                  <input type="date" value={employedSince} onChange={e => setEmployedSince(e.target.value)}
-                    style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, color:'var(--txt)', fontFamily:'var(--font-body)', minWidth:0 }} />
-                </div>
+                <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Beschäftigt seit</label>
+                <input type="date" value={employedSince} onChange={e => setEmployedSince(e.target.value)}
+                  style={{ width:'100%', boxSizing:'border-box', padding:'9px 11px', borderRadius:10, border:'none', background:'var(--surf-low)', fontSize:13.5, color:'var(--txt)', outline:'none', fontFamily:'var(--font-body)' }} />
               </div>
 
               <div>
-                <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Arbeitstage</label>
-                <div style={{ display:'flex', gap:5 }}>
+                <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Arbeitstage</label>
+                <div style={{ display:'flex', gap:4 }}>
                   {WEEKDAYS.map(({key, label}) => (
                     <button key={key} type="button" onClick={() => toggleDay(key)}
-                      style={{ flex:1, padding:'8px 0', borderRadius:10, border:`1.5px solid ${workDays.includes(key)?'var(--pri)':'var(--outline)'}`, background: workDays.includes(key)?'var(--pri)':'var(--surf-card)', color: workDays.includes(key)?'#fff':'var(--txt-muted)', fontSize:12, fontWeight:700, cursor:'pointer', transition:'all 0.15s' }}>
+                      style={{ flex:1, padding:'8px 0', borderRadius:9, border:'none', background: workDays.includes(key) ? 'var(--pri)' : 'var(--surf-low)', color: workDays.includes(key) ? '#fff' : 'var(--txt-muted)', fontSize:12, fontWeight:700, cursor:'pointer', transition:'all 0.15s' }}>
                       {label}
                     </button>
                   ))}
@@ -7610,156 +7636,136 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
               </div>
 
               <div>
-                <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:6 }}>Arbeitsstunden</label>
+                <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Arbeitsstunden</label>
                 <div style={{ display:'flex', gap:6, marginBottom:8 }}>
                   {(['fest','variabel'] as const).map(t => (
                     <button key={t} type="button" onClick={() => setHoursType(t)}
-                      style={{ flex:1, padding:'9px 0', borderRadius:10, border:`1.5px solid ${hoursType===t?'var(--pri)':'var(--outline)'}`, background:hoursType===t?'var(--pri-xl)':'var(--surf-card)', color:hoursType===t?'var(--pri)':'var(--txt-muted)', fontSize:12, fontWeight:700, cursor:'pointer', transition:'all 0.15s', display:'flex', alignItems:'center', justifyContent:'center', gap:5 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:15 }}>{t === 'fest' ? 'schedule' : 'swap_vert'}</span>
+                      style={{ flex:1, padding:'9px 0', borderRadius:10, border:'none', background:hoursType===t?'var(--pri)':'var(--surf-low)', color:hoursType===t?'#fff':'var(--txt-muted)', fontSize:12, fontWeight:700, cursor:'pointer', transition:'all 0.15s' }}>
                       {t === 'fest' ? 'Fest' : 'Variabel'}
                     </button>
                   ))}
                 </div>
                 {hoursType === 'fest' && (
-                  <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', flexShrink:0 }}>schedule</span>
-                    <input type="number" min="1" max="60" value={hoursPerWeek} onChange={e => setHoursPerWeek(e.target.value)}
-                      placeholder="40" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, fontWeight:600, color:'var(--txt)', fontFamily:'var(--font-body)', minWidth:0 }} />
-                    <span style={{ fontSize:12, color:'var(--txt-muted)', flexShrink:0 }}>Std/Woche</span>
-                  </div>
+                  <input type="number" min="1" max="60" value={hoursPerWeek} onChange={e => setHoursPerWeek(e.target.value)}
+                    placeholder="40 Std/Woche"
+                    style={{ width:'100%', boxSizing:'border-box', padding:'9px 11px', borderRadius:10, border:'none', background:'var(--surf-low)', fontSize:13.5, fontWeight:600, color:'var(--txt)', outline:'none', fontFamily:'var(--font-body)' }} />
                 )}
                 {hoursType === 'variabel' && (
-                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'9px 12px', borderRadius:12, background:'var(--surf-low)', border:'1px solid var(--outline)' }}>
-                    Stunden werden flexibel erfasst – kein festes Wochenkontingent.
+                  <div style={{ fontSize:12, color:'var(--txt-muted)', padding:'9px 11px', borderRadius:10, background:'var(--surf-low)' }}>
+                    Stunden werden flexibel erfasst.
                   </div>
                 )}
               </div>
 
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                 <div>
-                  <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>Stundenlohn</label>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', flexShrink:0 }}>euro</span>
-                    <input type="number" min="0" step="0.01" value={hourlyWage} onChange={e => setHourlyWage(e.target.value)}
-                      placeholder="13.00" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, fontWeight:600, color:'var(--txt)', fontFamily:'var(--font-body)', minWidth:0, width:'100%' }} />
-                  </div>
-                  <div style={{ fontSize:10, color:'var(--txt-muted)', marginTop:3 }}>€/Stunde</div>
+                  <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Stundenlohn</label>
+                  <input type="number" min="0" step="0.01" value={hourlyWage} onChange={e => setHourlyWage(e.target.value)}
+                    placeholder="13.00 €"
+                    style={{ width:'100%', boxSizing:'border-box', padding:'9px 11px', borderRadius:10, border:'none', background:'var(--surf-low)', fontSize:13.5, fontWeight:600, color:'var(--txt)', outline:'none', fontFamily:'var(--font-body)' }} />
                 </div>
                 <div>
-                  <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:5 }}>Urlaubstage</label>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', flexShrink:0 }}>beach_access</span>
-                    <input type="number" min="0" max="365" value={vacationDays} onChange={e => setVacationDays(e.target.value)}
-                      placeholder="30" style={{ flex:1, border:'none', outline:'none', background:'transparent', fontSize:14, fontWeight:600, color:'var(--txt)', fontFamily:'var(--font-body)', minWidth:0, width:'100%' }} />
-                  </div>
-                  <div style={{ fontSize:10, color:'var(--txt-muted)', marginTop:3 }}>Tage/Jahr</div>
+                  <label style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:5 }}>Urlaubstage</label>
+                  <input type="number" min="0" max="365" value={vacationDays} onChange={e => setVacationDays(e.target.value)}
+                    placeholder="30 Tage"
+                    style={{ width:'100%', boxSizing:'border-box', padding:'9px 11px', borderRadius:10, border:'none', background:'var(--surf-low)', fontSize:13.5, fontWeight:600, color:'var(--txt)', outline:'none', fontFamily:'var(--font-body)' }} />
                 </div>
               </div>
 
               {saveErr && <div style={{ background:'var(--err-bg)', color:'var(--err)', borderRadius:10, padding:'9px 12px', fontSize:13, display:'flex', gap:8, alignItems:'center' }}>
                 <span className="material-symbols-outlined" style={{ fontSize:15 }}>error</span>{saveErr}
               </div>}
-              <button onClick={handleSave} disabled={saving} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:13, borderRadius:12, border:'none', background:'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)', color:'#fff', fontSize:14, fontWeight:700, cursor:'pointer', boxShadow:'0 4px 14px rgba(9,106,112,0.2)', opacity:saving?0.7:1 }}>
-                <span className="material-symbols-outlined icon-sm">{saving?'hourglass_empty':'save'}</span>
+              <button onClick={handleSave} disabled={saving}
+                style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'11px 0', borderRadius:11, border:'none', background:'var(--pri)', color:'#fff', fontSize:13.5, fontWeight:700, cursor:'pointer', opacity:saving?0.7:1 }}>
                 {saving ? 'Wird gespeichert…' : 'Speichern'}
               </button>
             </div>
           ) : (
-            <div style={{ padding:'12px 14px', display:'flex', flexDirection:'column', gap:9 }}>
+            <div style={{ padding:'6px 16px 14px', display:'flex', flexDirection:'column', gap:7 }}>
               {[
-                { icon:'event', label:'Beschäftigt seit', value: member.employed_since
-                    ? new Date(member.employed_since).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})
-                    : null },
-                { icon:'schedule', label:'Arbeitszeit', value: member.work_hours_type === 'variabel' ? 'Variabel' : (member.work_hours_per_week ? `${member.work_hours_per_week} Std/Woche` : null) },
-                { icon:'euro', label:'Stundenlohn', value: member.hourly_wage ? `${Number(member.hourly_wage).toFixed(2)} €/Std` : null },
-                { icon:'beach_access', label:'Urlaubstage', value: `${member.vacation_days_per_year ?? 30} Tage/Jahr` },
+                { label:'Beschäftigt seit', value: member.employed_since ? new Date(member.employed_since).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : null },
+                { label:'Arbeitszeit', value: member.work_hours_type === 'variabel' ? 'Variabel' : (member.work_hours_per_week ? `${member.work_hours_per_week} Std/Woche` : null) },
+                { label:'Stundenlohn', value: member.hourly_wage ? `${Number(member.hourly_wage).toFixed(2)} €/Std` : null },
+                { label:'Urlaubstage', value: `${member.vacation_days_per_year ?? 30} Tage/Jahr` },
               ].map(row => (
-                <div key={row.label} style={{ display:'flex', alignItems:'center', gap:10, minHeight:26 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', width:18, flexShrink:0, textAlign:'center' }}>{row.icon}</span>
+                <div key={row.label} style={{ display:'flex', alignItems:'center', minHeight:22 }}>
                   <span style={{ fontSize:12, color:'var(--txt-muted)', width:104, flexShrink:0 }}>{row.label}</span>
-                  <span style={{ fontSize:13, fontWeight:600, color: row.value ? 'var(--txt)' : 'var(--txt-muted)', fontStyle: row.value ? 'normal' : 'italic' }}>
-                    {row.value ?? 'Nicht hinterlegt'}
-                  </span>
+                  <span style={{ fontSize:13, fontWeight:600, color: row.value ? 'var(--txt)' : 'var(--txt-muted)', fontStyle: row.value ? 'normal' : 'italic' }}>{row.value ?? 'Nicht hinterlegt'}</span>
                 </div>
               ))}
-              <div style={{ display:'flex', alignItems:'center', gap:10, minHeight:26 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--txt-muted)', width:18, flexShrink:0, textAlign:'center' }}>calendar_today</span>
+              <div style={{ display:'flex', alignItems:'center', minHeight:22 }}>
                 <span style={{ fontSize:12, color:'var(--txt-muted)', width:104, flexShrink:0 }}>Arbeitstage</span>
                 <div style={{ display:'flex', gap:3 }}>
-                  {WEEKDAYS.map(({key,label}) => {
+                  {WEEKDAYS.map(({key, label}) => {
                     const active = member.work_days?.includes(key)
-                    return <div key={key} style={{ width:24, height:22, borderRadius:6, fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', background: active?'var(--pri)':'var(--surf-low)', color: active?'#fff':'var(--txt-muted)' }}>{label}</div>
+                    return <div key={key} style={{ width:24, height:21, borderRadius:6, fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', background: active?'var(--pri)':'var(--surf-low)', color: active?'#fff':'var(--txt-muted)' }}>{label}</div>
                   })}
                 </div>
               </div>
-              <div style={{ marginTop:4, paddingTop:8, borderTop:'1px solid var(--outline)', fontSize:11, color:'var(--txt-muted)' }}>
-                App-Konto seit {memberSince}
-              </div>
+              <div style={{ marginTop:4, fontSize:11, color:'var(--txt-muted)' }}>App-Konto seit {memberSince}</div>
             </div>
           )}
-        </div>
 
-        {/* Teamleiter-Zuweisung */}
-        {role !== 'admin' && role !== 'teamleiter' && (
-          <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
-            <div style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)', display:'flex', alignItems:'center', gap:5 }}>
-              <span className="material-symbols-outlined" style={{ fontSize:14 }}>supervisor_account</span>
-              Teamleiter
-            </div>
-            <div style={{ padding:'12px 14px' }}>
-              {teamleiterList.length === 0 ? (
-                <div style={{ fontSize:13, color:'var(--txt-muted)', fontStyle:'italic' }}>Keine Teamleiter angelegt</div>
-              ) : (
-                <div style={{ position:'relative' }}>
-                  <select
-                    value={tlId}
-                    disabled={tlSaving}
-                    onChange={async e => {
-                      const newVal = e.target.value
-                      setTlId(newVal)
-                      setTlSaving(true)
-                      const { error } = await supabase.from('users').update({ teamleiter_id: newVal || null }).eq('id', member.id)
-                      setTlSaving(false)
-                      if (!error) onUpdated({ id: member.id, teamleiter_id: newVal || null } as any)
-                    }}
-                    style={{ width:'100%', padding:'9px 36px 9px 12px', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-low)', color:'var(--txt)', fontSize:13, fontWeight:600, appearance:'none', WebkitAppearance:'none', cursor:'pointer', outline:'none', opacity: tlSaving ? 0.6 : 1 }}>
-                    <option value="">Kein Teamleiter</option>
-                    {teamleiterList.map(tl => (
-                      <option key={tl.id} value={tl.id}>{tl.full_name}</option>
-                    ))}
-                  </select>
-                  <span className="material-symbols-outlined" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:18, color:'var(--txt-muted)', pointerEvents:'none' }}>
-                    {tlSaving ? 'hourglass_empty' : 'expand_more'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Zugeordnete Mitarbeiter (nur für Teamleiter) */}
-        {role === 'teamleiter' && teamWorkers !== undefined && (
-          <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
-            <div style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <span>Zugeordnete Mitarbeiter</span>
-              <span style={{ background:'var(--surf-low)', borderRadius:99, padding:'2px 8px', fontSize:11, fontWeight:600 }}>{teamWorkers.length}</span>
-            </div>
-            {teamWorkers.length === 0 ? (
-              <div style={{ padding:'12px 14px', fontSize:13, color:'var(--txt-muted)', fontStyle:'italic' }}>Noch keine Mitarbeiter zugeordnet</div>
-            ) : (
-              <div>
-                {teamWorkers.map((w, i) => (
-                  <div key={w.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 14px', borderBottom: i < teamWorkers.length-1 ? '1px solid var(--outline)' : 'none' }}>
-                    <div style={{ width:30, height:30, borderRadius:9, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>
-                      {w.full_name.split(' ').map((n: string)=>n[0]).join('').slice(0,2).toUpperCase()}
-                    </div>
-                    <div style={{ fontSize:13, fontWeight:600, color:'var(--txt)' }}>{w.full_name}</div>
+          {/* Teamleiter-Zuweisung (innerhalb Profil-Card) */}
+          {role !== 'admin' && role !== 'teamleiter' && (
+            <>
+              <div style={{ height:1, background:'var(--outline)', margin:'0 14px' }} />
+              <div style={{ padding:'11px 16px 14px' }}>
+                <span style={{ display:'block', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>Teamleiter</span>
+                {teamleiterList.length === 0 ? (
+                  <div style={{ fontSize:13, color:'var(--txt-muted)', fontStyle:'italic' }}>Keine Teamleiter angelegt</div>
+                ) : (
+                  <div style={{ position:'relative' }}>
+                    <select value={tlId} disabled={tlSaving}
+                      onChange={async e => {
+                        const newVal = e.target.value
+                        setTlId(newVal); setTlSaving(true)
+                        const { error } = await supabase.from('users').update({ teamleiter_id: newVal || null }).eq('id', member.id)
+                        setTlSaving(false)
+                        if (!error) onUpdated({ id: member.id, teamleiter_id: newVal || null } as any)
+                      }}
+                      style={{ width:'100%', boxSizing:'border-box', padding:'9px 36px 9px 11px', borderRadius:10, border:'none', background:'var(--surf-low)', color:'var(--txt)', fontSize:13, fontWeight:600, appearance:'none', WebkitAppearance:'none', cursor:'pointer', outline:'none', opacity: tlSaving ? 0.6 : 1 }}>
+                      <option value="">Kein Teamleiter</option>
+                      {teamleiterList.map(tl => (
+                        <option key={tl.id} value={tl.id}>{tl.full_name}</option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined" style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:16, color:'var(--txt-muted)', pointerEvents:'none' }}>
+                      {tlSaving ? 'hourglass_empty' : 'expand_more'}
+                    </span>
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
-        )}
+            </>
+          )}
+
+          {/* Zugeordnete Mitarbeiter (nur für Teamleiter) */}
+          {role === 'teamleiter' && teamWorkers !== undefined && (
+            <>
+              <div style={{ height:1, background:'var(--outline)', margin:'0 14px' }} />
+              <div style={{ padding:'11px 16px 14px' }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                  <span style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>Zugeordnete Mitarbeiter</span>
+                  <span style={{ background:'var(--surf-low)', borderRadius:99, padding:'2px 8px', fontSize:11, fontWeight:600, color:'var(--txt-muted)' }}>{teamWorkers.length}</span>
+                </div>
+                {teamWorkers.length === 0 ? (
+                  <div style={{ fontSize:13, color:'var(--txt-muted)', fontStyle:'italic' }}>Noch keine Mitarbeiter zugeordnet</div>
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                    {teamWorkers.map(w => (
+                      <div key={w.id} style={{ display:'flex', alignItems:'center', gap:10 }}>
+                        <div style={{ width:30, height:30, borderRadius:9, background:'var(--pri-xl)', color:'var(--pri)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:11, flexShrink:0 }}>
+                          {w.full_name.split(' ').map((n: string)=>n[0]).join('').slice(0,2).toUpperCase()}
+                        </div>
+                        <div style={{ fontSize:13, fontWeight:600, color:'var(--txt)' }}>{w.full_name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Zeiterfassung & Urlaub */}
         {(() => {
@@ -7797,12 +7803,12 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
           const statusBg: Record<string,string>    = { ausstehend:'#fffbeb', genehmigt:'var(--ok-bg)', abgelehnt:'var(--err-bg)' }
 
           return (
-            <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
-              <div style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)' }}>
+            <div style={{ background:'var(--surf-card)', borderRadius:22, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div style={{ padding:'11px 16px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em', borderBottom:'1px solid var(--outline)' }}>
                 Zeiterfassung & Urlaub
               </div>
 
-              <div style={{ padding:'12px 14px', display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ padding:'12px 16px', display:'flex', flexDirection:'column', gap:12 }}>
 
                 <div style={{ display:'flex', gap:6 }}>
                   {years.map(y => (
@@ -7818,7 +7824,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
                 <div style={{ position:'relative' }}>
                   <select value={maStatsMonth ?? 'all'}
                     onChange={e => setMaStatsMonth(e.target.value === 'all' ? null : parseInt(e.target.value))}
-                    style={{ width:'100%', padding:'8px 36px 8px 12px', borderRadius:12, border:'1.5px solid var(--outline)',
+                    style={{ width:'100%', padding:'8px 36px 8px 11px', borderRadius:10, border:'none',
                       background:'var(--surf-low)', color:'var(--txt)', fontSize:13, fontWeight:700,
                       appearance:'none', WebkitAppearance:'none', cursor:'pointer', outline:'none' }}>
                     <option value="all">Gesamtes Jahr</option>
@@ -7831,16 +7837,13 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
 
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                   {[
-                    { icon:'beach_access', label:'Urlaub genommen', value:`${urlaubGenehmigt}`, color:'#0c8f85' },
-                    { icon:'hourglass_empty', label:'Ausstehend', value:`${urlaubPending}`, color:'#f59e0b' },
-                    { icon:'sick', label:'Kranktage', value:`${kranktage}`, color:'var(--err)' },
-                    { icon:'task_alt', label:'Aufgaben erledigt', value:`${maDoneCount}`, color:'var(--ok)' },
+                    { label:'Urlaub genommen', value:urlaubGenehmigt, color:'var(--pri)' },
+                    { label:'Ausstehend', value:urlaubPending, color:'#f59e0b' },
+                    { label:'Kranktage', value:kranktage, color:'var(--err)' },
+                    { label:'Aufgaben erledigt', value:maDoneCount, color:'var(--ok)' },
                   ].map(kpi => (
-                    <div key={kpi.label} style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px 10px', display:'flex', flexDirection:'column', gap:4 }}>
-                      <div style={{ width:28, height:28, borderRadius:8, background:kpi.color+'22', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        <span className="material-symbols-outlined icon-fill" style={{ fontSize:16, color:kpi.color }}>{kpi.icon}</span>
-                      </div>
-                      <div style={{ fontSize:20, fontWeight:800, color:'var(--txt)', fontFamily:'var(--font-head)', lineHeight:1 }}>{kpi.value}</div>
+                    <div key={kpi.label} style={{ background:'var(--surf-low)', borderRadius:12, padding:'12px 12px 10px' }}>
+                      <div style={{ fontSize:22, fontWeight:800, color:kpi.color, fontFamily:'var(--font-head)', lineHeight:1, marginBottom:4 }}>{kpi.value}</div>
                       <div style={{ fontSize:10, color:'var(--txt-muted)', fontWeight:600 }}>{kpi.label}</div>
                     </div>
                   ))}
@@ -7867,7 +7870,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
                   const recentLeaves = filtLeaves.filter(l => new Date(l.to_date) >= thirtyDaysAgo)
                   return recentLeaves.length > 0 && (
                   <div>
-                    <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:7 }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:7 }}>
                       Antragshistorie
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -7886,7 +7889,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
                                 {l.type==='urlaub'?'Urlaub':'Krankmeldung'} · {days} {days===1?'Tag':'Tage'}
                               </div>
                               <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{from} – {to}</div>
-                              {l.note && <div style={{ fontSize:11, color:'var(--txt-sec)', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.note}</div>}
+                              {l.note && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.note}</div>}
                             </div>
                             <span style={{ fontSize:11, fontWeight:700, color: statusColor[l.status], background: statusBg[l.status], borderRadius:20, padding:'3px 10px', flexShrink:0 }}>
                               {statusLabel[l.status]}
@@ -7899,7 +7902,7 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
                   )
                 })()}
                 {filtLeaves.filter(l => new Date(l.to_date) >= (() => { const d=new Date(); d.setDate(d.getDate()-30); return d; })()).length === 0 && (
-                  <div style={{ textAlign:'center', padding:'12px 0', color:'var(--txt-muted)', fontSize:13 }}>
+                  <div style={{ textAlign:'center', padding:'8px 0', color:'var(--txt-muted)', fontSize:13 }}>
                     Keine Einträge für diesen Zeitraum
                   </div>
                 )}
@@ -7909,24 +7912,23 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
         })()}
 
         {/* Rolle */}
-        <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
-          <div style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)' }}>Rolle</div>
-          <div style={{ padding:'12px 14px', display:'flex', flexDirection:'column', gap:10 }}>
+        <div style={{ background:'var(--surf-card)', borderRadius:22, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ padding:'11px 16px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.07em', borderBottom:'1px solid var(--outline)' }}>Rolle</div>
+          <div style={{ padding:'12px 16px', display:'flex', flexDirection:'column', gap:10 }}>
             <div style={{ display:'flex', gap:6 }}>
               {([
-                {val:'mitarbeiter', label:'Mitarbeiter', icon:'badge'},
-                {val:'teamleiter',  label:'Teamleiter',  icon:'manage_accounts'},
-                {val:'admin',       label:'Admin',        icon:'admin_panel_settings'},
-                {val:'support',     label:'Support',      icon:'support_agent'},
+                {val:'mitarbeiter', label:'Mitarbeiter'},
+                {val:'teamleiter',  label:'Teamleiter'},
+                {val:'admin',       label:'Admin'},
+                {val:'support',     label:'Support'},
               ] as const).map(r => {
                 const isActive = currentRole === r.val
                 return (
                   <button key={r.val} onClick={() => handleRoleChange(r.val)} disabled={roleChanging}
-                    style={{ flex:1, padding:'9px 4px', borderRadius:10, border:`1.5px solid ${isActive?'var(--pri)':'var(--outline)'}`,
-                      background: isActive?'var(--pri-xl)':'transparent', color: isActive?'var(--pri)':'var(--txt-muted)',
-                      fontWeight:700, fontSize:11, cursor:roleChanging?'wait':'pointer',
-                      display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:3, transition:'all 0.15s' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:18 }}>{r.icon}</span>
+                    style={{ flex:1, padding:'9px 4px', borderRadius:10, border:'none',
+                      background: isActive ? 'var(--pri)' : 'var(--surf-low)',
+                      color: isActive ? '#fff' : 'var(--txt-muted)',
+                      fontWeight:700, fontSize:11, cursor:roleChanging?'wait':'pointer', transition:'all 0.15s' }}>
                     {r.label}
                   </button>
                 )
@@ -7948,92 +7950,37 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDel
           </div>
         </div>
 
-        {/* App-Zugang */}
-        <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', border:'1px solid var(--outline)' }}>
-          <div style={{ padding:'9px 14px', fontSize:10, fontWeight:700, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'0.08em', borderBottom:'1px solid var(--outline)' }}>App-Zugang</div>
-          <div style={{ padding:'12px 14px' }}>
-            <p style={{ fontSize:13, color:'var(--txt-sec)', lineHeight:1.5, marginBottom:10 }}>
-              {member.is_active
-                ? 'Mitarbeiter hat aktuell Zugang zur App und kann Aufgaben sehen und bearbeiten.'
-                : 'Mitarbeiter hat keinen App-Zugang mehr. Alle Daten bleiben erhalten.'}
-            </p>
+        {/* App-Zugang – flache Card, kein separater Löschen-Block */}
+        <div style={{ background:'var(--surf-card)', borderRadius:16, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18, color: member.is_active ? 'var(--ok)' : 'var(--txt-muted)', flexShrink:0 }}>
+              {member.is_active ? 'check_circle' : 'block'}
+            </span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:'var(--txt)' }}>App-Zugang</div>
+              <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:1 }}>
+                {member.is_active ? 'Aktiv – Mitarbeiter kann sich anmelden' : 'Entzogen – kein Login möglich'}
+              </div>
+            </div>
             {!confirmDeactivate ? (
               <button onClick={() => setConfirmDeactivate(true)}
-                style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 14px', borderRadius:12, border:`1.5px solid ${member.is_active?'var(--err-dot)':'var(--ok)'}`, background:'transparent', color: member.is_active?'var(--err-dot)':'var(--ok)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                <span className="material-symbols-outlined icon-sm">{member.is_active?'block':'check_circle'}</span>
-                {member.is_active ? 'Zugang entziehen' : 'Zugang wiederherstellen'}
+                style={{ flexShrink:0, padding:'7px 13px', borderRadius:10, border:'none', background:'var(--surf-low)', color: member.is_active ? 'var(--err-dot)' : 'var(--ok)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                {member.is_active ? 'Entziehen' : 'Wiederherstellen'}
               </button>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                <div style={{ background: member.is_active ? 'var(--err-bg)' : 'var(--ok-bg)', borderRadius:12, padding:'10px 12px', fontSize:13, color: member.is_active ? 'var(--err)' : 'var(--ok)', display:'flex', gap:8 }}>
-                  <span className="material-symbols-outlined icon-sm icon-fill">{member.is_active?'warning':'info'}</span>
-                  {member.is_active
-                    ? `Wirklich Zugang für ${member.full_name} entziehen? MA kann sich nicht mehr anmelden.`
-                    : `Zugang für ${member.full_name} wiederherstellen?`}
-                </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={() => setConfirmDeactivate(false)} style={{ flex:1, padding:'9px 0', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:13, fontWeight:700, cursor:'pointer' }}>Abbrechen</button>
-                  <button onClick={() => { onToggleActive(); setConfirmDeactivate(false) }}
-                    style={{ flex:1, padding:'9px 0', borderRadius:12, border:'none', background: member.is_active ? 'var(--err-dot)' : 'var(--ok)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                    {member.is_active ? 'Entziehen' : 'Wiederherstellen'}
-                  </button>
-                </div>
+              <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                <button onClick={() => setConfirmDeactivate(false)}
+                  style={{ padding:'7px 11px', borderRadius:10, border:'none', background:'var(--surf-low)', color:'var(--txt-muted)', fontSize:12, fontWeight:700, cursor:'pointer' }}>Nein</button>
+                <button onClick={() => { onToggleActive(); setConfirmDeactivate(false) }}
+                  style={{ padding:'7px 13px', borderRadius:10, border:'none', background: member.is_active ? 'var(--err-dot)' : 'var(--ok)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+                  {member.is_active ? 'Entziehen' : 'Ja'}
+                </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Löschen-Zone */}
-        <div style={{ marginTop:4, background:'var(--surf-card)', borderRadius:16, border:'1.5px solid var(--err-dot)', overflow:'hidden' }}>
-          <div style={{ padding:'10px 14px', borderBottom:'1px solid #ffdad6', display:'flex', alignItems:'center', gap:7 }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--err-dot)' }}>delete_forever</span>
-            <div style={{ fontSize:13, fontWeight:700, color:'var(--err-dot)', fontFamily:'var(--font-head)' }}>Mitarbeiter löschen</div>
-          </div>
-          <div style={{ padding:'12px 14px' }}>
-            <p style={{ fontSize:13, color:'var(--txt-sec)', lineHeight:1.5, marginBottom:10 }}>
-              Account und alle zugehörigen Daten werden unwiderruflich gelöscht. Aufgaben bleiben erhalten, werden aber keiner Person mehr zugewiesen.
-            </p>
-            {deleteErr && (
-              <div style={{ background:'var(--err-bg)', color:'var(--err-dot)', borderRadius:10, padding:'9px 12px', fontSize:13, marginBottom:10, display:'flex', gap:8 }}>
-                <span className="material-symbols-outlined" style={{ fontSize:16, flexShrink:0 }}>error</span>{deleteErr}
-              </div>
-            )}
-            {!confirmDelete ? (
-              <button onClick={() => setConfirmDelete(true)}
-                style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 14px', borderRadius:12, border:'1.5px solid var(--err-dot)', background:'transparent', color:'var(--err-dot)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:17 }}>delete</span>
-                Endgültig löschen
-              </button>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                <div style={{ background:'var(--err-bg)', borderRadius:12, padding:'10px 12px', fontSize:13, color:'var(--err-dot)', display:'flex', gap:8 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize:16, flexShrink:0, marginTop:1 }}>warning</span>
-                  <span>Wirklich <strong>{member.full_name}</strong> unwiderruflich löschen? Diese Aktion kann nicht rükgängig gemacht werden.</span>
-                </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={() => { setConfirmDelete(false); setDeleteErr('') }}
-                    style={{ flex:1, padding:'9px 0', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                    Abbrechen
-                  </button>
-                  <button
-                    disabled={deleting}
-                    onClick={async () => {
-                      setDeleting(true); setDeleteErr('')
-                      try { await onDelete(member.id) }
-                      catch(e: any) { setDeleteErr(e.message); setDeleting(false); setConfirmDelete(false) }
-                    }}
-                    style={{ flex:1, padding:'9px 0', borderRadius:12, border:'none', background:'var(--err-dot)', color:'#fff', fontSize:13, fontWeight:700, cursor:deleting?'wait':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                    {deleting
-                      ? <><span className="material-symbols-outlined" style={{ fontSize:16 }}>hourglass_empty</span>Löschen…</>
-                      : <><span className="material-symbols-outlined" style={{ fontSize:16 }}>delete_forever</span>Ja, löschen</>}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div style={{ height:12 }} />
+        <div style={{ height:8 }} />
       </div>
       </div>
     </PageOverlay>
