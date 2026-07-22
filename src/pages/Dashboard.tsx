@@ -1195,51 +1195,46 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 <span className="material-symbols-outlined" style={{ fontSize:40, display:'block', marginBottom:8, opacity:0.4 }}>group</span>
                 Noch keine Mitarbeiter
               </div>
-            ) : [...team].sort((a,b)=>a.full_name.localeCompare(b.full_name,'de')).map(m => {
-              const role = m.role_name || 'mitarbeiter'
-              const ini = m.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
-              const roleColor: Record<string,string> = { admin:'#7c3aed', teamleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
-              const roleBg: Record<string,string> = { admin:'#f3e8ff', teamleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
-              return (
-                <div key={m.id}
-                  onClick={() => setSelectedMember(m)}
-                  style={{ ...s.taskCard, opacity: m.is_active ? 1 : 0.55, cursor:'pointer', transition:'box-shadow 0.15s' }}
-                  onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 16px rgba(9,106,112,0.12)')}
-                  onMouseLeave={e => (e.currentTarget.style.boxShadow=(s.taskCard as any).boxShadow||'0 1px 4px rgba(0,0,0,0.06)')}
-                >
-                  {/* Avatar + Live-Dot */}
-                  <div style={{ position:'relative', flexShrink:0 }}>
-                    <div style={{ width:44, height:44, borderRadius:14, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:14, fontFamily:'var(--font-head)', boxShadow: m.is_active ? '0 4px 10px rgba(9,106,112,0.25)' : 'none' }}>{ini}</div>
-                    {activeWorkerIds.has(m.id) && (
-                      <span style={{ position:'absolute', bottom:1, right:1, width:11, height:11, borderRadius:'50%', background:'#22c55e', border:'2px solid var(--surf-card)', animation:'livePulse 1.8s ease-in-out infinite' }}/>
-                    )}
-                  </div>
-                  {/* Info */}
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:700, fontFamily:'var(--font-head)', color:'var(--txt)', marginBottom:4, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
-                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                      <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:700, color: roleColor[role]||'var(--pri)', background: roleBg[role]||'var(--pri-xl)', borderRadius:20, padding:'3px 8px' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:12 }}>badge</span>{ROLE_LABELS[role]||role}
-                      </span>
-                      {activeWorkerIds.has(m.id) && (
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'#15803d', background:'#dcfce7', borderRadius:20, padding:'3px 8px' }}>
-                          <span style={{ width:6, height:6, borderRadius:'50%', background:'#22c55e', display:'inline-block', animation:'livePulse 1.8s ease-in-out infinite' }}/>
-                          In Arbeit
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns: isDesktop ? 'repeat(auto-fill,minmax(280px,1fr))' : '1fr', gap:8 }}>
+                {[...team].sort((a,b)=>a.full_name.localeCompare(b.full_name,'de')).map(m => {
+                  const role = m.role_name || 'mitarbeiter'
+                  const ini = m.full_name.split(' ').map((n:string)=>n[0]).join('').slice(0,2).toUpperCase()
+                  const roleColor: Record<string,string> = { admin:'#7c3aed', teamleiter:'#0369a1', mitarbeiter:'var(--pri)', support:'#dc2626' }
+                  const roleBg: Record<string,string> = { admin:'#f3e8ff', teamleiter:'#e0f2fe', mitarbeiter:'var(--pri-xl)', support:'#fef2f2' }
+                  return (
+                    <div key={m.id}
+                      onClick={() => setSelectedMember(m)}
+                      style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--surf-card)', borderRadius:14, border:'1px solid var(--outline)', opacity: m.is_active ? 1 : 0.55, cursor:'pointer', transition:'box-shadow 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.boxShadow='0 4px 16px rgba(9,106,112,0.10)')}
+                      onMouseLeave={e => (e.currentTarget.style.boxShadow='none')}
+                    >
+                      {/* Avatar */}
+                      <div style={{ position:'relative', flexShrink:0 }}>
+                        <div style={{ width:40, height:40, borderRadius:12, background: m.is_active ? 'linear-gradient(135deg,var(--pri) 0%,var(--pri-c) 100%)' : 'var(--surf-high)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:13, fontFamily:'var(--font-head)' }}>{ini}</div>
+                        {activeWorkerIds.has(m.id) && (
+                          <span style={{ position:'absolute', bottom:0, right:0, width:10, height:10, borderRadius:'50%', background:'#22c55e', border:'2px solid var(--surf-card)' }}/>
+                        )}
+                      </div>
+                      {/* Info */}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{m.full_name}</div>
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, fontWeight:600, color: roleColor[role]||'var(--pri)', background: roleBg[role]||'var(--pri-xl)', borderRadius:99, padding:'2px 7px', marginTop:3 }}>
+                          {ROLE_LABELS[role]||role}
                         </span>
-                      )}
+                      </div>
+                      {/* Status */}
+                      <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                        <span style={{ fontSize:11, fontWeight:600, color: m.is_active ? 'var(--ok)' : 'var(--txt-muted)', background: m.is_active ? 'var(--ok-bg)' : 'var(--surf-high)', borderRadius:99, padding:'2px 8px' }}>
+                          {m.is_active ? 'Aktiv' : 'Inaktiv'}
+                        </span>
+                        <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--txt-muted)' }}>chevron_right</span>
+                      </div>
                     </div>
-                  </div>
-                  {/* Status + Chevron */}
-                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-                    <span style={{ fontSize:11, fontWeight:700, color: m.is_active ? 'var(--ok)' : 'var(--txt-muted)', background: m.is_active ? 'var(--ok-bg)' : 'var(--surf-high)', borderRadius:20, padding:'3px 8px', display:'flex', alignItems:'center', gap:3 }}>
-                      <span className="material-symbols-outlined icon-fill" style={{ fontSize:12 }}>{m.is_active ? 'check_circle' : 'block'}</span>
-                      {m.is_active ? 'Aktiv' : 'Inaktiv'}
-                    </span>
-                    <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--txt-muted)' }}>chevron_right</span>
-                  </div>
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            )}
 
             {/* ── Urlaubssperren ── */}
             <div style={{ marginTop:28 }}>
@@ -1263,15 +1258,13 @@ export default function Dashboard({ userName, onLogout }: Props) {
               ) : (
                 <div>
                   {blackouts.map((b:any) => (
-                    <div key={b.id} style={{ background:'#fef2f2', borderRadius:14, padding:'12px 16px', marginBottom:8, border:'1.5px solid #fca5a5', display:'flex', alignItems:'center', gap:12 }}>
-                      <div style={{ width:38, height:38, borderRadius:12, background:'#fee2e2', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                        <span className="material-symbols-outlined icon-fill" style={{ fontSize:20, color:'#dc2626' }}>block</span>
-                      </div>
+                    <div key={b.id} style={{ background:'#fef2f2', borderRadius:12, padding:'10px 14px', marginBottom:6, border:'1px solid #fca5a5', display:'flex', alignItems:'center', gap:10 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:16, color:'#dc2626', flexShrink:0 }}>block</span>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:14, fontWeight:700, color:'#991b1b' }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:'#991b1b' }}>
                           {new Date(b.from_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})} – {new Date(b.to_date).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})}
                         </div>
-                        {b.reason && <div style={{ fontSize:12, color:'#dc2626', marginTop:1 }}>{b.reason}</div>}
+                        {b.reason && <div style={{ fontSize:11, color:'#dc2626', marginTop:1 }}>{b.reason}</div>}
                       </div>
                       <button onClick={async()=>{
                         if (!confirm('Sperre entfernen?')) return
