@@ -1599,29 +1599,30 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 const unassigned = tasks.filter(t => t.is_active && !t.default_assignee_id && (t.due_date??'')<= todayStr && (!t.end_date || t.end_date >= todayStr))
                 if (unassigned.length === 0) return null
                 return (
-                  <div style={{ background:'#fff8e6', border:'1px solid #f59e0b', borderRadius:16, marginBottom:16, overflow:'hidden', maxWidth: isDesktop ? 600 : '100%' }}>
-                    {/* Header */}
-                    <div style={{ display:'flex', gap:10, alignItems:'center', padding:'12px 16px', borderBottom: unassigned.length > 0 ? '1px solid #fde68a' : 'none' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:18, color:'#b45309', flexShrink:0 }}>warning</span>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>
-                          {unassigned.length === 1 ? '1 Aufgabe ohne Mitarbeiter' : `${unassigned.length} Aufgaben ohne Mitarbeiter`}
-                        </div>
-                        <div style={{ fontSize:11, color:'#b45309', marginTop:1 }}>Aufgabe öffnen um Mitarbeiter zuzuweisen</div>
-                      </div>
+                  <div style={{ marginBottom:16, maxWidth: isDesktop ? 600 : '100%' }}>
+                    {/* Kompakter Hinweis-Chip */}
+                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:10, background:'#fef3c7', marginBottom:10 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:16, color:'#d97706', flexShrink:0 }}>warning</span>
+                      <span style={{ fontSize:12, fontWeight:700, color:'#92400e', flex:1 }}>
+                        {unassigned.length === 1 ? '1 Aufgabe ohne zugewiesenen Mitarbeiter' : `${unassigned.length} Aufgaben ohne zugewiesenen Mitarbeiter`}
+                      </span>
                     </div>
-                    {/* Task-Zeilen */}
-                    {unassigned.map((t: any, i: number) => (
-                      <button key={t.id} onClick={() => setEditTask(t)}
-                        style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom: i < unassigned.length-1 ? '1px solid #fde68a' : 'none', background:'transparent', cursor:'pointer', textAlign:'left' as const }}>
-                        <span style={{ fontSize:16, flexShrink:0, lineHeight:1 }}>{t.categories?.emoji || '📋'}</span>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:13, fontWeight:700, color:'#92400e', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' as const }}>{t.title}</div>
-                          {t.objects?.address && <div style={{ fontSize:11, color:'#b45309', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' as const }}>{t.objects.address}</div>}
-                        </div>
-                        <span className="material-symbols-outlined" style={{ fontSize:15, color:'#b45309', flexShrink:0, opacity:0.7 }}>arrow_forward</span>
-                      </button>
-                    ))}
+                    {/* Aufgaben als eigenständige Cards */}
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {unassigned.map((t: any) => (
+                        <button key={t.id} onClick={() => setEditTask(t)}
+                          style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:12, border:'none', background:'var(--surf-card)', cursor:'pointer', textAlign:'left' as const, boxShadow:'0 1px 2px rgba(0,0,0,0.05)' }}>
+                          <div style={{ width:34, height:34, borderRadius:9, background:'#fff8e1', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16, lineHeight:1 }}>
+                            {t.categories?.emoji || '📋'}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:700, color:'var(--txt)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' as const }}>{t.title}</div>
+                            {t.objects?.address && <div style={{ fontSize:11, color:'var(--txt-muted)', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' as const }}>{t.objects.address}</div>}
+                          </div>
+                          <span style={{ fontSize:11, fontWeight:700, color:'#d97706', flexShrink:0, background:'#fef3c7', padding:'3px 8px', borderRadius:6 }}>Zuweisen</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )
               })()}
