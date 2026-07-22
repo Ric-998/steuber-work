@@ -1599,30 +1599,29 @@ export default function Dashboard({ userName, onLogout }: Props) {
                 const unassigned = tasks.filter(t => t.is_active && !t.default_assignee_id && (t.due_date??'')<= todayStr && (!t.end_date || t.end_date >= todayStr))
                 if (unassigned.length === 0) return null
                 return (
-                  <div style={{ background:'#fff8e6', border:'1px solid #f59e0b', borderRadius:14, padding:'14px 16px', marginBottom:16 }}>
-                    <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom: unassigned.length > 0 ? 10 : 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize:20, color:'#b45309', flexShrink:0 }}>warning</span>
+                  <div style={{ background:'#fff8e6', border:'1px solid #f59e0b', borderRadius:16, marginBottom:16, overflow:'hidden', maxWidth: isDesktop ? 600 : '100%' }}>
+                    {/* Header */}
+                    <div style={{ display:'flex', gap:10, alignItems:'center', padding:'12px 16px', borderBottom: unassigned.length > 0 ? '1px solid #fde68a' : 'none' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:18, color:'#b45309', flexShrink:0 }}>warning</span>
                       <div style={{ flex:1 }}>
                         <div style={{ fontSize:13, fontWeight:700, color:'#92400e' }}>
                           {unassigned.length === 1 ? '1 Aufgabe ohne Mitarbeiter' : `${unassigned.length} Aufgaben ohne Mitarbeiter`}
                         </div>
-                        <div style={{ fontSize:11, color:'#b45309', marginTop:1 }}>Tippe auf eine Aufgabe um einen Mitarbeiter zuzuweisen</div>
+                        <div style={{ fontSize:11, color:'#b45309', marginTop:1 }}>Aufgabe öffnen um Mitarbeiter zuzuweisen</div>
                       </div>
                     </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {unassigned.map((t: any) => (
-                        <button key={t.id} onClick={() => setEditTask(t)}
-                          style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:10, border:'1px solid #f59e0b', background:'rgba(255,255,255,0.6)', cursor:'pointer', textAlign:'left' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize:17, color:'#b45309', flexShrink:0 }}>{t.categories?.emoji ? undefined : 'task'}</span>
-                          {t.categories?.emoji && <span style={{ fontSize:16, flexShrink:0 }}>{t.categories.emoji}</span>}
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:13, fontWeight:700, color:'#92400e', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.title}</div>
-                            {t.objects?.address && <div style={{ fontSize:11, color:'#b45309', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.objects.address}</div>}
-                          </div>
-                          <span className="material-symbols-outlined" style={{ fontSize:16, color:'#b45309', flexShrink:0 }}>arrow_forward</span>
-                        </button>
-                      ))}
-                    </div>
+                    {/* Task-Zeilen */}
+                    {unassigned.map((t: any, i: number) => (
+                      <button key={t.id} onClick={() => setEditTask(t)}
+                        style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 16px', borderBottom: i < unassigned.length-1 ? '1px solid #fde68a' : 'none', background:'transparent', cursor:'pointer', textAlign:'left' as const }}>
+                        <span style={{ fontSize:16, flexShrink:0, lineHeight:1 }}>{t.categories?.emoji || '📋'}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'#92400e', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' as const }}>{t.title}</div>
+                          {t.objects?.address && <div style={{ fontSize:11, color:'#b45309', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' as const }}>{t.objects.address}</div>}
+                        </div>
+                        <span className="material-symbols-outlined" style={{ fontSize:15, color:'#b45309', flexShrink:0, opacity:0.7 }}>arrow_forward</span>
+                      </button>
+                    ))}
                   </div>
                 )
               })()}
