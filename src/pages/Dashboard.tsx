@@ -1978,6 +1978,19 @@ export default function Dashboard({ userName, onLogout }: Props) {
             toggleActive(selectedMember.id, selectedMember.is_active)
             setSelectedMember(prev => prev ? { ...prev, is_active: !prev.is_active } : null)
           }}
+          onDelete={async (userId) => {
+            const { data: { session } } = await supabase.auth.getSession()
+            const res = await fetch(`${(supabase as any).supabaseUrl}/functions/v1/delete-user`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+              body: JSON.stringify({ userId }),
+            })
+            const json = await res.json()
+            if (!res.ok) throw new Error(json.error || 'Fehler beim Löschen')
+            setTeam(prev => prev.filter(m => m.id !== userId))
+            setSelectedMember(null)
+            showToast('Mitarbeiter gelöscht', 'ok')
+          }}
         />
       )}
 
@@ -7221,15 +7234,19 @@ const WEEKDAYS = [
   { key:'do', label:'Do' }, { key:'fr', label:'Fr' }, { key:'sa', label:'Sa' },
 ]
 
-function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDesktop }: {
+function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, onDelete, isDesktop }: {
   member: TeamMember
   onClose: () => void
   onUpdated: (updated: Partial<TeamMember>) => void
   onToggleActive: () => void
+  onDelete: (userId: string) => Promise<void>
   isDesktop: boolean
 }) {
   const [saving, setSaving] = useState(false)
   const [confirmDeactivate, setConfirmDeactivate] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteErr, setDeleteErr] = useState('')
 
   // Editable fields
   const [employedSince, setEmployedSince] = useState(member.employed_since ?? '')
@@ -7875,6 +7892,56 @@ function MemberDetailOverlay({ member, onClose, onUpdated, onToggleActive, isDes
                   <button onClick={() => { onToggleActive(); setConfirmDeactivate(false) }}
                     style={{ flex:1, padding:'10px 0', borderRadius:12, border:'none', background: member.is_active ? 'var(--err-dot)' : 'var(--ok)', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer' }}>
                     {member.is_active ? 'Entziehen' : 'Wiederherstellen'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Löschen-Zone ── */}
+        <div style={{ marginTop:8, background:'var(--surf-card)', borderRadius:16, border:'1.5px solid var(--err-dot)', overflow:'hidden' }}>
+          <div style={{ padding:'12px 16px', borderBottom:'1px solid #ffdad6', display:'flex', alignItems:'center', gap:8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:17, color:'var(--err-dot)' }}>delete_forever</span>
+            <div style={{ fontSize:14, fontWeight:700, color:'var(--err-dot)', fontFamily:'var(--font-head)' }}>Mitarbeiter löschen</div>
+          </div>
+          <div style={{ padding:'14px 16px' }}>
+            <p style={{ fontSize:13, color:'var(--txt-sec)', lineHeight:1.5, marginBottom:12 }}>
+              Account und alle zugehörigen Daten werden unwiderruflich gelöscht. Aufgaben bleiben erhalten, werden aber keiner Person mehr zugewiesen.
+            </p>
+            {deleteErr && (
+              <div style={{ background:'var(--err-bg)', color:'var(--err-dot)', borderRadius:10, padding:'10px 12px', fontSize:13, marginBottom:12, display:'flex', gap:8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize:16, flexShrink:0 }}>error</span>{deleteErr}
+              </div>
+            )}
+            {!confirmDelete ? (
+              <button onClick={() => setConfirmDelete(true)}
+                style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 16px', borderRadius:12, border:'1.5px solid var(--err-dot)', background:'transparent', color:'var(--err-dot)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:17 }}>delete</span>
+                Endgültig löschen
+              </button>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                <div style={{ background:'var(--err-bg)', borderRadius:12, padding:'12px 14px', fontSize:13, color:'var(--err-dot)', display:'flex', gap:8 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:16, flexShrink:0, marginTop:1 }}>warning</span>
+                  <span>Wirklich <strong>{member.full_name}</strong> unwiderruflich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</span>
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => { setConfirmDelete(false); setDeleteErr('') }}
+                    style={{ flex:1, padding:'10px 0', borderRadius:12, border:'1.5px solid var(--outline)', background:'var(--surf-card)', color:'var(--txt)', fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                    Abbrechen
+                  </button>
+                  <button
+                    disabled={deleting}
+                    onClick={async () => {
+                      setDeleting(true); setDeleteErr('')
+                      try { await onDelete(member.id) }
+                      catch(e: any) { setDeleteErr(e.message); setDeleting(false); setConfirmDelete(false) }
+                    }}
+                    style={{ flex:1, padding:'10px 0', borderRadius:12, border:'none', background:'var(--err-dot)', color:'#fff', fontSize:13, fontWeight:700, cursor:deleting?'wait':'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                    {deleting
+                      ? <><span className="material-symbols-outlined" style={{ fontSize:16 }}>hourglass_empty</span>Löschen…</>
+                      : <><span className="material-symbols-outlined" style={{ fontSize:16 }}>delete_forever</span>Ja, löschen</>}
                   </button>
                 </div>
               </div>
